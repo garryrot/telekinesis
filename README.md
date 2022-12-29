@@ -118,9 +118,13 @@ If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyp
 
 First of all, because I can :3
 
-There have been several efforts to control toys with Skyrim in the past. Most of them read Papyrus log to control Vibration events. This projects tries a completely different approach to solve the problem from ground up by extending Papyrus.
+There have been several efforts to control toys with Skyrim in the past. Most of the solutions read Papyrus log to control Vibration events. This projects tries a completely different approach, solving the problem from ground up by extending Papyrus.
 
-My approach aimes to give the device control directoy to mods, while removing a potential dependency on external processes, that makes modding harder.
+This can server multiple purposes:
+
+- Give the device control back to Papyrus Scripts, not depending on any external agent to control the device
+- Easier setup by removing external processes
+- Very fast reaction time
 
 
 ## Changelog
