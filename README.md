@@ -104,39 +104,24 @@ Showcase of the sample Mod (Triggers vibration based on DD `OnVibrateEffectStart
 
 (*) More connection-managers be activated in later versions 
 
-
-## API
-
-[See TK_Telekinesis.psc]()
-
-#### 
-
-```cs
-scriptName TK_Telekinesis hidden
-bool function TK_ScanForDevices() global native
-int function TK_StartVibrateAll(Float speed) global nativ
-int function TK_StopVibrateAll() global native
-string function Tk_AwaitNextEvent() global native
-
-
-bool function Tk_Close() global native
-```
-
-## Why...
-
-### 
-
-### This has been done before, why do it again?
-
-There have been several efforts to control toys with Skyrim in the past. Most of them uread Papyrus log to control Vibration events. This projects tries a different approach to solve the problem from ground up by extending Papyrus:
-
 ## Troubleshooting
 
-If anything fails or behaves in an unexpected way, check the error log in th SKSE logs of this plugin `Telekinesis.SKSE.log` and `Telekinesis.Plug.log` 
+### Devices don't connect
 
-You can adapt logging level by editing `Telekinesis.yaml` (in `Data/SKSE/Plugins` next to your `Telekinesis.dll`)
+First, make sure that your device is couple correctly and works with Buttplug.io. You can [Intiface Central Desktop App](https://intiface.com/central) to test your device and verify that it actually works before proceeding.
 
-You can probably find them in `%USERPROFILE%/My Games/Sykrim Special Edition/SKSE/...`
+### Bug Reports
+
+If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyprus.0.log` and the Logs of this plugin (`Telekinesis.SKSE.log` and `Telekinesis.Plug.log`)
+
+* You will probably find them in `%USERPROFILE%/My Games/Sykrim Special Edition/SKSE/...`
+
+* If you can reproduce the issue, adapt the debug level by changing `Telekinesis.yaml` (in `Data/SKSE/Plugins` next to your `Telekinesis.dll`) and set everything to `trace`.
+
+
+## This has been done before, why do it again?
+
+There have been several efforts to control toys with Skyrim in the past. Most of them uread Papyrus log to control Vibration events. This projects tries a different approach to solve the problem from ground up by extending Papyrus:
 
 
 ## Changelog
