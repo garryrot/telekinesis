@@ -13,13 +13,10 @@ This is my humble attempt at creating Papyrus bindings for the famous buttplug.i
 
 >:warning: **EARLY TEST PROTOTYPE: THIS API WILL CHANGE** :warning:
 
-### 1. Install Telekinesis
+### 1. Installation
 
-**Depdendencies**
-
- - SKSE64
- - Skyrim SE/VR/AE
- - Address Library
+**Depdendencies**: SKSE64,  Skyrim SE/VR/AE and Address Library
+**Incompatibilities**:  Other mods that control Intiface/Or Buttplug.io in one way or the other might cause undefined behavior.
 
 ### 2 Connect and Scan
 
@@ -74,20 +71,18 @@ EndEvent
 ### 4. Shutting Down
 
 At one point the user will close the game or load a different safe. If possible, you should
-call `TK_StopVibrateAll` to stop all devices.
-
-In the worst case (i.e. if the user kills the game process while a vibration is running)
+call `TK_StopVibrateAll` to stop all devices. In the worst case (i.e. if the user kills the game process while a vibration is running)
 the `Stop Event` will be lost and the vibrating toys might need to be turned off manually.
 
-I don't know if there is any reliable event or hook to do this. Please tell me, if you know.
+ - I don't know if there is any reliable event or hook to do this. Please tell me, if you know.
 
+`TK_Close` will free up the associated memory resources. If the process dies, this happens
+anyways. After this, you can call `TK_ScanAndConnect` again to start all over again.
 ```cs
 TK_Telekinesis.TK_StopVibrateAll() // stop all devices
 TK_Telekinesis.TK_Close() // destroy the connection 
 ```
 
-`TK_Close` will free up the associated memory resources. If the process dies, this happens
-anyways. After this, you can call `TK_ScanAndConnect` again to start all over again.
 
 ## Demo
 
@@ -119,9 +114,13 @@ If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyp
 * If you can reproduce the issue, adapt the debug level by changing `Telekinesis.yaml` (in `Data/SKSE/Plugins` next to your `Telekinesis.dll`) and set everything to `trace`.
 
 
-## This has been done before, why do it again?
+## Why yet another bluetooth control?
 
-There have been several efforts to control toys with Skyrim in the past. Most of them uread Papyrus log to control Vibration events. This projects tries a different approach to solve the problem from ground up by extending Papyrus:
+First of all, because I can :3
+
+There have been several efforts to control toys with Skyrim in the past. Most of them read Papyrus log to control Vibration events. This projects tries a completely different approach to solve the problem from ground up by extending Papyrus.
+
+My approach aimes to give the device control directoy to mods, while removing a potential dependency on external processes, that makes modding harder.
 
 
 ## Changelog
