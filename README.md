@@ -1,16 +1,93 @@
-# Telekinesis
+# Telekinesis (Bluetooth Toy Control for Papyrus)
 
-This is my humble attempt at creating Papyrus bindings for the famous buttplug.io toy control. 
+This is my humble attempt at creating Papyrus bindings for the famous buttplug.io toy control framework. 
 
-**In a Nutshell:** This resource allows modders to control bluetooth toys (Vibrators, etc.) from within papyrus functions in Skyrim. This does not provide actual game content. If you are not a Skyrim Mod Developer it will do nothing for you, unless you also run a Mod that is making use of it.
+**In a Nutshell:** This SKSE64 plugin allowes modders to control bluetooth toys (Vibrators, etc.) from within Papyrus scripts. This does not provide actual game content. If you are not a Skyrim Mod Developer it will do nothing for you, unless you also run a Mod that is making use of it.
 
 ## Features
-
-There have been several efforts to control toys from within Skyrim Mods in the past, most of which use the Papyrus log to control Vibration events. This projects tries to solve the problem from ground up by extending Papyrus:
-
  * Very fast and reactive native implementation
- * Device control directly from within Papyrus Scripts scripts
- * No dependency on external processes or applications
+ * Toy control directly from within Papyrus
+ * No dependency on external processes, just install the ESP
+
+## Usage
+
+>:warning: **EARLY TEST PROTOTYPE: THIS API WILL CHANGE** :warning:
+
+### 1. Install Telekinesis
+
+**Depdendencies**
+
+ - SKSE64
+ - Skyrim SE/VR/AE
+ - Address Library
+
+### 2 Connect and Scan
+
+Start Telekinesis and scan for devices. This must be done once on every game startup (actually
+once for every game process). You most likely want to do this `OnInit` and `OnPlayerLoadGame`.
+
+```cs
+Actor property Player auto
+Event OnInit()
+    TK_Telekinesis.TK_ScanForDevices()
+    RegisterForUpdate(5) // for displaying updates (see section 3)
+EndEvent
+```
+
+If Telekinesis wasn't started, the other functions will not have any effect.
+
+### 2. Device Control
+
+Call `TK_StartVibrateAll(speed)` to vibrate all devices.
+
+```cs
+int vibrated = TK_Telekinesis.TK_StartVibrateAll(1.0) // speed can be any float from 0 to (1.0=full speed)
+Debug.Notification( "Vibrating" + vibrated + " device(s)..." )
+```
+
+Call `TK_StartVibrateAll(0)` to stop all devices
+
+```cs
+Util.Wait(5);
+int stopped = TK_Telekinesis.TK_StartVibrateAll(0) // 0 = stop vibrating
+Debug.Notification( "Stopping" + stopped + " device(s)..." )
+```
+
+
+If no devices are connected or the connection was not established, this will simply do nothing.
+
+#### 3. Monitoring Connected Devices
+
+You can poll `Tk_AwaitNextEvent` to see if any device connected or disconnected. This
+will return a message or the default string `""` (if nothing happened).
+
+```cs
+Event OnUpdate()
+    String evt = TK_Telekinesis.Tk_AwaitNextEvent()
+    If (evt != "")
+        Debug.Notification(evt) // If it says "Device XY connected" you are ready to go
+    EndIf
+EndEvent
+```
+
+
+### 4. Shutting Down
+
+At one point the user will close the game or load a different safe. If possible, you should
+call `TK_StopVibrateAll` to stop all devices.
+
+In the worst case (i.e. if the user kills the game process while a vibration is running)
+the `Stop Event` will be lost and the vibrating toys might need to be turned off manually.
+
+I don't know if there is any reliable event or hook to do this. Please tell me, if you know.
+
+```cs
+TK_Telekinesis.TK_StopVibrateAll() // stop all devices
+TK_Telekinesis.TK_Close() // destroy the connection 
+```
+
+`TK_Close` will free up the associated memory resources. If the process dies, this happens
+anyways. After this, you can call `TK_ScanAndConnect` again to start all over again.
 
 ## Demo
 
@@ -21,76 +98,37 @@ Showcase of the sample Mod (Triggers vibration based on DD `OnVibrateEffectStart
 ## Caveats & Known Issues
 
  * Only BluetoothLE Vibrators are activated right now (*)
-    - List of devices that might work: [IoST Index of Bluetooth Vibrators with Buttplug IO support](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
-
- * I only tested this on SE (v1.5.97.0) with the newest version of 
-
+    - [List of Devices that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
+ * I only tested this on SE (v1.5.97.0)
  * If you close or reload the game during a vibration event it may not stop until you turn off your device manually
 
 (*) More connection-managers be activated in later versions 
 
 
-## Installation (Mod Developers)
-
- - Download the latest Telekinesis.Version.7z and install it with your mod manager
- - This is also a dependency for your mod users
-
-**Depdendencies**
-
- - SKSE64
- - Skyrim SE/VR/AE
- - Address Library
-
-
 ## API
 
-ATTENTION: This is my first attempt at a prototype and is very likely to change in fundamental ways. 
+[See TK_Telekinesis.psc]()
 
-#### TK_Telekinesis.psc
+#### 
 
 ```cs
 scriptName TK_Telekinesis hidden
-
-// Sets up a new connection and starts scanning for devices. 
-// This will automatically connect to every single bluetooth
-// toy Buttplug.io knows about, and that is turned on and coupled to
-// you PCs bluetooth connection. Right now
-// the scanning will continue indefinitely, so new devices might be added at
-// any point in time automatically
 bool function TK_ScanForDevices() global native
-
-// Vibrate all devices that are currently connected.
-// Speed is any float between 0.0(=off) and 1.0 (=full power)
-// TK_StartVibrateAll( 0 ) should also be used for stopping the vibration,
-// as it provides a smoother experience than TK_StopVibrateAll
-// TODO: Rename to Tk_SetVibrationSpeed
-int function TK_StartVibrateAll(Float speed) global native
-
-// Immediately stops all connected devices
-// This should be used for shutdown, before calling Tk_Close.
-// TODO: Rename to Tk_StopAll
+int function TK_StartVibrateAll(Float speed) global nativ
 int function TK_StopVibrateAll() global native
-
-// Returns a stream of messages that describe
-// the status devices of devices, and whether they are
-// connecting or disconnecting.
-//
-// - Returns a new Event every time this is called.
-//  EXAMPLE:
-//  * "" (Empty string, if no new messages available)  
-//  * "Device YOUR_DEVICE connected" (This device is connected and will be controlled)
-//  * "Device YOUR_DEVICE disconnected" (This device should no longer get vibrated)
-//  
-// DISCLAIMER: The implementation is a really shitty hackjob right now and will
-// only return one event at a time (and even drop some). When multiple
-// Mods consume this, they will steal each others events
 string function Tk_AwaitNextEvent() global native
 
-// Close the connection and dispose all structures. Until you run
-// TK_ScanForDevices again to set up a new connection no controls
-// will have any effect after calling this
+
 bool function Tk_Close() global native
 ```
+
+## Why...
+
+### 
+
+### This has been done before, why do it again?
+
+There have been several efforts to control toys with Skyrim in the past. Most of them uread Papyrus log to control Vibration events. This projects tries a different approach to solve the problem from ground up by extending Papyrus:
 
 ## Troubleshooting
 
