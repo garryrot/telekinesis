@@ -13,15 +13,15 @@ This is my humble attempt at creating Papyrus bindings for the famous buttplug.i
 
 >:warning: **EARLY TEST PROTOTYPE: THIS API WILL CHANGE** :warning:
 
-### 1. Installation
+### 1. Install
 
 1. Install the Mod
 2. Move the .psc file `TK_Telekinesis.psc` into a path where your Papyrus Compiler can find it. For Creation Kit its probably something like `data/source/scripts` but I don't get its folder structure at all tbh.
 
-**Depdendencies**: SKSE64,  Skyrim SE/VR/AE and Address Library
+**Depdendencies**: `SKSE64`, `Skyrim SE`, `Address Library for SKSE Plugins`
 **Incompatibilities**:  Other mods that control Intiface/Or Buttplug.io in one way or the other might cause undefined behavior.
 
-### 2 Connect and Scan
+### 2. Start
 
 Start Telekinesis and scan for devices. This must be done once on every game startup (actually
 once for every game process). You most likely want to do this `OnInit` and `OnPlayerLoadGame`.
@@ -36,7 +36,7 @@ EndEvent
 
 If Telekinesis wasn't started, the other functions will not have any effect.
 
-### 2. Device Control
+### 3. Control Devices 
 
 Call `TK_StartVibrateAll(speed)` to vibrate all devices.
 
@@ -53,10 +53,9 @@ int stopped = TK_Telekinesis.TK_StartVibrateAll(0) // 0 = stop vibrating
 Debug.Notification( "Stopping" + stopped + " device(s)..." )
 ```
 
+If no devices are connected or Telekinesis was not started, this will simply do nothing.
 
-If no devices are connected or the connection was not established, this will simply do nothing.
-
-#### 3. Monitoring Connected Devices
+#### 4. Monitoring Connections
 
 You can poll `Tk_AwaitNextEvent` to see if any device connected or disconnected. This
 will return a message or the default string `""` (if nothing happened).
@@ -70,8 +69,7 @@ Event OnUpdate()
 EndEvent
 ```
 
-
-### 4. Shutting Down
+### 5. Shutting Down
 
 At one point the user will close the game or load a different safe. If possible, you should call `TK_StopVibrateAll`
 to stop all devices. In the worst case (i.e. if the user kills the game process while a vibration is running)
