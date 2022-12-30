@@ -32,8 +32,8 @@ namespace Telekinesis {
         return tk_vibrate_all(_tk, speed);
     }
 
-    __declspec(dllexport) int Tk_StopVibrateAll(StaticFunctionTag*) {
-        log::info("TK_StopVibrateAll");
+    __declspec(dllexport) int Tk_StopAll(StaticFunctionTag*) {
+        log::info("Tk_StopAll");
         if (_tk == NULL)
             return 0;
 
@@ -82,7 +82,7 @@ namespace Telekinesis {
     bool RegisterPapyrusCalls(IVirtualMachine* vm) {
         vm->RegisterFunction("TK_ScanForDevices", PapyrusClass, Tk_ConnectAndScanForDevices);
         vm->RegisterFunction("TK_StartVibrateAll", PapyrusClass, Tk_StartVibrateAll);
-        vm->RegisterFunction("TK_StopVibrateAll", PapyrusClass, Tk_StopVibrateAll);
+        vm->RegisterFunction("Tk_StopAll", PapyrusClass, Tk_StopAll);
         vm->RegisterFunction("Tk_PollEvents", PapyrusClass, Tk_PollEvents);
         vm->RegisterFunction("Tk_Close", PapyrusClass, Tk_Close);
         return true;

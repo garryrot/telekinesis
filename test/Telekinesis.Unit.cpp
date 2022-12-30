@@ -21,14 +21,14 @@ TEST_CASE("Connection/Connecting_Works") {
 
 TEST_CASE("Controlls/NotConnected_ReturnFalse") { 
     REQUIRE_FALSE(Tk_StartVibrateAll(NULL, 0.0));
-    REQUIRE_FALSE(Tk_StopVibrateAll(NULL));
+    REQUIRE_FALSE(Tk_StopAll(NULL));
     REQUIRE_FALSE(Tk_Close(NULL));
 }
 
 TEST_CASE("Controlls/Connected_ReturnTrue") {
     Tk_ConnectAndScanForDevices(NULL);
     REQUIRE(Tk_StartVibrateAll(NULL, 0.0) >= 0);
-    REQUIRE(Tk_StopVibrateAll(NULL) >= 0);
+    REQUIRE(Tk_StopAll(NULL) >= 0);
     Sleep(10);
     Tk_Close(NULL);
 }
@@ -38,7 +38,7 @@ TEST_CASE("Controlls/ConnectAndDisconnect_ReturnsFalse") {
     Sleep(10);
     Tk_Close(NULL);
     REQUIRE_FALSE(Tk_StartVibrateAll(NULL, 0.0));
-    REQUIRE_FALSE(Tk_StopVibrateAll(NULL));
+    REQUIRE_FALSE(Tk_StopAll(NULL));
     REQUIRE_FALSE(Tk_Close(NULL));
 }
 

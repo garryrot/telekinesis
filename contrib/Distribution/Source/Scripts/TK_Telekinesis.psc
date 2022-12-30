@@ -22,7 +22,7 @@ string function Tk_PollEvents() global native
 ; Vibrate all devices that are currently connected.
 ; Speed is any float between 0.0(=off) and 1.0 (=full power)
 ; TK_StartVibrateAll( 0 ) should also be used for stopping the vibration,
-; as it provides a smoother experience than TK_StopVibrateAll
+; as it provides a smoother experience than Tk_StopAll
 ; TODO: Rename to Tk_SetVibrationSpeed
 Int function TK_StartVibrateAll(Float speed) global native
 
@@ -31,9 +31,8 @@ Int function TK_StartVibrateAll(Float speed) global native
 ;
 ; NOTE: You could also use it to stop device vibration manually, but I've
 ; experienced that it will cause weird behavior: Some devices still store
-; the last vibration speed, so 
-; TODO: Rename to Tk_StopAll
-Int function TK_StopVibrateAll() global native
+; the last vibration speed
+Int function Tk_StopAll() global native
 
 ; Close the connection and dispose all structures. Telekinesis will not be
 ; usable from this point on. However, you may run TK_ScanForDevices to

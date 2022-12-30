@@ -74,14 +74,14 @@ EndEvent
 
 ### 5. Shutting Down
 
-At one point the user will close the game or load a different safe. If possible, you should call `TK_StopVibrateAll`
+At one point the user will close the game or load a different safe. If possible, you should call `Tk_StopAll`
 to stop all devices. In the worst case (i.e. if the user kills the game process while a vibration is running)
 the `Stop Event` will be lost and the vibrating toys might need to be turned off manually.
 
 I don't know if there is any reliable event or hook to do this. Please tell me if you do.
 
 ```cs
-TK_Telekinesis.TK_StopVibrateAll() // stop all devices
+TK_Telekinesis.Tk_StopAll() // stop all devices
 ```
 
 `TK_Close` will free up the associated memory resources after everything else is done.
