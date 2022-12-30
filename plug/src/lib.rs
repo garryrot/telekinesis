@@ -14,6 +14,8 @@ use std::{
 };
 use tracing::error;
 
+use crate::telekinesis::TkEvent;
+
 mod logging;
 mod telekinesis;
 mod tests;
@@ -21,7 +23,7 @@ mod tests_int;
 
 #[no_mangle]
 pub extern "C" fn tk_connect() -> *mut c_void {
-    let tk = Telekinesis::connect_with(async {
+    let tk = Telekinesis::new(async {
         let server = ButtplugServerBuilder::default()
             .comm_manager(BtlePlugCommunicationManagerBuilder::default())
             .finish()?;
@@ -65,7 +67,7 @@ pub extern "C" fn tk_await_next_event(_tk: *const c_void) -> *mut i8 {
     // Big bad hack to get it to work without having to do the effort
     // to return and manage a list of cstrings. TBD
     if evt.len() > 0 {
-        CString::new(evt[0].clone()).expect("not null").into_raw() as *mut i8
+        CString::new(evt[0].as_string()).expect("not null").into_raw() as *mut i8
         // just drop if there is more than one event lol
     } else {
         std::ptr::null_mut()

@@ -49,7 +49,7 @@ mod tests_int {
         let vibrated = tk_vibrate_all(tk, 1.0);
         thread::sleep(Duration::from_secs(1));
         let stopped = tk_stop_all(tk);
-
+ 
         tk_close(tk);
         assert!(vibrated == 1);
         assert!(stopped == 1);

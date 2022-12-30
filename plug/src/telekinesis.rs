@@ -11,7 +11,7 @@ use tracing::{error, info};
 pub struct Telekinesis {
     pub client: ButtplugClient,
     pub runtime: Runtime,
-    messages: tokio::sync::mpsc::Receiver<String>,
+    pub event_receiver: tokio::sync::mpsc::Receiver<ButtplugClientEvent>,
 }
 
 pub enum TkError {
@@ -30,46 +30,53 @@ impl From<ButtplugClientError> for TkError {
     }
 }
 
+pub trait TkEvent {
+    fn as_string(&self) -> String;
+}
+
+impl TkEvent for ButtplugClientEvent {
+    fn as_string(&self) -> String {
+        match self {
+            ButtplugClientEvent::DeviceAdded(device) => {
+                format!( "Device '{}' connected.", device.name() )
+            }
+            ButtplugClientEvent::DeviceRemoved(device) => {
+                format!("Device '{}' Removed.", device.name())
+            }
+            ButtplugClientEvent::ScanningFinished => {
+                String::from("Device scanning is finished!")
+            }
+            ButtplugClientEvent::PingTimeout => String::from("Ping Timeout"),
+            ButtplugClientEvent::ServerConnect => String::from("Server Connect"),
+            ButtplugClientEvent::ServerDisconnect => String::from("Server Disconnect"),
+            ButtplugClientEvent::Error(err) => err.to_string(),
+        }
+    }
+}
+
+pub fn create_event_handling_thread( runtime: &Runtime, client: &ButtplugClient) -> tokio::sync::mpsc::Receiver<ButtplugClientEvent> {
+    let (event_sender, event_receiver) = tokio::sync::mpsc::channel(4096);
+    let mut events = client.event_stream();
+    runtime.spawn(async move {
+        info!("Event polling thread started");
+        while let Some(event) = events.next().await {
+            event_sender.send(event).await.expect("channel full")
+        }
+    });
+    event_receiver
+}
+
 impl Telekinesis {
-    pub fn connect_with(
+    pub fn new(
         fut: impl Future<Output = Result<ButtplugClient, TkError>>,
     ) -> Result<Telekinesis, TkError> {
         let runtime = Runtime::new().unwrap();
-        let (tx, rx) = tokio::sync::mpsc::channel(1024);
-
         let client = runtime.block_on(fut)?;
-        let mut events = client.event_stream();
-        let recv = rx;
-        runtime.spawn(async move {
-            while let Some(event) = events.next().await {
-                match event {
-                    ButtplugClientEvent::DeviceAdded(device) => {
-                        info!("Device {} Connected!", device.name());
-                        tx.send(format!("Device {} Connected!", device.name()))
-                            .await
-                            .unwrap();
-                    }
-                    ButtplugClientEvent::DeviceRemoved(device) => {
-                        info!("Device {} Removed!", device.name());
-                        tx.send(format!("Device {} Removed!", device.name()))
-                            .await
-                            .unwrap();
-                    }
-                    ButtplugClientEvent::ScanningFinished => {
-                        info!("Device scanning is finished!");
-                        tx.send(format!("Device scanning is finished!"))
-                            .await
-                            .unwrap();
-                    }
-                    _ => {}
-                }
-            }
-        });
-
+        let event_receiver = create_event_handling_thread(&runtime, &client);
         Ok(Telekinesis {
             client: client,
             runtime: runtime,
-            messages: recv,
+            event_receiver: event_receiver,
         })
     }
 
@@ -126,9 +133,9 @@ impl Telekinesis {
         })
     }
 
-    pub fn get_next_event(&mut self) -> Vec<String> {
-        let mut strings: Vec<String> = vec![];
-        if let Ok(msg) = self.messages.try_recv() {
+    pub fn get_next_event(&mut self) -> Vec<ButtplugClientEvent> {
+        let mut strings: Vec<ButtplugClientEvent> = vec![];
+        if let Ok(msg) = self.event_receiver.try_recv() {
             strings.push(msg);
         }
         strings
