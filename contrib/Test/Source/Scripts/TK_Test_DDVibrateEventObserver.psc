@@ -1,13 +1,14 @@
 Scriptname TK_Test_DDVibrateEventObserver extends Quest  
 
-Actor property Player auto
+Spell property VibrateSpell auto
 
 Event OnInit()
 	Log("OnInit")
 	ScanForDevices();
 	RegisterForModEvent("DeviceVibrateEffectStart", "OnVibrateEffectStart")
 	RegisterForModEvent("DeviceVibrateEffectStop", "OnVibrateEffectStop")
-	RegisterForUpdate(2) ; Very short intervall for testing
+	Game.GetPlayer().AddSpell(VibrateSpell);
+	RegisterForUpdate(3) ; Very short intervall for testing
 EndEvent
 
 Function ScanForDevices()
