@@ -1,8 +1,8 @@
 # Telekinesis (Bluetooth Toy Control for Papyrus) V0.1.0
 
-This is my humble attempt at creating Papyrus bindings for the famous buttplug.io toy control framework. 
+**In a Nutshell**
 
-**In a Nutshell:** This SKSE64 plugin allowes modders to control bluetooth toys (Vibrators, etc.) from within Papyrus scripts. This does not provide actual game content. If you are not a Skyrim Mod Developer it will do nothing for you, unless you also run a Mod that is making use of it.
+This is my humble attempt at creating Papyrus bindings for the famous buttplug.io toy control library. This SKSE64 plugin allows modders to control bluetooth toys (Vibrators, etc.) from within Papyrus scripts. It provides several new Papyrus functions that let you Scan for local devices and then control/vibrate them. This does not provide any playable content on its own, (unless you run the Sample ESP). This is pretty much a big experimental prototype and still work in progress. The API I expose right now can and will change.
 
 ## Features
  * Very fast and reactive native implementation
@@ -17,6 +17,9 @@ This is my humble attempt at creating Papyrus bindings for the famous buttplug.i
 
 1. Install the Mod
 2. Move the .psc file `TK_Telekinesis.psc` into a path where your Papyrus Compiler can find it. For Creation Kit its probably something like `data/source/scripts` but I don't get its folder structure at all tbh.
+3. Connect your Toy via Bluetooth
+4. Open up Creation Kit and [Use the Papyrus Functions!](https://github.com/garryrot/telekinesis/blob/master/contrib/Distribution/Source/Scripts/TK_Telekinesis.psc)
+4. Alternatively: Install The Sample ESP (Telekinesis.Sample.7z), which demonstrates the use of those Papyrus Functions In-Game
 
 **Depdendencies**: `SKSE64`, `Skyrim SE`, `Address Library for SKSE Plugins`
 **Incompatibilities**:  Other mods that control Intiface/Or Buttplug.io in one way or the other might cause undefined behavior.
@@ -57,12 +60,12 @@ If no devices are connected or Telekinesis was not started, this will simply do 
 
 #### 4. Monitoring Connections
 
-You can poll `Tk_AwaitNextEvent` to see if any device connected or disconnected. This
+You can poll `Tk_PollEvents` to see if any device connected or disconnected. This
 will return a message or the default string `""` (if nothing happened).
 
 ```cs
 Event OnUpdate()
-    String evt = TK_Telekinesis.Tk_AwaitNextEvent()
+    String evt = TK_Telekinesis.Tk_PollEvents()
     If (evt != "")
         Debug.Notification(evt) // If it says "Device XY connected" you are ready to go
     EndIf
