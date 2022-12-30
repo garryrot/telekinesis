@@ -89,9 +89,14 @@ TK_Telekinesis.TK_Close() // destroy the connection
 
 ## Demo
 
-Showcase of the sample Mod (Triggers vibration based on DD `OnVibrateEffectStart` and `OnVibrateEffectStart` events)
+Showcase of the Sample/Test-Mod `Telekinesis.SampleProject.7z`
 
-*You can already run this mod if you want, but its just a proof of concept and lacks any settings (and fun)*
+- Triggers vibration based on DD `OnVibrateEffectStart` and `OnVibrateEffectStart` events
+- Gives the player a "Telekinesis Vibrate Toy" spell that causes a vibration effect
+
+*You can already run this if you want, but its just a proof of concept and lacks any settings (and fun)*
+
+[![Watch the Video](https://i.imgur.com/vKb2F1B.png)](https://www.youtube.com/watch?v=_EoiLqY_6_Q)
 
 ## Caveats & Known Issues
 
