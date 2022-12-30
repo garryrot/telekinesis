@@ -96,7 +96,7 @@ Showcase of the Sample/Test-Mod `Telekinesis.SampleProject.7z`
 
 *You can already run this if you want, but its just a proof of concept and lacks any settings (and fun)*
 
-[![Watch the Video](https://i.imgur.com/vKb2F1B.png)](https://www.youtube.com/watch?v=_EoiLqY_6_Q)
+[![Watch the Video](https://i.imgur.com/QiG6p2y.jpg)](https://www.youtube.com/watch?v=_EoiLqY_6_Q)
 
 ## Caveats & Known Issues
 
