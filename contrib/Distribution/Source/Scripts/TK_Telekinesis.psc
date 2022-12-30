@@ -17,7 +17,7 @@ Bool function TK_ScanForDevices() global native
 ; DISCLAIMER: The implementation is a really shitty hackjob right now and will
 ; only return one event at a time (and even drop some). When multiple
 ; Mods consume this, they will steal each others events
-string function Tk_AwaitNextEvent() global native
+string function Tk_PollEvents() global native
 
 ; Vibrate all devices that are currently connected.
 ; Speed is any float between 0.0(=off) and 1.0 (=full power)

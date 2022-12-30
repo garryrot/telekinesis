@@ -40,8 +40,8 @@ namespace Telekinesis {
         return tk_stop_all(_tk);
     }
 
-    __declspec(dllexport) RE::BSFixedString Tk_AwaitNextEvent(StaticFunctionTag*) {
-        log::info("Tk_AwaitNextEvent");
+    __declspec(dllexport) RE::BSFixedString Tk_PollEvents(StaticFunctionTag*) {
+        log::info("Tk_PollEvents");
         if (_tk == NULL) {
             log::error("event query while _tk does not exist");
             return BSFixedString("");
@@ -83,7 +83,7 @@ namespace Telekinesis {
         vm->RegisterFunction("TK_ScanForDevices", PapyrusClass, Tk_ConnectAndScanForDevices);
         vm->RegisterFunction("TK_StartVibrateAll", PapyrusClass, Tk_StartVibrateAll);
         vm->RegisterFunction("TK_StopVibrateAll", PapyrusClass, Tk_StopVibrateAll);
-        vm->RegisterFunction("Tk_AwaitNextEvent", PapyrusClass, Tk_AwaitNextEvent);
+        vm->RegisterFunction("Tk_PollEvents", PapyrusClass, Tk_PollEvents);
         vm->RegisterFunction("Tk_Close", PapyrusClass, Tk_Close);
         return true;
     }

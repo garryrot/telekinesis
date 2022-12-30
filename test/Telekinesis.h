@@ -7,6 +7,6 @@ namespace Telekinesis {
     __declspec(dllexport) bool Tk_ConnectAndScanForDevices(StaticFunctionTag*);
     __declspec(dllexport) int Tk_StartVibrateAll(StaticFunctionTag*, float_t speed);
     __declspec(dllexport) int Tk_StopVibrateAll(StaticFunctionTag*);
-    __declspec(dllexport) BSFixedString Tk_AwaitNextEvent(StaticFunctionTag*);
+    __declspec(dllexport) BSFixedString Tk_PollEvents(StaticFunctionTag*);
     __declspec(dllexport) bool Tk_Close(StaticFunctionTag*);
 }

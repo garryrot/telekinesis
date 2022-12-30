@@ -17,7 +17,7 @@ Function ScanForDevices()
 EndFunction
 
 Event OnUpdate()
-	String evt = TK_Telekinesis.Tk_AwaitNextEvent();
+	String evt = TK_Telekinesis.Tk_PollEvents();
 	If (evt != "")
 		Log(evt)
 	EndIf
