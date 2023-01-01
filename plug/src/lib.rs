@@ -14,8 +14,6 @@ use std::{
 };
 use tracing::error;
 
-use crate::telekinesis::TkEvent;
-
 mod logging;
 mod telekinesis;
 mod tests;
@@ -52,7 +50,7 @@ pub extern "C" fn tk_scan_for_devices(_tk: *const c_void) -> bool {
 
 #[tracing::instrument]
 #[no_mangle]
-pub extern "C" fn tk_vibrate_all(_tk: *const c_void, speed: c_float) -> i32 {
+pub extern "C" fn tk_vibrate_all(_tk: *const c_void, speed: c_float) -> bool {
     get_handle_unsafe(_tk).vibrate_all(speed)
 }
 
@@ -83,15 +81,15 @@ pub extern "C" fn tk_free_event(_: *const c_void, event: *mut i8) {
 
 #[tracing::instrument]
 #[no_mangle]
-pub extern "C" fn tk_stop_all(_tk: *const c_void) -> i32 {
+pub extern "C" fn tk_stop_all(_tk: *const c_void) -> bool {
     get_handle_unsafe(_tk).stop_all()
 }
 
 #[tracing::instrument]
 #[no_mangle]
 pub extern "C" fn tk_close(_tk: *mut c_void) {
-    let tk = unsafe { Box::from_raw(_tk as *mut Telekinesis) };
-    tk.tk_close();
+    let mut tk = unsafe { Box::from_raw(_tk as *mut Telekinesis) };
+    tk.disconnect();
 }
 
 fn get_handle_unsafe(tk: *const c_void) -> &'static Telekinesis {

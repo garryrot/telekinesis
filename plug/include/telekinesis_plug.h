@@ -18,13 +18,13 @@ void *tk_connect();
 
 bool tk_scan_for_devices(const void *_tk);
 
-int32_t tk_vibrate_all(const void *_tk, float speed);
+bool tk_vibrate_all(const void *_tk, float speed);
 
 int8_t *tk_await_next_event(const void *_tk);
 
 void tk_free_event(const void*, int8_t *event);
 
-int32_t tk_stop_all(const void *_tk);
+bool tk_stop_all(const void *_tk);
 
 void tk_close(void *_tk);
 

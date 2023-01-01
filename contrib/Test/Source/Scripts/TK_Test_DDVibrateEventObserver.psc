@@ -25,14 +25,12 @@ EndEvent
 
 Event OnVibrateEffectStart(string eventName, string argString, float argNum, form sender)
 	Log("DeviceVibrateEffectStart")
-	int vibrated = TK_Telekinesis.TK_StartVibrateAll(1.0)
-	Log("Vibrating " + vibrated + " devices...")
+	TK_Telekinesis.TK_StartVibrateAll(1.0)
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string argString, float argNum, form sender)
 	Log("OnVibrateEffectStop")
-	int stopped = TK_Telekinesis.TK_StartVibrateAll(0.0)
-	Log("Stopping " + stopped + " devices...")
+	TK_Telekinesis.TK_StartVibrateAll(0.0)
 EndEvent
 
 Function Log(string textToPrint)
