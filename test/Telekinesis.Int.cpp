@@ -17,19 +17,18 @@ TEST_CASE("telekinesis_plug/cbindings_vibrates_the_device_E2E") {
 
     int8_t *evt = NULL;
     do {
-        std::cout << "Waiting on device.";
+        std::cout << ".";
         Sleep(1000);
         evt = tk_await_next_event(tk);
     } while (evt == NULL);
     std::cout << "Got it!";
-
     std::string message((char *)evt);
     REQUIRE_THAT(message, ContainsSubstring("Device"));
+
     tk_free_event(tk, evt);
     float_t speed = 0.1;
-    REQUIRE(tk_vibrate_all(tk, speed) == 1);
+    REQUIRE(tk_vibrate_all(tk, speed) == true);
     Sleep(5000);
-    REQUIRE(tk_stop_all(tk) == 1);
+    REQUIRE(tk_stop_all(tk) == true);
     tk_close(tk);
-
 }
