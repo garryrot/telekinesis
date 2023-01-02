@@ -21,7 +21,7 @@ mod tests_int {
 
     fn _poll_next_event(tk: *const c_void) -> CString {
         loop {
-            let event = tk_await_next_event(tk);
+            let event = tk_try_get_next_event(tk);
             if event.is_null() {
                 println!("Polling...");
                 thread::sleep(Duration::from_secs(1));
@@ -94,7 +94,7 @@ mod tests_int {
         fn assert_next_event( tk: &mut Telekinesis, contains: &str) {
             thread::sleep(Duration::from_secs(1));
             let evt = tk.get_next_event();
-            assert!(evt[0].as_string().contains(contains));
+            assert!(evt.unwrap().as_string().contains(contains));
         }
 
         // act & assert
@@ -126,10 +126,13 @@ mod tests_int {
         tk.disconnect();
         
         // assert
-        let evt = tk.get_next_event();
-        assert!(evt[0].as_string().contains("connected"));
-        assert!(evt[1].as_string().contains("Vibrating"));
-        assert!(evt[2].as_string().contains("Vibrating"));
-        assert!(evt[3].as_string().contains("Stopping"));
+        let mut evt = tk.get_next_event();
+        assert!(evt.unwrap().as_string().contains("connected"));
+        evt = tk.get_next_event();
+        assert!(evt.unwrap().as_string().contains("Vibrating"));
+        evt = tk.get_next_event();
+        assert!(evt.unwrap().as_string().contains("Vibrating"));
+        evt = tk.get_next_event();
+        assert!(evt.unwrap().as_string().contains("Stopping"));
     }
 }

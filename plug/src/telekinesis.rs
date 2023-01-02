@@ -206,12 +206,11 @@ impl Telekinesis {
         }
     }
 
-    pub fn get_next_event(&mut self) -> Vec<TkEventEnum> {
-        let mut strings: Vec<TkEventEnum> = vec![];
-        while let Ok(msg) = self.event_receiver.try_recv() {
-            strings.push(msg);
+    pub fn get_next_event(&mut self) -> Option<TkEventEnum> {
+        if let Ok(msg) = self.event_receiver.try_recv() {
+            return Some(msg)
         }
-        strings
+        None
     }
 
     // pub fn tk_get_connected_devices(&self) {

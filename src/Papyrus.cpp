@@ -42,22 +42,31 @@ namespace Telekinesis {
         return true;
     }
 
-    __declspec(dllexport) RE::BSFixedString Tk_PollEvents(StaticFunctionTag*) {
+    __declspec(dllexport) std::vector<std::string> Tk_PollEventsStdString() {
+        std::vector<std::string> output;
         log::info("Tk_PollEvents");
         if (_tk == NULL) {
             log::error("event query while _tk does not exist");
-            return BSFixedString("");
+            return output;
         }
 
-        if (int8_t* evt = tk_await_next_event(_tk)) {
+        int8_t* evt;
+        while ((evt = tk_try_get_next_event(_tk)) != NULL) {
             std::string evtstr((char*)evt);
-            log::info("Received event: {}.", evtstr);
+            output.push_back(evtstr);
             tk_free_event(_tk, evt);
-            return BSFixedString(evtstr);
-        } else {
-            log::debug("no new event");
-            return BSFixedString("");
+            log::info("Received event: {}.", evtstr);
         }
+        return output; 
+    } 
+    
+    __declspec(dllexport) std::vector<RE::BSFixedString> Tk_PollEvents(StaticFunctionTag*) {
+        std::vector<RE::BSFixedString> output;
+        auto evts = Tk_PollEventsStdString();
+        for (size_t i = 0; i < evts.size(); i++) {
+            output.push_back(evts[i]);
+        }
+        return output;
     } 
 
     __declspec(dllexport) bool Tk_Close(StaticFunctionTag*) {
@@ -69,9 +78,8 @@ namespace Telekinesis {
         _tk = NULL;
         return true;
     }
-    
 
-    //__declspec(dllexport) std::vector<RE::BSFixedString> Tk_Get_All_Devices(StaticFunctionTag*) {
+    //__declspec(dllexport) std::vector<RE::BSFixedString> Tk_GetDevices(StaticFunctionTag*) {
     //    std::vector<RE::BSFixedString> output;
     //    if (_tk == NULL) return output;
     //    // TODO: Implement me

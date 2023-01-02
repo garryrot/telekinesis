@@ -19,7 +19,7 @@ TEST_CASE("telekinesis_plug/cbindings_vibrates_the_device_E2E") {
     do {
         std::cout << ".";
         Sleep(1000);
-        evt = tk_await_next_event(tk);
+        evt = tk_try_get_next_event(tk);
     } while (evt == NULL);
     std::cout << "Got it!";
     std::string message((char *)evt);

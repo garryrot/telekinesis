@@ -17,10 +17,12 @@ Function ScanForDevices()
 EndFunction
 
 Event OnUpdate()
-	String evt = TK_Telekinesis.Tk_PollEvents();
-	If (evt != "")
-		Log(evt)
-	EndIf
+	String[] evts = TK_Telekinesis.Tk_PollEvents();
+	Int i = 0;
+	While (i < evts.Length) 
+		Log(evts[0])
+		i += 1
+	EndWhile
 EndEvent
 
 Event OnVibrateEffectStart(string eventName, string argString, float argNum, form sender)

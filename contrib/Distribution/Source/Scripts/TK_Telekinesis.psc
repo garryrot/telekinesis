@@ -24,17 +24,14 @@ Bool function TK_StartVibrateAll(Float speed) global native
 ; Returns false when the command could not be sent
 Bool function Tk_StopAll() global native
 
-; Returns a stream of messages that describe the status devices of devices
-; - RETURN a string describing the Event or a default String ("") if nothing happened
-; Examples:
-;  * "" (Nothing happened)
+; Returns a stream of messages that describe events in Tk
+; - RETURN a string describing the Event or an empty Array if nothing happened
+; Examples messages:
 ;  * "Device XY connected" (This device is connected and will be controlled)
-;  * "Device XY disconnected" (This device should no longer get vibrated)
-;  
-; DISCLAIMER: The implementation is a really shitty hackjob right now and will
-; only return one event at a time (and even drop some). When multiple
-; Mods consume this, they will steal each others events
-string function Tk_PollEvents() global native
+;  * "Device XY disconnected" (This device is no longer connected and will be ignored)
+;  * "Vibrating X devices..." (A vibrate command was successful and vibrated X devices)
+; When multiple Mods consume this, they will steal each others events
+String[] function Tk_PollEvents() global native
 
 ; Close the connection and dispose all structures. Telekinesis will not be
 ; usable from this point on. However, you may run TK_ScanForDevices to

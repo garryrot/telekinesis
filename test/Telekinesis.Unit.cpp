@@ -42,6 +42,33 @@ TEST_CASE("Controlls/ConnectAndDisconnect_ReturnsFalse") {
     REQUIRE_FALSE(Tk_Close(NULL));
 }
 
+TEST_CASE("Papyrus/poll_events_nothing_happened_returns_empty_list") {
+    Tk_ConnectAndScanForDevices(NULL);
+    auto list = Tk_PollEventsStdString();
+    Tk_Close(NULL);
+}
+
+TEST_CASE("Papyrus/poll_commands_produce_1_event") {
+    Tk_ConnectAndScanForDevices(NULL);
+    Tk_StartVibrateAll(NULL, 0.0);
+    Sleep(1);
+    auto list = Tk_PollEventsStdString();
+    REQUIRE(list.size() == 1);
+    Tk_Close(NULL);
+}
+
+TEST_CASE("Papyrus/poll_events_2_commands_produce_2_events") {
+    Tk_ConnectAndScanForDevices(NULL);
+    Tk_StartVibrateAll(NULL, 0.0);
+    Tk_StartVibrateAll(NULL, 0.0);
+    Sleep(1);
+    auto list = Tk_PollEventsStdString();
+    REQUIRE(list.size() == 2);
+    Tk_Close(NULL);
+}
+
+// TODO: fill beyond 128
+
 TEST_CASE("telekinesis_plug/cbinding_returns_instance") {
     void *tk = tk_connect();
     REQUIRE(tk != NULL);

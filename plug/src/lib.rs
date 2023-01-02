@@ -56,17 +56,13 @@ pub extern "C" fn tk_vibrate_all(_tk: *const c_void, speed: c_float) -> bool {
 
 #[tracing::instrument]
 #[no_mangle]
-pub extern "C" fn tk_await_next_event(_tk: *const c_void) -> *mut i8 {
+pub extern "C" fn tk_try_get_next_event(_tk: *const c_void) -> *mut i8 {
     assert!(false == _tk.is_null());
     let mut tk = unsafe { Box::from_raw(_tk as *mut Telekinesis) };
     let evt = tk.get_next_event();
     forget(tk);
-
-    // Big bad hack to get it to work without having to do the effort
-    // to return and manage a list of cstrings. TBD
-    if evt.len() > 0 {
-        CString::new(evt[0].as_string()).expect("not null").into_raw() as *mut i8
-        // just drop if there is more than one event lol
+    if let Some(ok) = evt{
+        CString::new(ok.as_string()).unwrap().into_raw() as *mut i8
     } else {
         std::ptr::null_mut()
     }
