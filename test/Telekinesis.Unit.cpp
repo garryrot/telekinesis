@@ -13,6 +13,7 @@ using namespace SKSE::log;
 using namespace Telekinesis;
 
 // papyrus native function implementations
+
 TEST_CASE("Connection/Connecting_Works") {
     Tk_ConnectAndScanForDevices(NULL);
     Sleep(10);
@@ -67,7 +68,18 @@ TEST_CASE("Papyrus/poll_events_2_commands_produce_2_events") {
     Tk_Close(NULL);
 }
 
-// TODO: fill beyond 128
+TEST_CASE("Papyrus/poll_events_200_commands_produce_128_events") {
+    Tk_ConnectAndScanForDevices(NULL);
+    for (size_t i = 0; i < 200; i++) {
+        Tk_StopAll(NULL);
+    }
+    Sleep(2);
+    auto list = Tk_PollEventsStdString();
+    REQUIRE(list.size() == 128);
+    Tk_Close(NULL);
+}
+
+// rust ffi
 
 TEST_CASE("telekinesis_plug/cbinding_returns_instance") {
     void *tk = tk_connect();

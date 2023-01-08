@@ -46,12 +46,12 @@ namespace Telekinesis {
         std::vector<std::string> output;
         log::info("Tk_PollEvents");
         if (_tk == NULL) {
-            log::error("event query while _tk does not exist");
             return output;
         }
 
         int8_t* evt;
-        while ((evt = tk_try_get_next_event(_tk)) != NULL) {
+        int i = 0;
+        while (i++ < 128 && (evt = tk_try_get_next_event(_tk)) != NULL) {
             std::string evtstr((char*)evt);
             output.push_back(evtstr);
             tk_free_event(_tk, evt);
@@ -78,16 +78,6 @@ namespace Telekinesis {
         _tk = NULL;
         return true;
     }
-
-    //__declspec(dllexport) std::vector<RE::BSFixedString> Tk_GetDevices(StaticFunctionTag*) {
-    //    std::vector<RE::BSFixedString> output;
-    //    if (_tk == NULL) return output;
-    //    // TODO: Implement me
-    //    for (size_t i = 0; i < len; i++) {
-    //        output.push_back(BSFixedString());
-    //    }
-    //    return output;
-    //}
 
     bool RegisterPapyrusCalls(IVirtualMachine* vm) {
         vm->RegisterFunction("TK_ScanForDevices", PapyrusClass, Tk_ConnectAndScanForDevices);
