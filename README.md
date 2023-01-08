@@ -128,19 +128,30 @@ If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyp
 
 First of all, because I can :3
 
-I created this project because I knew how to do this and thought I could contribute back to this community.
+Right now, this is more of a proof of concept, and far from a stable production state.
 
-There have been several efforts to control toys with Skyrim in the past. Most of the solutions read Papyrus log to control toys from within a different process. This projects tries a completely different approach, solving the problem from the ground up by extending Papyrus:
+There several other toy control projects you can use. The most complete and feature-rich approach
+is [GIFT](https://github.com/MinLL/GameInterfaceForToys), which processes events from the Papyrus Logs and controls
+external, and also supports a bigger variety of outputs (not only buttplug.io but also E-Stim, Chaster, etc.) and
+different Games.
+
+Right now, if you are not a mod developer with very specific speed and integration requirements, you most likely 
+want to use GIFT.
+
+### When Telekinesis?
+
+Telekinesis tries a completely different approach, trying to fit a different niche by providing native Papyrus functions.
 
 **Upsides**:
 
-- Very fast reaction time, because everything happens in-process
+- Fast reaction time, because everything happens in-process
 - Gives device control directly to Papyrus, which should make the creation of interactive interactions really easy
-- Will only add one external dependency (Telekinesis) to your mod
+- Will only add one mod dependency (this mod)
 
 **Downsides**:
 
 - With tighter integration and without an external supervisor process, there is one less failsafe. For example, if the User kill Skyrim with alt+f4, and then you have to turn off your device manually
+- Mods might not expose Papyrus events for all the things that show up the logs
 - External GUI applications might be easier to use than MCM Menus
 
 ## License
@@ -148,6 +159,11 @@ There have been several efforts to control toys with Skyrim in the past. Most of
 This if free software. If you want to change this, redistribute it, or integrate it into your mod, you are free to whatever you like, as long as it is permitted by the  [Apache License](LICENSE)
 
 ## Changelog
+
+### 0.2.0
+
+- Support message queuing to reduce mini lags
+- More consistent naming of API functions
 
 ### 0.1.0
 

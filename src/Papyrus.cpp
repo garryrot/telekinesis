@@ -58,7 +58,7 @@ namespace Telekinesis {
             log::info("Received event: {}.", evtstr);
         }
         return output; 
-    } 
+    }
     
     __declspec(dllexport) std::vector<RE::BSFixedString> Tk_PollEvents(StaticFunctionTag*) {
         std::vector<RE::BSFixedString> output;
