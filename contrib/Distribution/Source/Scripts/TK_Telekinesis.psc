@@ -10,10 +10,10 @@ Bool function TK_ScanForDevices() global native
 
 ; Vibrate all devices that are currently connected.
 ; Speed is any float between 0.0(=off) and 1.0 (=full power)
-; TK_StartVibrateAll( 0 ) should also be used for stopping the vibration,
+; TK_VibrateAll( 0 ) should also be used for stopping the vibration,
 ; as it provides a smoother experience than Tk_StopAll
 ; Returns false when the command could not be sent
-Bool function TK_StartVibrateAll(Float speed) global native
+Bool function TK_VibrateAll(Float speed) global native
 
 ; Immediately stops all connected devices. This should be used for
 ; shutdown, before calling Tk_Close to assure that everything stopped.

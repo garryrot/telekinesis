@@ -41,18 +41,18 @@ If Telekinesis wasn't started, the other functions will not have any effect.
 
 ### 3. Control Devices 
 
-Call `TK_StartVibrateAll(speed)` to vibrate all devices.
+Call `TK_VibrateAll(speed)` to vibrate all devices.
 
 ```cs
-int vibrated = TK_Telekinesis.TK_StartVibrateAll(1.0) // speed can be any float from 0 to (1.0=full speed)
+int vibrated = TK_Telekinesis.TK_VibrateAll(1.0) // speed can be any float from 0 to (1.0=full speed)
 Debug.Notification( "Vibrating" + vibrated + " device(s)..." )
 ```
 
-Call `TK_StartVibrateAll(0)` to stop all devices
+Call `TK_VibrateAll(0)` to stop all devices
 
 ```cs
 Util.Wait(5);
-int stopped = TK_Telekinesis.TK_StartVibrateAll(0) // 0 = stop vibrating
+int stopped = TK_Telekinesis.TK_VibrateAll(0) // 0 = stop vibrating
 Debug.Notification( "Stopping" + stopped + " device(s)..." )
 ```
 
