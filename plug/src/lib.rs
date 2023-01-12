@@ -1,19 +1,9 @@
-use buttplug::{
-    client::ButtplugClient,
-    core::connector::ButtplugInProcessClientConnectorBuilder,
-    server::{
-        device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
-        ButtplugServerBuilder,
-    },
-};
-use telekinesis::{Telekinesis, TkError};
-
+use telekinesis::{Telekinesis};
 use std::{
     ffi::{c_float, c_void, CString},
     mem::forget,
 };
 use tracing::error;
-
 mod logging;
 mod telekinesis;
 mod tests;
@@ -21,19 +11,7 @@ mod tests_int;
 
 #[no_mangle]
 pub extern "C" fn tk_connect() -> *mut c_void {
-    let tk = Telekinesis::new(async {
-        let server = ButtplugServerBuilder::default()
-            .comm_manager(BtlePlugCommunicationManagerBuilder::default())
-            .finish()?;
-        let connector = ButtplugInProcessClientConnectorBuilder::default()
-            .server(server)
-            .finish();
-        let client = ButtplugClient::new("Telekinesis");
-        client.connect(connector).await?;
-        Ok::<ButtplugClient, TkError>(client)
-    });
-
-    match tk {
+    match Telekinesis::new_with_default_settings() {
         Ok(unwrapped) => Box::into_raw(Box::new(unwrapped)) as *mut c_void,
         Err(_) => {
             error!("Failed creating server.");

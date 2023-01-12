@@ -2,10 +2,10 @@ use std::{ffi::c_float, sync::Arc};
 
 use buttplug::{
     client::{ButtplugClient, ButtplugClientError, ButtplugClientEvent, VibrateCommand, ButtplugClientDevice},
-    server::ButtplugServerError, core::errors::ButtplugError,
+    server::{ButtplugServerError, ButtplugServerBuilder, device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder}, core::{errors::ButtplugError, connector::ButtplugInProcessClientConnectorBuilder},
 };
 use futures::{Future, StreamExt};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Runtime};
 use tracing::{error, info, warn};
 
 pub struct Telekinesis {
@@ -38,7 +38,6 @@ pub enum TkEventEnum {
     TkError(ButtplugError),
     Other(ButtplugClientEvent)
 }
-
 
 impl TkEventEnum {
     fn from_event(event: ButtplugClientEvent) -> TkEventEnum {
@@ -161,6 +160,20 @@ pub fn create_event_handling_thread(
 }
 
 impl Telekinesis {
+    pub fn new_with_default_settings() -> Result<Telekinesis, TkError> {
+        Telekinesis::new(async {
+            let server = ButtplugServerBuilder::default()
+                .comm_manager(BtlePlugCommunicationManagerBuilder::default())
+                .finish()?;
+            let connector = ButtplugInProcessClientConnectorBuilder::default()
+                .server(server)
+                .finish();
+            let client = ButtplugClient::new("Telekinesis");
+            client.connect(connector).await?;
+            Ok::<ButtplugClient, TkError>(client)
+        })
+    }
+
     pub fn new(
         fut: impl Future<Output = Result<ButtplugClient, TkError>>,
     ) -> Result<Telekinesis, TkError> {

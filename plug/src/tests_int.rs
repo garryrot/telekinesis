@@ -40,7 +40,7 @@ mod tests_int {
     fn _ffi_connect_scan_and_vibrate_devices() {
         let tk = tk_connect();
         tk_scan_for_devices(tk);
-
+        
         thread::sleep(Duration::from_secs(5));
         _assert_string(tk, _poll_next_event(tk), "Device");
 
@@ -67,18 +67,7 @@ mod tests_int {
     }
 
     fn _connect() -> Telekinesis {
-        let tk = Telekinesis::new(async {
-            let server = ButtplugServerBuilder::default()
-                .comm_manager(BtlePlugCommunicationManagerBuilder::default())
-                .finish()?;
-            let connector = ButtplugInProcessClientConnectorBuilder::default()
-                .server(server)
-                .finish();
-            let client = ButtplugClient::new("Telekinesis");
-            client.connect(connector).await?;
-            Ok::<ButtplugClient, TkError>(client)
-        });
-
+        let tk = Telekinesis::new_with_default_settings();
         if let Ok(tk) = tk {
             return tk;
         }
