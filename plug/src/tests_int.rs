@@ -67,8 +67,7 @@ mod tests_int {
     }
 
     fn _connect() -> Telekinesis {
-        let tk = Telekinesis::new_with_default_settings();
-        if let Ok(tk) = tk {
+        if let Ok(tk) = Telekinesis::new_with_default_settings() {
             return tk;
         }
         else {

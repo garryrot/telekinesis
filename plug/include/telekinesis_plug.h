@@ -20,6 +20,8 @@ bool tk_scan_for_devices(const void *_tk);
 
 bool tk_vibrate_all(const void *_tk, float speed);
 
+bool tk_vibrate_all_for(const void *_tk, float speed, float duration_sec);
+
 int8_t *tk_try_get_next_event(const void *_tk);
 
 void tk_free_event(const void*, int8_t *event);
