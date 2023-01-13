@@ -1,4 +1,4 @@
-use std::{ffi::c_float, sync::Arc};
+use std::{ffi::c_float, sync::Arc, fmt};
 
 use buttplug::{
     client::{
@@ -17,11 +17,17 @@ use tracing::{debug, error, info, instrument, span, warn, Level};
 
 use crate::util::Narrow;
 
-#[derive(Debug)]
 pub struct Telekinesis {
     pub runtime: Runtime,
     pub event_receiver: tokio::sync::mpsc::Receiver<TkEventEnum>,
     pub command_sender: tokio::sync::mpsc::Sender<TkCommand>,
+}
+
+impl fmt::Debug for Telekinesis 
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Telekinesis").finish()
+    }
 }
 
 #[derive(Debug)]
@@ -83,7 +89,6 @@ pub enum TkCommand {
 }
 
 pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
-    info!("Scanning for devices.");
     if let Err(err) = client.start_scanning().await {
         error!(error = err.to_string(), "Failed scanning for devices.");
         return false;
@@ -298,6 +303,7 @@ impl Telekinesis {
         }
     }
 
+    #[instrument]
     pub fn get_next_event(&mut self) -> Option<TkEventEnum> {
         debug!("get_next_event");
         if let Ok(msg) = self.event_receiver.try_recv() {
