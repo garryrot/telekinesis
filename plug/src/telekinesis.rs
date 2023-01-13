@@ -15,6 +15,8 @@ use futures::{Future, StreamExt};
 use tokio::{runtime::Runtime, select, time::sleep};
 use tracing::{debug, error, info, instrument, span, warn, Level};
 
+use crate::util::Narrow;
+
 #[derive(Debug)]
 pub struct Telekinesis {
     pub runtime: Runtime,
@@ -130,7 +132,7 @@ pub fn create_cmd_handling_thread(
     client: ButtplugClient,
     event_sender: tokio::sync::mpsc::Sender<TkEventEnum>,
 ) -> tokio::sync::mpsc::Sender<TkCommand> {
-    let (command_sender, mut command_receiver) = tokio::sync::mpsc::channel(4096);
+    let (command_sender, mut command_receiver) = tokio::sync::mpsc::channel(128); // shouldn't be big, we consume cmds immediately
     runtime.spawn(async move {
         info!("Comand worker thread started");
         let _ = span!(Level::INFO, "cmd_handling_thread").entered();
@@ -196,7 +198,7 @@ pub fn create_event_handling_thread(
     tokio::sync::mpsc::Receiver<TkEventEnum>,
     tokio::sync::mpsc::Sender<TkEventEnum>,
 ) {
-    let (event_sender, event_receiver) = tokio::sync::mpsc::channel(512);
+    let (event_sender, event_receiver) = tokio::sync::mpsc::channel(2048); // big in case events are not consumed
     let sender_clone = event_sender.clone();
     let mut events = client.event_stream();
     runtime.spawn(async move {
@@ -251,12 +253,13 @@ impl Telekinesis {
         true
     }
 
+    // TODO: Drop Messages if event queue has overflow to not force users to consume
     #[instrument]
     pub fn vibrate_all(&self, speed: f32) -> bool {
         info!("Sending Command: Vibrate all");
         if let Err(_) = self
             .command_sender
-            .blocking_send(TkCommand::TkVibrateAll(speed))
+            .blocking_send(TkCommand::TkVibrateAll( speed.narrow( 0.0, 1.0 )))
         {
             error!("Failed to send vibrate_all");
             return false;
@@ -269,7 +272,7 @@ impl Telekinesis {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
             .command_sender
-            .blocking_send(TkCommand::TkVibrateAllDelayed(speed, duration))
+            .blocking_send(TkCommand::TkVibrateAllDelayed( speed.narrow( 0.0, 1.0 ), duration))
         {
             error!("Failed to send delayed command");
             return false;

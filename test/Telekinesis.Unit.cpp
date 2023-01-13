@@ -22,6 +22,7 @@ TEST_CASE("Connection/Connecting_Works") {
 
 TEST_CASE("Controlls/NotConnected_ReturnFalse") { 
     REQUIRE_FALSE(TK_VibrateAll(NULL, 0.0));
+    REQUIRE_FALSE(TK_VibrateAllFor(NULL, 0.0, 0.0));
     REQUIRE_FALSE(Tk_StopAll(NULL));
     REQUIRE_FALSE(Tk_Close(NULL));
 }
@@ -61,10 +62,10 @@ TEST_CASE("Papyrus/poll_commands_produce_1_event") {
 TEST_CASE("Papyrus/poll_events_2_commands_produce_2_events") {
     Tk_ConnectAndScanForDevices(NULL);
     TK_VibrateAll(NULL, 0.0);
-    TK_VibrateAll(NULL, 0.0);
-    Sleep(1);
+    TK_VibrateAllFor(NULL, 0.0, 0.0); // delay emits 2 events
+    Sleep(10);
     auto list = Tk_PollEventsStdString();
-    REQUIRE(list.size() == 2);
+    REQUIRE(list.size() == 3);
     Tk_Close(NULL);
 }
 

@@ -8,6 +8,7 @@ use tracing::error;
 mod logging;
 mod telekinesis;
 mod tests;
+mod util;
 mod tests_int;
 
 #[no_mangle]
