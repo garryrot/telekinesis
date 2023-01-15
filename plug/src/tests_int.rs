@@ -4,7 +4,6 @@ mod tests_int {
     use lazy_static::lazy_static;
     use nonparallel::nonparallel;
 
-    use core::panic;
     use std::ffi::c_void;
 
     use std::thread;
@@ -69,19 +68,11 @@ mod tests_int {
         _ffi_connect_scan_and_vibrate_devices();
     }
 
-    fn _connect() -> Telekinesis {
-        if let Ok(tk) = Telekinesis::new_with_default_settings() {
-            return tk;
-        } else {
-            panic!();
-        }
-    }
-
     #[test]
     #[nonparallel(M)]
     fn scan_vibrate_and_stop_events_are_returned_e2e() {
         // arrange
-        let mut tk: Telekinesis = _connect();
+        let mut tk: Telekinesis = Telekinesis::new_with_default_settings().unwrap();
         fn assert_next_event(tk: &mut Telekinesis, contains: &str) {
             thread::sleep(Duration::from_secs(1));
             let evt = tk.get_next_event();
@@ -106,7 +97,7 @@ mod tests_int {
     #[nonparallel(M)]
     fn scan_vibrate_and_stop_events_are_queued_e2e() {
         // arrange
-        let mut tk: Telekinesis = _connect();
+        let mut tk: Telekinesis = Telekinesis::new_with_default_settings().unwrap();
 
         // act
         tk.scan_for_devices();
