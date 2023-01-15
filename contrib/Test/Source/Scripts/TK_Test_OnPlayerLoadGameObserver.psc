@@ -16,9 +16,10 @@ EndFunction
 
 Event OnHit(ObjectReference aggressor, Form source, Projectile projectile, bool powerAttack, bool sneakAttack, bool bashAttack, bool blocked)
 	Actor actorRef = PlayerRef.GetActorRef()
-	Float health = actorRef.GetActorValue("Health")
-	Float maxHealth = actorRef.GetBaseActorValue("Health")
-	Float strength = 1 - (health / maxHealth)
-	Log("OnHit " + strength + " health: " + health + " maxHealth: " + maxHealth)
-	TK_Telekinesis.TK_VibrateAllFor(strength, 1.5)
+	Float strength = 1 - (actorRef.GetActorValue("Health") / actorRef.GetBaseActorValue("Health"))
+	Float duration = 0.5 * (actorRef.GetBaseActorValue("Stamina") / actorRef.GetActorValue("Stamina"))
+	if (duration > 2)
+		duration = 2
+	endif
+	TK_Telekinesis.TK_VibrateAllFor(strength, duration + strength)
 EndEvent
