@@ -3,7 +3,7 @@ mod tests_int {
     use crate::*;
 
     use core::panic;
-    use std::ffi::{c_void};
+    use std::ffi::c_void;
 
     use std::thread;
     use std::time::Duration;
@@ -32,26 +32,22 @@ mod tests_int {
         }
     }
 
-    fn _assert_string( tk: *const c_void, raw_string: CString, starts_with: &str ) {
+    fn _assert_string(tk: *const c_void, raw_string: CString, starts_with: &str) {
         assert!(raw_string.to_str().unwrap().starts_with(starts_with));
-        tk_free_event(tk, raw_string.into_raw() );
+        tk_free_event(tk, raw_string.into_raw());
     }
 
     fn _ffi_connect_scan_and_vibrate_devices() {
         let tk = tk_connect();
         tk_scan_for_devices(tk);
-        
         thread::sleep(Duration::from_secs(5));
         _assert_string(tk, _poll_next_event(tk), "Device");
-
         tk_vibrate_all(tk, 1.0);
         thread::sleep(Duration::from_secs(1));
         _assert_string(tk, _poll_next_event(tk), "Vibrating");
-
         tk_stop_all(tk);
         thread::sleep(Duration::from_secs(5));
         _assert_string(tk, _poll_next_event(tk), "Stopping");
- 
         tk_close(tk);
     }
 
@@ -69,17 +65,16 @@ mod tests_int {
     fn _connect() -> Telekinesis {
         if let Ok(tk) = Telekinesis::new_with_default_settings() {
             return tk;
-        }
-        else {
+        } else {
             panic!();
         }
     }
 
     #[test]
-    fn scan_vibrate_and_stop_events_are_returned_e2e() {  
+    fn scan_vibrate_and_stop_events_are_returned_e2e() {
         // arrange
         let mut tk: Telekinesis = _connect();
-        fn assert_next_event( tk: &mut Telekinesis, contains: &str) {
+        fn assert_next_event(tk: &mut Telekinesis, contains: &str) {
             thread::sleep(Duration::from_secs(1));
             let evt = tk.get_next_event();
             assert!(evt.unwrap().as_string().contains(contains));
@@ -88,22 +83,22 @@ mod tests_int {
         // act & assert
         tk.scan_for_devices();
         thread::sleep(Duration::from_secs(5));
-        assert_next_event( &mut tk, "connected");
+        assert_next_event(&mut tk, "connected");
         tk.vibrate_all(1.0);
-        assert_next_event( &mut tk,"Vibrating");
+        assert_next_event(&mut tk, "Vibrating");
         tk.vibrate_all(0.5);
-        assert_next_event( &mut tk,"Vibrating");
+        assert_next_event(&mut tk, "Vibrating");
         tk.stop_all();
-        assert_next_event( &mut tk,"Stopping");
+        assert_next_event(&mut tk, "Stopping");
         tk.disconnect();
         let _ = tk.get_next_event();
     }
 
     #[test]
-    fn scan_vibrate_and_stop_events_are_queued_e2e() { 
+    fn scan_vibrate_and_stop_events_are_queued_e2e() {
         // arrange
         let mut tk: Telekinesis = _connect();
-        
+
         // act
         tk.scan_for_devices();
         thread::sleep(Duration::from_secs(5));
@@ -112,7 +107,7 @@ mod tests_int {
         tk.stop_all();
         thread::sleep(Duration::from_secs(2));
         tk.disconnect();
-        
+
         // assert
         let mut evt = tk.get_next_event();
         assert!(evt.unwrap().as_string().contains("connected"));
