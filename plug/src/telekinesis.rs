@@ -1,9 +1,8 @@
-use std::{ffi::c_float, sync::Arc, fmt};
+use std::{sync::Arc, fmt};
 
 use buttplug::{
     client::{
-        ButtplugClient, ButtplugClientDevice, ButtplugClientError, ButtplugClientEvent,
-        VibrateCommand,
+        ButtplugClient, ButtplugClientDevice, ButtplugClientError, ButtplugClientEvent
     },
     core::{connector::ButtplugInProcessClientConnectorBuilder, errors::ButtplugError},
     server::{
@@ -12,10 +11,10 @@ use buttplug::{
     },
 };
 use futures::{Future, StreamExt};
-use tokio::{runtime::Runtime, select, time::sleep};
-use tracing::{debug, error, info, instrument, span, warn, Level};
+use tokio::{runtime::Runtime};
+use tracing::{debug, error, info, instrument, warn};
 
-use crate::util::Narrow;
+use crate::{util::Narrow, commands::{create_cmd_handling_thread, TkCommand}};
 
 pub struct Telekinesis {
     pub runtime: Runtime,
@@ -77,123 +76,6 @@ impl TkEventEnum {
             TkEventEnum::Other(other) => format!("{:?}", other),
         }
     }
-}
-
-#[derive(Debug)]
-pub enum TkCommand {
-    TkScan,
-    TkVibrateAll(f32),
-    TkVibrateAllDelayed(f32, std::time::Duration),
-    TkStopAll,
-    TkDiscconect,
-}
-
-pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
-    if let Err(err) = client.start_scanning().await {
-        error!(error = err.to_string(), "Failed scanning for devices.");
-        return false;
-    }
-    true
-}
-
-pub async fn cmd_vibrate_all(client: &ButtplugClient, speed: c_float) -> i32 {
-    let mut vibrated = 0;
-    for device in client
-        .devices()
-        .iter()
-        .filter(|d| d.message_attributes().scalar_cmd().is_some())
-    {
-        debug!("Vibrating device {} with speed {}", device.name(), speed);
-        match device.vibrate(&VibrateCommand::Speed(speed.into())).await {
-            Ok(_) => vibrated += 1,
-            Err(err) => error!(
-                dev = device.name(),
-                error = err.to_string(),
-                "Failed to set device vibration speed."
-            ),
-        }
-    }
-    vibrated
-}
-
-pub async fn cmd_stop_all(client: &ButtplugClient) -> i32 {
-    let mut stopped = 0;
-    for device in client.devices() {
-        info!(dev = device.name(), "Stopping device.");
-        match device.stop().await {
-            Ok(_) => stopped += 1,
-            Err(err) => error!(
-                dev = device.name(),
-                error = err.to_string(),
-                "Failed to stop device."
-            ),
-        }
-    }
-    stopped
-}
-
-pub fn create_cmd_handling_thread(
-    runtime: &Runtime,
-    client: ButtplugClient,
-    event_sender: tokio::sync::mpsc::Sender<TkEventEnum>,
-) -> tokio::sync::mpsc::Sender<TkCommand> {
-    let (command_sender, mut command_receiver) = tokio::sync::mpsc::channel(128); // shouldn't be big, we consume cmds immediately
-    runtime.spawn(async move {
-        info!("Comand worker thread started");
-        let _ = span!(Level::INFO, "cmd_handling_thread").entered();
-
-        let mut delayed_cmd: Option<TkCommand> = None;
-        loop {
-            let recv_fut = command_receiver.recv();
-            let cmd = if let Some(TkCommand::TkVibrateAllDelayed(speed, duration)) = delayed_cmd {
-                debug!("Select delayed command");
-                select! {
-                    () = sleep(duration) => Some(TkCommand::TkVibrateAll(speed)),
-                    cmd = recv_fut => cmd
-                }
-            } else {
-                recv_fut.await
-            };
-            delayed_cmd = None; // always overwrite delayed with new command
-
-            if let Some(cmd) = cmd {
-                info!("Executing command {:?}", cmd);
-                match cmd {
-                    TkCommand::TkScan => {
-                        cmd_scan_for_devices(&client).await;
-                    }
-                    TkCommand::TkVibrateAll(speed) => {
-                        let vibrated = cmd_vibrate_all(&client, speed).await;
-                        event_sender
-                            .send(TkEventEnum::DeviceVibrated(vibrated))
-                            .await
-                            .unwrap_or_else(|_| error!("Queue full"));
-                    }
-                    TkCommand::TkStopAll => {
-                        let stopped = cmd_stop_all(&client).await;
-                        event_sender
-                            .send(TkEventEnum::DeviceStopped(stopped))
-                            .await
-                            .unwrap_or_else(|_| error!("Queue full"));
-                    }
-                    TkCommand::TkDiscconect => {
-                        client
-                            .disconnect()
-                            .await
-                            .unwrap_or_else(|_| error!("Failed to send disconnect to queue."));
-                    }
-                    TkCommand::TkVibrateAllDelayed(_, duration) => {
-                        info!("Delayed command {:?}", duration);
-                        delayed_cmd = Some(cmd);
-                    }
-                }
-            } else {
-                info!("Command stream closed");
-                break;
-            }
-        }
-    });
-    command_sender
 }
 
 pub fn create_event_handling_thread(
@@ -260,7 +142,7 @@ impl Telekinesis {
 
     // TODO: Drop Messages if event queue has overflow to not force users to consume
     #[instrument]
-    pub fn vibrate_all(&self, speed: f32) -> bool {
+    pub fn vibrate_all(&self, speed: f64) -> bool {
         info!("Sending Command: Vibrate all");
         if let Err(_) = self
             .command_sender
@@ -273,7 +155,7 @@ impl Telekinesis {
     }
 
     #[instrument]
-    pub fn vibrate_all_delayed(&self, speed: f32, duration: std::time::Duration) -> bool {
+    pub fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
             .command_sender

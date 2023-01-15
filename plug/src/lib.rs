@@ -8,8 +8,9 @@ use tracing::error;
 mod logging;
 mod telekinesis;
 mod tests;
-mod util;
 mod tests_int;
+mod util;
+mod commands;
 
 #[no_mangle]
 pub extern "C" fn tk_connect() -> *mut c_void {
@@ -29,19 +30,15 @@ pub extern "C" fn tk_scan_for_devices(_tk: *const c_void) -> bool {
 
 #[no_mangle]
 pub extern "C" fn tk_vibrate_all(_tk: *const c_void, speed: c_float) -> bool {
-    get_handle_unsafe(_tk).vibrate_all(speed)
+    get_handle_unsafe(_tk).vibrate_all(speed.into())
 }
 
 #[no_mangle]
-pub extern "C" fn tk_vibrate_all_for(
-    _tk: *const c_void,
-    speed: c_float,
-    duration_sec: c_float,
-) -> bool {
+pub extern "C" fn tk_vibrate_all_for(_tk: *const c_void, speed: c_float, dur_sec: c_float) -> bool {
     let handle = get_handle_unsafe(_tk);
 
-    handle.vibrate_all(speed)
-        && handle.vibrate_all_delayed(0.0, Duration::from_millis((duration_sec * 1000.0) as u64))
+    handle.vibrate_all(speed.into() )
+        && handle.vibrate_all_delayed(0.0, Duration::from_millis((dur_sec * 1000.0) as u64))
 }
 
 #[no_mangle]
