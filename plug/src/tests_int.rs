@@ -1,13 +1,18 @@
 #[cfg(test)]
 mod tests_int {
     use crate::*;
+    use lazy_static::lazy_static;
+    use nonparallel::nonparallel;
 
     use core::panic;
     use std::ffi::c_void;
 
     use std::thread;
     use std::time::Duration;
+    use std::sync::Mutex;
     use tracing::Level;
+
+    lazy_static! { static ref M: Mutex<()> = Mutex::new(()); }
 
     #[allow(dead_code)]
     fn enable_log() {
@@ -52,11 +57,13 @@ mod tests_int {
     }
 
     #[test]
+    #[nonparallel(M)]
     fn ffi_connect_scan_and_vibrate_devices_2e2() {
         _ffi_connect_scan_and_vibrate_devices();
     }
 
     #[test]
+    #[nonparallel(M)]
     fn ffi_connect_scan_and_vibrate_devices_works_after_reconnect_e2e() {
         _ffi_connect_scan_and_vibrate_devices();
         _ffi_connect_scan_and_vibrate_devices();
@@ -71,6 +78,7 @@ mod tests_int {
     }
 
     #[test]
+    #[nonparallel(M)]
     fn scan_vibrate_and_stop_events_are_returned_e2e() {
         // arrange
         let mut tk: Telekinesis = _connect();
@@ -95,6 +103,7 @@ mod tests_int {
     }
 
     #[test]
+    #[nonparallel(M)]
     fn scan_vibrate_and_stop_events_are_queued_e2e() {
         // arrange
         let mut tk: Telekinesis = _connect();
