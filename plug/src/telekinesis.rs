@@ -2,12 +2,12 @@ use std::{sync::Arc, fmt};
 
 use buttplug::{
     client::{
-        ButtplugClient, ButtplugClientDevice, ButtplugClientError, ButtplugClientEvent
+        ButtplugClient, ButtplugClientDevice, ButtplugClientEvent
     },
     core::{connector::ButtplugInProcessClientConnectorBuilder, errors::ButtplugError},
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
-        ButtplugServerBuilder, ButtplugServerError,
+        ButtplugServerBuilder,
     },
 };
 use futures::{Future, StreamExt};
@@ -26,23 +26,6 @@ impl fmt::Debug for Telekinesis
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Telekinesis").finish()
-    }
-}
-
-#[derive(Debug)]
-pub enum TkError {
-    ServerError(ButtplugServerError),
-    ClientError(ButtplugClientError),
-}
-
-impl From<ButtplugServerError> for TkError {
-    fn from(e: ButtplugServerError) -> Self {
-        TkError::ServerError(e)
-    }
-}
-impl From<ButtplugClientError> for TkError {
-    fn from(e: ButtplugClientError) -> Self {
-        TkError::ClientError(e)
     }
 }
 
@@ -101,7 +84,7 @@ pub fn create_event_handling_thread(
 }
 
 impl Telekinesis {
-    pub fn new_with_default_settings() -> Result<Telekinesis, TkError> {
+    pub fn new_with_default_settings() -> Result<Telekinesis, anyhow::Error> {
         info!("Connecting with defualt settings");
         Telekinesis::new(async {
             let server = ButtplugServerBuilder::default()
@@ -112,13 +95,13 @@ impl Telekinesis {
                 .finish();
             let client = ButtplugClient::new("Telekinesis");
             client.connect(connector).await?;
-            Ok::<ButtplugClient, TkError>(client)
+            Ok::<ButtplugClient, anyhow::Error>(client)
         })
     }
 
     pub fn new(
-        fut: impl Future<Output = Result<ButtplugClient, TkError>>,
-    ) -> Result<Telekinesis, TkError> {
+        fut: impl Future<Output = Result<ButtplugClient, anyhow::Error>>,
+    ) -> Result<Telekinesis, anyhow::Error> {
         let runtime = Runtime::new().unwrap();
         let client = runtime.block_on(fut)?;
         let (event_receiver, event_sender) = create_event_handling_thread(&runtime, &client);
