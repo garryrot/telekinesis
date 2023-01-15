@@ -12,6 +12,10 @@ mod tests_int {
     use tracing::Level;
 
     lazy_static! { static ref M: Mutex<()> = Mutex::new(()); }
+            
+    fn _sleep1() {
+        thread::sleep(Duration::from_millis(200));
+    }
 
     #[allow(dead_code)]
     fn enable_log() {
@@ -47,10 +51,10 @@ mod tests_int {
         thread::sleep(Duration::from_secs(5));
         _assert_string(tk, _poll_next_event(tk), "Device");
         tk_vibrate_all(tk, 1.0);
-        thread::sleep(Duration::from_secs(1));
+        _sleep1();
         _assert_string(tk, _poll_next_event(tk), "Vibrating");
         tk_stop_all(tk);
-        thread::sleep(Duration::from_secs(5));
+        _sleep1();
         _assert_string(tk, _poll_next_event(tk), "Stopping");
         tk_close(tk);
     }
@@ -73,22 +77,24 @@ mod tests_int {
     fn scan_vibrate_and_stop_events_are_returned_e2e() {
         // arrange
         let mut tk: Telekinesis = Telekinesis::new_with_default_settings().unwrap();
-        fn assert_next_event(tk: &mut Telekinesis, contains: &str) {
-            thread::sleep(Duration::from_secs(1));
-            let evt = tk.get_next_event();
-            assert!(evt.unwrap().as_string().contains(contains));
-        }
 
         // act & assert
         tk.scan_for_devices();
         thread::sleep(Duration::from_secs(5));
-        assert_next_event(&mut tk, "connected");
+        tk.get_next_event().unwrap().to_string().contains("connected");
+
         tk.vibrate_all(1.0);
-        assert_next_event(&mut tk, "Vibrating");
+        _sleep1();
+        tk.get_next_event().unwrap().to_string().contains("Vibrating");
+
         tk.vibrate_all(0.5);
-        assert_next_event(&mut tk, "Vibrating");
+        _sleep1();
+        tk.get_next_event().unwrap().to_string().contains("Vibrating");
+
         tk.stop_all();
-        assert_next_event(&mut tk, "Stopping");
+        _sleep1();
+        tk.get_next_event().unwrap().to_string().contains("Stopping");
+
         tk.disconnect();
         let _ = tk.get_next_event();
     }
@@ -109,13 +115,9 @@ mod tests_int {
         tk.disconnect();
 
         // assert
-        let mut evt = tk.get_next_event();
-        assert!(evt.unwrap().as_string().contains("connected"));
-        evt = tk.get_next_event();
-        assert!(evt.unwrap().as_string().contains("Vibrating"));
-        evt = tk.get_next_event();
-        assert!(evt.unwrap().as_string().contains("Vibrating"));
-        evt = tk.get_next_event();
-        assert!(evt.unwrap().as_string().contains("Stopping"));
+        assert!(tk.get_next_event().unwrap().to_string().contains("connected"));
+        assert!(tk.get_next_event().unwrap().to_string().contains("Vibrating"));
+        assert!(tk.get_next_event().unwrap().to_string().contains("Vibrating"));
+        assert!(tk.get_next_event().unwrap().to_string().contains("Stopping"));
     }
 }

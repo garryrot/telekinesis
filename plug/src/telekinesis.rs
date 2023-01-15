@@ -1,4 +1,4 @@
-use std::{sync::Arc, fmt};
+use std::{sync::Arc, fmt::{self, Display}};
 
 use buttplug::{
     client::{
@@ -29,7 +29,6 @@ impl fmt::Debug for Telekinesis
     }
 }
 
-#[derive(Debug)]
 pub enum TkEventEnum {
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
@@ -39,6 +38,21 @@ pub enum TkEventEnum {
     Other(ButtplugClientEvent),
 }
 
+impl Display for TkEventEnum 
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let _ = match self {
+            TkEventEnum::DeviceAdded(device) => write!(f, "Device '{}' connected.", device.name()),
+            TkEventEnum::DeviceRemoved(device) => write!(f, "Device '{}' Removed.", device.name()),
+            TkEventEnum::DeviceVibrated(speed)=> write!(f, "Vibrating '{}' devices.", speed),
+            TkEventEnum::DeviceStopped(speed) => write!(f, "Stopping '{}' devices.", speed),
+            TkEventEnum::TkError(err) => write!(f, "Error '{:?}'", err),
+            TkEventEnum::Other(other) => write!(f, "{:?}", other),
+        };
+        Ok(())
+    }
+}
+
 impl TkEventEnum {
     fn from_event(event: ButtplugClientEvent) -> TkEventEnum {
         match event {
@@ -46,17 +60,6 @@ impl TkEventEnum {
             ButtplugClientEvent::DeviceRemoved(device) => TkEventEnum::DeviceRemoved(device),
             ButtplugClientEvent::Error(err) => TkEventEnum::TkError(err),
             other => TkEventEnum::Other(other),
-        }
-    }
-
-    pub fn as_string(&self) -> String {
-        match self {
-            TkEventEnum::DeviceAdded(device) => format!("Device '{}' connected.", device.name()),
-            TkEventEnum::DeviceRemoved(device) => format!("Device '{}' Removed.", device.name()),
-            TkEventEnum::DeviceVibrated(i) => format!("Vibrating '{}' devices.", i),
-            TkEventEnum::DeviceStopped(i) => format!("Stopping '{}' devices.", i),
-            TkEventEnum::TkError(err) => format!("Error '{}'", err.to_string()),
-            TkEventEnum::Other(other) => format!("{:?}", other),
         }
     }
 }
@@ -172,7 +175,7 @@ impl Telekinesis {
     pub fn get_next_event(&mut self) -> Option<TkEventEnum> {
         debug!("get_next_event");
         if let Ok(msg) = self.event_receiver.try_recv() {
-            debug!("Got event {:?}", msg);
+            debug!("Got event {}", msg.to_string());
             return Some(msg);
         }
         None

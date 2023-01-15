@@ -48,7 +48,7 @@ pub extern "C" fn tk_try_get_next_event(_tk: *const c_void) -> *mut i8 {
     let evt = tk.get_next_event();
     forget(tk);
     if let Some(ok) = evt {
-        CString::new(ok.as_string()).unwrap().into_raw() as *mut i8
+        CString::new(ok.to_string()).unwrap().into_raw() as *mut i8
     } else {
         std::ptr::null_mut()
     }
