@@ -4,14 +4,15 @@ use std::{
     time::Duration,
 };
 use telekinesis::Telekinesis;
+use telekinesis::TkEventEnum;
 use tracing::error;
 mod logging;
 mod telekinesis;
-mod tests;
-mod tests_int;
 mod util;
 mod commands;
+mod tests;
 
+// Export as C FFI
 #[no_mangle]
 pub extern "C" fn tk_connect() -> *mut c_void {
     match Telekinesis::new_with_default_settings() {
@@ -74,4 +75,19 @@ pub extern "C" fn tk_close(_tk: *mut c_void) {
 fn get_handle_unsafe(tk: *const c_void) -> &'static Telekinesis {
     assert!(false == tk.is_null());
     unsafe { &*(tk as *const Telekinesis) }
+}
+
+// Export as rust library
+pub fn new_with_default_settings() -> impl Tk
+{
+    Telekinesis::new_with_default_settings().unwrap() 
+}
+
+pub trait Tk {
+    fn scan_for_devices(&self) -> bool;
+    fn vibrate_all(&self, speed: f64) -> bool;
+    fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool;
+    fn stop_all(&self) -> bool;
+    fn disconnect(&mut self);
+    fn get_next_event(&mut self) -> Option<TkEventEnum>;
 }

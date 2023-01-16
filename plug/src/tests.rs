@@ -6,21 +6,6 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    fn _sleep( milliseconds: u64 ) {
-        thread::sleep(Duration::from_millis(milliseconds));
-    }
-
-    fn _assert_one_event( tk: &mut Telekinesis) {
-        _sleep(10);
-        assert!( tk.get_next_event().is_some() );
-        assert!( tk.get_next_event().is_none() );
-    }
-
-    fn _assert_no_event( tk: &mut Telekinesis) {
-        _sleep(10);
-        assert!( tk.get_next_event().is_none() );
-    }
-
     #[test]
     fn init_logging_handles_nullpointr_without_panic() {
         tk_init_logging(LogLevel::Trace, null());
@@ -53,4 +38,21 @@ mod tests {
         tk.vibrate_all(0.33);
         _assert_one_event(&mut tk);
     }
+
+    
+    fn _sleep( milliseconds: u64 ) {
+        thread::sleep(Duration::from_millis(milliseconds));
+    }
+
+    fn _assert_one_event( tk: &mut Telekinesis) {
+        _sleep(10);
+        assert!( tk.get_next_event().is_some() );
+        assert!( tk.get_next_event().is_none() );
+    }
+
+    fn _assert_no_event( tk: &mut Telekinesis) {
+        _sleep(10);
+        assert!( tk.get_next_event().is_none() );
+    }
+
 }

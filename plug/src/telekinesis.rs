@@ -14,14 +14,13 @@ use futures::{Future, StreamExt};
 use tokio::{runtime::Runtime};
 use tracing::{debug, error, info, instrument, warn};
 
-use crate::{util::Narrow, commands::{create_cmd_handling_thread, TkCommand}};
+use crate::{util::Narrow, commands::{create_cmd_handling_thread, TkCommand}, Tk};
 
 pub struct Telekinesis {
     pub runtime: Runtime,
     pub event_receiver: tokio::sync::mpsc::Receiver<TkEventEnum>,
     pub command_sender: tokio::sync::mpsc::Sender<TkCommand>,
 }
-
 impl fmt::Debug for Telekinesis 
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -86,7 +85,8 @@ pub fn create_event_handling_thread(
     (event_receiver, sender_clone)
 }
 
-impl Telekinesis {
+impl Telekinesis 
+{
     pub fn new_with_default_settings() -> Result<Telekinesis, anyhow::Error> {
         info!("Connecting with defualt settings");
         Telekinesis::new(async {
@@ -115,9 +115,11 @@ impl Telekinesis {
             command_sender: command_sender,
         })
     }
+}
 
+impl Tk for Telekinesis {
     #[instrument]
-    pub fn scan_for_devices(&self) -> bool {
+    fn scan_for_devices(&self) -> bool {
         info!("Sending Command: Scan for devices");
         if let Err(_) = self.command_sender.blocking_send(TkCommand::TkScan) {
             error!("Failed to send vibrate_all"); // whats skyrim gonna do about it
@@ -128,7 +130,7 @@ impl Telekinesis {
 
     // TODO: Drop Messages if event queue has overflow to not force users to consume
     #[instrument]
-    pub fn vibrate_all(&self, speed: f64) -> bool {
+    fn vibrate_all(&self, speed: f64) -> bool {
         info!("Sending Command: Vibrate all");
         if let Err(_) = self
             .command_sender
@@ -141,7 +143,7 @@ impl Telekinesis {
     }
 
     #[instrument]
-    pub fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool {
+    fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
             .command_sender
@@ -154,7 +156,7 @@ impl Telekinesis {
     }
 
     #[instrument]
-    pub fn stop_all(&self) -> bool {
+    fn stop_all(&self) -> bool {
         info!("Sending Command: Stop all");
         if let Err(_) = self.command_sender.blocking_send(TkCommand::TkStopAll) {
             error!("Failed to send stop_all");
@@ -164,7 +166,7 @@ impl Telekinesis {
     }
 
     #[instrument]
-    pub fn disconnect(&mut self) {
+    fn disconnect(&mut self) {
         info!("Sending Command: Disconnecting client");
         if let Err(_) = self.command_sender.blocking_send(TkCommand::TkDiscconect) {
             error!("Failed to send disconnect");
@@ -172,7 +174,7 @@ impl Telekinesis {
     }
 
     #[instrument]
-    pub fn get_next_event(&mut self) -> Option<TkEventEnum> {
+    fn get_next_event(&mut self) -> Option<TkEventEnum> {
         debug!("get_next_event");
         if let Ok(msg) = self.event_receiver.try_recv() {
             debug!("Got event {}", msg.to_string());

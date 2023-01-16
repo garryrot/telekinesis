@@ -1,11 +1,11 @@
 [package]
-name = "telekinesis_plug"
-version = "0.2.0"
+name = "plug"
+version = "0.3.0"
 edition = "2021"
 
 [lib]
 name = "telekinesis_plug"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 anyhow = "1.0.68"
