@@ -39,7 +39,6 @@ mod tests {
         _assert_one_event(&mut tk);
     }
 
-    
     fn _sleep( milliseconds: u64 ) {
         thread::sleep(Duration::from_millis(milliseconds));
     }
