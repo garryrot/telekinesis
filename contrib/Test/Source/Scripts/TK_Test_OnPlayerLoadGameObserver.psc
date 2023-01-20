@@ -5,8 +5,8 @@ ReferenceAlias property PlayerRef auto
 
 Event OnPlayerLoadGame()
 	Log("OnPlayerLoadGame")
-	Log("TK_ScanForDevices...")
-	TK_Telekinesis.TK_ScanForDevices();
+	Log("ScanForDevices...")
+	Tele.ScanForDevices();
 EndEvent
 
 Function Log(string textToPrint)
@@ -21,5 +21,5 @@ Event OnHit(ObjectReference aggressor, Form source, Projectile projectile, bool 
 	if (duration < 0.5)
 		duration = 0.5
 	endif
-	TK_Telekinesis.TK_VibrateAllFor(strength, duration)
+	Tele.VibrateAllFor(strength, duration)
 EndEvent

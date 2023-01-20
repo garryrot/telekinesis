@@ -13,75 +13,73 @@ using namespace SKSE::log;
 using namespace Telekinesis;
 
 // papyrus native function implementations
-
 TEST_CASE("Connection/Connecting_Works") {
-    Tk_ConnectAndScanForDevices(NULL);
+    ConnectAndScanForDevices(NULL);
     Sleep(10);
-    Tk_Close(NULL);
+    Close(NULL);
 }
 
 TEST_CASE("Controlls/NotConnected_ReturnFalse") { 
-    REQUIRE_FALSE(TK_VibrateAll(NULL, 0.0));
-    REQUIRE_FALSE(TK_VibrateAllFor(NULL, 0.0, 0.0));
-    REQUIRE_FALSE(Tk_StopAll(NULL));
-    REQUIRE_FALSE(Tk_Close(NULL));
+    REQUIRE_FALSE(VibrateAll(NULL, 0.0));
+    REQUIRE_FALSE(VibrateAllFor(NULL, 0.0, 0.0));
+    REQUIRE_FALSE(StopAll(NULL));
+    REQUIRE_FALSE(Close(NULL));
 }
 
 TEST_CASE("Controlls/Connected_ReturnTrue") {
-    Tk_ConnectAndScanForDevices(NULL);
-    REQUIRE(TK_VibrateAll(NULL, 0.0) == true);
-    REQUIRE(Tk_StopAll(NULL) == true);
+    ConnectAndScanForDevices(NULL);
+    REQUIRE(VibrateAll(NULL, 0.0) == true);
+    REQUIRE(StopAll(NULL) == true);
     Sleep(10);
-    Tk_Close(NULL);
+    Close(NULL);
 }
 
 TEST_CASE("Controlls/ConnectAndDisconnect_ReturnsFalse") {
-    Tk_ConnectAndScanForDevices(NULL);
+    ConnectAndScanForDevices(NULL);
     Sleep(10);
-    Tk_Close(NULL);
-    REQUIRE_FALSE(TK_VibrateAll(NULL, 0.0));
-    REQUIRE_FALSE(Tk_StopAll(NULL));
-    REQUIRE_FALSE(Tk_Close(NULL));
+    Close(NULL);
+    REQUIRE_FALSE(VibrateAll(NULL, 0.0));
+    REQUIRE_FALSE(StopAll(NULL));
+    REQUIRE_FALSE(Close(NULL));
 }
 
 TEST_CASE("Papyrus/poll_events_nothing_happened_returns_empty_list") {
-    Tk_ConnectAndScanForDevices(NULL);
-    auto list = Tk_PollEventsStdString();
-    Tk_Close(NULL);
+    ConnectAndScanForDevices(NULL);
+    auto list = PollEventsStdString();
+    Close(NULL);
 }
 
 TEST_CASE("Papyrus/poll_commands_produce_1_event") {
-    Tk_ConnectAndScanForDevices(NULL);
-    TK_VibrateAll(NULL, 0.0);
+    ConnectAndScanForDevices(NULL);
+    VibrateAll(NULL, 0.0);
     Sleep(1);
-    auto list = Tk_PollEventsStdString();
+    auto list = PollEventsStdString();
     REQUIRE(list.size() == 1);
-    Tk_Close(NULL);
+    Close(NULL);
 }
 
 TEST_CASE("Papyrus/poll_events_2_commands_produce_2_events") {
-    Tk_ConnectAndScanForDevices(NULL);
-    TK_VibrateAll(NULL, 0.0);
-    TK_VibrateAllFor(NULL, 0.0, 0.0); // delay emits 2 events
+    ConnectAndScanForDevices(NULL);
+    VibrateAll(NULL, 0.0);
+    VibrateAllFor(NULL, 0.0, 0.0); // delay emits 2 events
     Sleep(10);
-    auto list = Tk_PollEventsStdString();
+    auto list = PollEventsStdString();
     REQUIRE(list.size() == 3);
-    Tk_Close(NULL);
+    Close(NULL);
 }
 
 TEST_CASE("Papyrus/poll_events_200_commands_produce_128_events") {
-    Tk_ConnectAndScanForDevices(NULL);
+    ConnectAndScanForDevices(NULL);
     for (size_t i = 0; i < 200; i++) {
-        Tk_StopAll(NULL);
+        StopAll(NULL);
     }
     Sleep(2);
-    auto list = Tk_PollEventsStdString();
+    auto list = PollEventsStdString();
     REQUIRE(list.size() == 128);
-    Tk_Close(NULL);
+    Close(NULL);
 }
 
 // rust ffi
-
 TEST_CASE("telekinesis_plug/cbinding_returns_instance") {
     void *tk = tk_connect();
     REQUIRE(tk != NULL);

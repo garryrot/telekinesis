@@ -1,4 +1,4 @@
-# Telekinesis (Bluetooth Toy Control for Papyrus) V0.1.0
+# Telekinesis (Bluetooth Toy Control for Papyrus) V0.3.0
 
 **In a Nutshell**
 
@@ -16,9 +16,9 @@ This is my humble attempt at creating Papyrus bindings for the famous buttplug.i
 ### 1. Install
 
 1. Install the Mod
-2. Move the .psc file `TK_Telekinesis.psc` into a path where your Papyrus Compiler can find it. For Creation Kit its probably something like `data/source/scripts` but I don't get its folder structure at all tbh.
+2. Move the Main .psc file `Tele.psc` into a path where your Papyrus Compiler can find it. For Creation Kit its probably something like `data/source/scripts` but I don't get its folder structure at all tbh.
 3. Connect your Toy via Bluetooth
-4. Open up Creation Kit and [Use the Papyrus Functions!](https://github.com/garryrot/telekinesis/blob/master/contrib/Distribution/Source/Scripts/TK_Telekinesis.psc)
+4. Open up Creation Kit and [Use the Papyrus Functions!](https://github.com/garryrot/telekinesis/blob/master/contrib/Distribution/Source/Scripts/Tele.psc)
 4. Alternatively: Install The Sample ESP (Telekinesis.Sample.7z), which demonstrates the use of those Papyrus Functions In-Game
 
 **Depdendencies**: `SKSE64`, `Skyrim SE`, `Address Library for SKSE Plugins`
@@ -32,7 +32,7 @@ once for every game process). You most likely want to do this `OnInit` and `OnPl
 ```cs
 Actor property Player auto
 Event OnInit()
-    TK_Telekinesis.TK_ScanForDevices()
+    Tele.ScanForDevices()
     RegisterForUpdate(5) // for displaying updates (see section 3)
 EndEvent
 ```
@@ -41,18 +41,18 @@ If Telekinesis wasn't started, the other functions will not have any effect.
 
 ### 3. Control Devices 
 
-Call `TK_VibrateAll(speed)` to vibrate all devices.
+Call `VibrateAll(speed)` to vibrate all devices.
 
 ```cs
-int vibrated = TK_Telekinesis.TK_VibrateAll(1.0) // speed can be any float from 0 to (1.0=full speed)
+int vibrated = Tele.VibrateAll(1.0) // speed can be any float from 0 to (1.0=full speed)
 Debug.Notification( "Vibrating" + vibrated + " device(s)..." )
 ```
 
-Call `TK_VibrateAll(0)` to stop all devices
+Call `VibrateAll(0)` to stop all devices
 
 ```cs
 Util.Wait(5);
-int stopped = TK_Telekinesis.TK_VibrateAll(0) // 0 = stop vibrating
+int stopped = Tele.VibrateAll(0) // 0 = stop vibrating
 Debug.Notification( "Stopping" + stopped + " device(s)..." )
 ```
 
@@ -60,12 +60,12 @@ If no devices are connected or Telekinesis was not started, this will simply do 
 
 #### 4. Monitoring Connections
 
-You can poll `Tk_PollEvents` to see if any device connected or disconnected. This
+You can poll `PollEvents` to see if any device connected or disconnected. This
 will return a message or the default string `""` (if nothing happened).
 
 ```cs
 Event OnUpdate()
-    String evt = TK_Telekinesis.Tk_PollEvents()
+    String evt = Tele.PollEvents()
     If (evt != "")
         Debug.Notification(evt) // If it says "Device XY connected" you are ready to go
     EndIf
@@ -74,20 +74,20 @@ EndEvent
 
 ### 5. Shutting Down
 
-At one point the user will close the game or load a different safe. If possible, you should call `Tk_StopAll`
+At one point the user will close the game or load a different safe. If possible, you should call `StopAll`
 to stop all devices. In the worst case (i.e. if the user kills the game process while a vibration is running)
 the `Stop Event` will be lost and the vibrating toys might need to be turned off manually.
 
 I don't know if there is any reliable event or hook to do this. Please tell me if you do.
 
 ```cs
-TK_Telekinesis.Tk_StopAll() // stop all devices
+Tele.StopAll() // stop all devices
 ```
 
-`TK_Close` will free up the associated memory resources after everything else is done.
+`Close` will free up the associated memory resources after everything else is done.
 
 ```cs
-TK_Telekinesis.TK_Close() // destroy the connection 
+Tele.Close() // destroy the connection 
 ```
 
 ## Demo
@@ -159,6 +159,13 @@ Telekinesis tries a completely different approach, trying to fit a different nic
 This if free software. If you want to change this, redistribute it, or integrate it into your mod, you are free to whatever you like, as long as it is permitted by the  [Apache License](LICENSE)
 
 ## Changelog
+
+### 0.3.0
+
+- Fix AE support
+- Support vibrating for a certain duration
+- Actually link against the correct rust library, so the stutter fix from 0.2.0 is now correctly included
+- Reworked/Broke entire API
 
 ### 0.2.0
 

@@ -9,11 +9,11 @@ using namespace SKSE;
 
 namespace Telekinesis {
 
-    constexpr std::string_view PapyrusClass = "TK_Telekinesis";
+    constexpr std::string_view PapyrusClass = "Tele";
     static void* _tk = NULL;
 
-    __declspec(dllexport) bool Tk_ConnectAndScanForDevices(StaticFunctionTag*) {
-        log::info("TK_ScanForDevices");
+    __declspec(dllexport) bool ConnectAndScanForDevices(StaticFunctionTag*) {
+        log::info("Telekinesis::ScanForDevices");
         if (_tk == NULL) {
             if ((_tk = tk_connect()) == NULL) {
                 log::error("tk_connect returned null pointer. Server not created.");
@@ -24,8 +24,8 @@ namespace Telekinesis {
         return true;
     }
 
-    __declspec(dllexport) bool TK_VibrateAll(StaticFunctionTag*, float_t speed) {
-        log::info("TK_VibrateAll ( speed={} ) ", speed );
+    __declspec(dllexport) bool VibrateAll(StaticFunctionTag*, float_t speed) {
+        log::info("Telekinesis::VibrateAll ( speed={} ) ", speed );
         if (_tk == NULL)
             return false;
 
@@ -33,16 +33,16 @@ namespace Telekinesis {
         return true;
     }
 
-    __declspec(dllexport) bool TK_VibrateAllFor(StaticFunctionTag*, float_t speed, float_t time_sec) {
-        log::info("TK_VibrateAllFor ( speed={}, time_sec={} ) ", speed, time_sec);
+    __declspec(dllexport) bool VibrateAllFor(StaticFunctionTag*, float_t speed, float_t time_sec) {
+        log::info("Telekinesis::VibrateAllFor ( speed={}, time_sec={} ) ", speed, time_sec);
         if (_tk == NULL) return false;
 
         tk_vibrate_all_for(_tk, speed, time_sec);
         return true;
     }
 
-    __declspec(dllexport) bool Tk_StopAll(StaticFunctionTag*) {
-        log::info("Tk_StopAll");
+    __declspec(dllexport) bool StopAll(StaticFunctionTag*) {
+        log::info("Telekinesis::StopAll");
         if (_tk == NULL)
             return false;
 
@@ -50,9 +50,9 @@ namespace Telekinesis {
         return true;
     }
 
-    __declspec(dllexport) std::vector<std::string> Tk_PollEventsStdString() {
+    __declspec(dllexport) std::vector<std::string> PollEventsStdString() {
         std::vector<std::string> output;
-        log::info("Tk_PollEvents");
+        log::info("Telekinesis::PollEvents");
         if (_tk == NULL) {
             return output;
         }
@@ -68,17 +68,17 @@ namespace Telekinesis {
         return output; 
     }
     
-    __declspec(dllexport) std::vector<RE::BSFixedString> Tk_PollEvents(StaticFunctionTag*) {
+    __declspec(dllexport) std::vector<RE::BSFixedString> PollEvents(StaticFunctionTag*) {
         std::vector<RE::BSFixedString> output;
-        auto evts = Tk_PollEventsStdString();
+        auto evts = PollEventsStdString();
         for (size_t i = 0; i < evts.size(); i++) {
             output.push_back(evts[i]);
         }
         return output;
     } 
 
-    __declspec(dllexport) bool Tk_Close(StaticFunctionTag*) {
-        log::info("Tk_Close");
+    __declspec(dllexport) bool Close(StaticFunctionTag*) {
+        log::info("Telekinesis::Close");
         if (_tk == NULL)
             return false;
 
@@ -88,12 +88,12 @@ namespace Telekinesis {
     }
 
     bool RegisterPapyrusCalls(IVirtualMachine* vm) {
-        vm->RegisterFunction("TK_ScanForDevices", PapyrusClass, Tk_ConnectAndScanForDevices);
-        vm->RegisterFunction("TK_VibrateAll", PapyrusClass, TK_VibrateAll);
-        vm->RegisterFunction("TK_VibrateAllFor", PapyrusClass, TK_VibrateAllFor);
-        vm->RegisterFunction("Tk_StopAll", PapyrusClass, Tk_StopAll);
-        vm->RegisterFunction("Tk_PollEvents", PapyrusClass, Tk_PollEvents);
-        vm->RegisterFunction("Tk_Close", PapyrusClass, Tk_Close);
+        vm->RegisterFunction("ScanForDevices", PapyrusClass, ConnectAndScanForDevices);
+        vm->RegisterFunction("VibrateAll", PapyrusClass, VibrateAll);
+        vm->RegisterFunction("VibrateAllFor", PapyrusClass, VibrateAllFor);
+        vm->RegisterFunction("StopAll", PapyrusClass, StopAll);
+        vm->RegisterFunction("PollEvents", PapyrusClass, PollEvents);
+        vm->RegisterFunction("Close", PapyrusClass, Close);
         return true;
     }
 }
