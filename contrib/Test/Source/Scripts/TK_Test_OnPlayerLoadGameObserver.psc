@@ -9,11 +9,6 @@ Event OnPlayerLoadGame()
 	Tele.ScanForDevices();
 EndEvent
 
-Function Log(string textToPrint)
-	Debug.Trace("[TK] " + textToPrint)
-	Debug.Notification("[TK] " + textToPrint)
-EndFunction
-
 Event OnHit(ObjectReference aggressor, Form source, Projectile projectile, bool powerAttack, bool sneakAttack, bool bashAttack, bool blocked)
 	Actor actorRef = PlayerRef.GetActorRef()
 	Float strength = 1 - (actorRef.GetActorValue("Health") / actorRef.GetBaseActorValue("Health"))
@@ -23,3 +18,8 @@ Event OnHit(ObjectReference aggressor, Form source, Projectile projectile, bool 
 	endif
 	Tele.VibrateAllFor(strength, duration)
 EndEvent
+
+Function Log(string textToPrint)
+	Debug.Trace("[Tele] " + textToPrint)
+	Debug.Notification("[Tele] " + textToPrint)
+EndFunction

@@ -193,6 +193,6 @@ Event OnToysDenied(string eventName, string argString, float argNum, form sender
 EndEvent
 
 Function Log(string textToPrint)
-	Debug.Trace("[TK] " + textToPrint)
-	Debug.Notification("[TK] " + textToPrint)
+	Debug.Trace("[Tele] " + textToPrint)
+	Debug.Notification("[Tele] " + textToPrint)
 EndFunction

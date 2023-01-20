@@ -10,6 +10,6 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 endEvent
 
 Function Log(string textToPrint)
-	Debug.Trace("[TK] " + textToPrint)
-	Debug.Notification("[TK] " + textToPrint)
+	Debug.Trace("[Tele] " + textToPrint)
+	Debug.Notification("[Tele] " + textToPrint)
 EndFunction
