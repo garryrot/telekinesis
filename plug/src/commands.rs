@@ -1,5 +1,5 @@
 use buttplug::client::{ButtplugClient, VibrateCommand};
-use tokio::{select, runtime::Runtime, time::sleep};
+use tokio::{select, runtime::Handle, time::sleep};
 use tracing::{error, info, span, debug, Level};
 
 use crate::telekinesis::TkEvent;
@@ -57,13 +57,12 @@ pub async fn cmd_stop_all(client: &ButtplugClient) -> i32 {
     stopped
 }
 
-pub fn create_cmd_handling_thread(
-    runtime: &Runtime,
+pub fn create_cmd_thread(
     client: ButtplugClient,
     event_sender: tokio::sync::mpsc::Sender<TkEvent>,
-) -> tokio::sync::mpsc::Sender<TkAction> {
-    let (command_sender, mut command_receiver) = tokio::sync::mpsc::channel(128); // shouldn't be big, we consume cmds immediately
-    runtime.spawn(async move {
+    mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>
+) {
+    Handle::current().spawn(async move {
         info!("Comand worker thread started");
         let _ = span!(Level::INFO, "cmd_handling_thread").entered();
 
@@ -118,5 +117,4 @@ pub fn create_cmd_handling_thread(
             }
         }
     });
-    command_sender
 }

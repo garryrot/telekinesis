@@ -12,12 +12,12 @@ use buttplug::{
 use futures::{Future, StreamExt};
 use tokio::{runtime::Runtime};
 use tracing::{debug, error, info, instrument, warn};
-use crate::{util::Narrow, commands::{create_cmd_handling_thread, TkAction}, Tk};
+use crate::{util::Narrow, commands::{create_cmd_thread, TkAction}, Tk};
 
 pub struct Telekinesis {
-    pub runtime: Runtime,
     pub event_receiver: tokio::sync::mpsc::Receiver<TkEvent>,
     pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
+    pub thread: Runtime
 }
 
 pub enum TkEvent {
@@ -55,26 +55,30 @@ impl TkEvent {
     }
 }
 
-pub fn create_event_handling_thread(
-    runtime: &Runtime,
-    client: &ButtplugClient,
-) -> (
-    tokio::sync::mpsc::Receiver<TkEvent>,
-    tokio::sync::mpsc::Sender<TkEvent>,
-) {
-    let (event_sender, event_receiver) = tokio::sync::mpsc::channel(2048); // big in case events are not consumed
-    let sender_clone = event_sender.clone();
-    let mut events = client.event_stream();
+pub fn create_main_thread(fn_create_client: impl Future<Output = Result<ButtplugClient, anyhow::Error>> + std::marker::Send + 'static)
+-> (tokio::sync::mpsc::Receiver<TkEvent>, tokio::sync::mpsc::Sender<TkAction>, Runtime) {
+    let (event_sender, event_receiver) = tokio::sync::mpsc::channel(2048); 
+    let (command_sender, command_receiver) = tokio::sync::mpsc::channel(128);
+
+    let runtime = Runtime::new().unwrap();
     runtime.spawn(async move {
         info!("Event polling thread started");
-        while let Some(event) = events.next().await {
-            event_sender
-                .send(TkEvent::from_event(event))
-                .await
-                .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
+        match fn_create_client.await {
+            Ok(client) => {
+                let mut events = client.event_stream();
+                let sender_clone_cmd = event_sender.clone();
+                create_cmd_thread(client, sender_clone_cmd, command_receiver);
+                while let Some(event) = events.next().await {
+                    event_sender
+                        .send(TkEvent::from_event(event))
+                        .await
+                        .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
+                }
+            }
+            Err(err) => error!("Could not create buttplug client: {}", err.to_string()),
         }
     });
-    (event_receiver, sender_clone)
+    (event_receiver, command_sender, runtime)
 }
 
 impl Telekinesis 
@@ -94,17 +98,12 @@ impl Telekinesis
         })
     }
 
-    pub fn new(
-        fut: impl Future<Output = Result<ButtplugClient, anyhow::Error>>,
-    ) -> Result<Telekinesis, anyhow::Error> {
-        let runtime = Runtime::new().unwrap();
-        let client = runtime.block_on(fut)?;
-        let (event_receiver, event_sender) = create_event_handling_thread(&runtime, &client);
-        let command_sender = create_cmd_handling_thread(&runtime, client, event_sender);
+    pub fn new(fut: impl Future<Output = Result<ButtplugClient, anyhow::Error>> + std::marker::Send + 'static) -> Result<Telekinesis, anyhow::Error> {
+        let (event_receiver, command_sender, runtime) = create_main_thread(fut);
         Ok(Telekinesis {
-            runtime: runtime,
             event_receiver: event_receiver,
             command_sender: command_sender,
+            thread: runtime
         })
     }
 }
