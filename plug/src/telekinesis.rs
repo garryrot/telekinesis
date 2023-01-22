@@ -11,7 +11,7 @@ use buttplug::{
 };
 use futures::{Future, StreamExt};
 use tokio::{runtime::Runtime};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, warn};
 use crate::{util::Narrow, commands::{create_cmd_thread, TkAction}, Tk};
 
 pub struct Telekinesis {
@@ -55,37 +55,12 @@ impl TkEvent {
     }
 }
 
-pub fn create_main_thread(fn_create_client: impl Future<Output = Result<ButtplugClient, anyhow::Error>> + std::marker::Send + 'static)
--> (tokio::sync::mpsc::Receiver<TkEvent>, tokio::sync::mpsc::Sender<TkAction>, Runtime) {
-    let (event_sender, event_receiver) = tokio::sync::mpsc::channel(2048); 
-    let (command_sender, command_receiver) = tokio::sync::mpsc::channel(128);
-
-    let runtime = Runtime::new().unwrap();
-    runtime.spawn(async move {
-        info!("Event polling thread started");
-        match fn_create_client.await {
-            Ok(client) => {
-                let mut events = client.event_stream();
-                let sender_clone_cmd = event_sender.clone();
-                create_cmd_thread(client, sender_clone_cmd, command_receiver);
-                while let Some(event) = events.next().await {
-                    event_sender
-                        .send(TkEvent::from_event(event))
-                        .await
-                        .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
-                }
-            }
-            Err(err) => error!("Could not create buttplug client: {}", err.to_string()),
-        }
-    });
-    (event_receiver, command_sender, runtime)
-}
 
 impl Telekinesis 
 {
-    pub fn new_with_default_settings() -> Result<Telekinesis, anyhow::Error> {
+    pub fn connect_with_default_settings() -> Result<Telekinesis, anyhow::Error> {
         info!("Connecting with defualt settings");
-        Telekinesis::new(async {
+        Telekinesis::connect(async {
             let server = ButtplugServerBuilder::default()
                 .comm_manager(BtlePlugCommunicationManagerBuilder::default())
                 .finish()?;
@@ -97,12 +72,31 @@ impl Telekinesis
             Ok::<ButtplugClient, anyhow::Error>(client)
         })
     }
-
-    pub fn new(fut: impl Future<Output = Result<ButtplugClient, anyhow::Error>> + std::marker::Send + 'static) -> Result<Telekinesis, anyhow::Error> {
-        let (event_receiver, command_sender, runtime) = create_main_thread(fut);
+    
+    pub fn connect(fn_create_client: impl Future<Output = Result<ButtplugClient, anyhow::Error>> + std::marker::Send + 'static) -> Result<Telekinesis, anyhow::Error> {
+        let (event_sender, event_receiver) = tokio::sync::mpsc::channel(2048); // big, cause we dont know if client reads them fast
+        let (command_sender, command_receiver) = tokio::sync::mpsc::channel(128); // small cause we handle them immediately
+        let runtime = Runtime::new()?;
+        runtime.spawn(async move {
+            let res = fn_create_client.await;
+            if let Err(e) = res {
+                error!("Could not create buttplug client: {}", e);
+                return
+            }
+            info!("Event reading thread started");
+            let client = res.unwrap();
+            let mut events = client.event_stream();
+            create_cmd_thread(client, event_sender.clone(), command_receiver);
+            while let Some(event) = events.next().await {
+                event_sender
+                    .send(TkEvent::from_event(event))
+                    .await
+                    .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
+            }
+        });
         Ok(Telekinesis {
-            event_receiver: event_receiver,
             command_sender: command_sender,
+            event_receiver: event_receiver,
             thread: runtime
         })
     }
@@ -116,7 +110,6 @@ impl fmt::Debug for Telekinesis
 }
 
 impl Tk for Telekinesis {
-    #[instrument]
     fn scan_for_devices(&self) -> bool {
         info!("Sending Command: Scan for devices");
         if let Err(_) = self.command_sender.blocking_send(TkAction::TkScan) {
@@ -126,8 +119,7 @@ impl Tk for Telekinesis {
         true
     }
 
-    // TODO: Drop Messages if event queue has overflow to not force users to consume
-    #[instrument]
+    // TODO: Drop messages if event queue is full
     fn vibrate_all(&self, speed: f64) -> bool {
         info!("Sending Command: Vibrate all");
         if let Err(_) = self
@@ -140,7 +132,6 @@ impl Tk for Telekinesis {
         true
     }
 
-    #[instrument]
     fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
@@ -153,7 +144,6 @@ impl Tk for Telekinesis {
         true
     }
 
-    #[instrument]
     fn stop_all(&self) -> bool {
         info!("Sending Command: Stop all");
         if let Err(_) = self.command_sender.blocking_send(TkAction::TkStopAll) {
@@ -163,7 +153,6 @@ impl Tk for Telekinesis {
         true
     }
 
-    #[instrument]
     fn disconnect(&mut self) {
         info!("Sending Command: Disconnecting client");
         if let Err(_) = self.command_sender.blocking_send(TkAction::TkDiscconect) {
@@ -171,7 +160,6 @@ impl Tk for Telekinesis {
         }
     }
 
-    #[instrument]
     fn get_next_event(&mut self) -> Option<TkEvent> {
         debug!("get_next_event");
         if let Ok(msg) = self.event_receiver.try_recv() {

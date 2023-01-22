@@ -14,7 +14,7 @@ mod tests;
 // Export as C FFI
 #[no_mangle]
 pub extern "C" fn tk_connect() -> *mut c_void {
-    match Telekinesis::new_with_default_settings() {
+    match Telekinesis::connect_with_default_settings() {
         Ok(unwrapped) => Box::into_raw(Box::new(unwrapped)) as *mut c_void,
         Err(_) => {
             error!("Failed creating server.");
@@ -79,7 +79,7 @@ fn get_handle_unsafe(tk: *const c_void) -> &'static Telekinesis {
 // Export as rust library
 pub fn new_with_default_settings() -> impl Tk
 {
-    Telekinesis::new_with_default_settings().unwrap() 
+    Telekinesis::connect_with_default_settings().unwrap() 
 }
 
 pub trait Tk {

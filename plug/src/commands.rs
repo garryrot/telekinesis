@@ -63,9 +63,8 @@ pub fn create_cmd_thread(
     mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>
 ) {
     Handle::current().spawn(async move {
-        info!("Comand worker thread started");
+        info!("Comand handling thread started");
         let _ = span!(Level::INFO, "cmd_handling_thread").entered();
-
         let mut delayed_cmd: Option<TkAction> = None;
         loop {
             let recv_fut = command_receiver.recv();

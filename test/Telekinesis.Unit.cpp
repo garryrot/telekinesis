@@ -36,7 +36,7 @@ TEST_CASE("Controlls/Connected_ReturnTrue") {
 
 TEST_CASE("Controlls/ConnectAndDisconnect_ReturnsFalse") {
     ConnectAndScanForDevices(NULL);
-    Sleep(10);
+    Sleep(50);
     Close(NULL);
     REQUIRE_FALSE(VibrateAll(NULL, 0.0));
     REQUIRE_FALSE(StopAll(NULL));
@@ -45,12 +45,14 @@ TEST_CASE("Controlls/ConnectAndDisconnect_ReturnsFalse") {
 
 TEST_CASE("Papyrus/poll_events_nothing_happened_returns_empty_list") {
     ConnectAndScanForDevices(NULL);
+    Sleep(50);
     auto list = PollEventsStdString();
     Close(NULL);
 }
 
 TEST_CASE("Papyrus/poll_commands_produce_1_event") {
     ConnectAndScanForDevices(NULL);
+    Sleep(50);
     VibrateAll(NULL, 0.0);
     Sleep(1);
     auto list = PollEventsStdString();
@@ -60,6 +62,7 @@ TEST_CASE("Papyrus/poll_commands_produce_1_event") {
 
 TEST_CASE("Papyrus/poll_events_2_commands_produce_2_events") {
     ConnectAndScanForDevices(NULL);
+    Sleep(50);
     VibrateAll(NULL, 0.0);
     VibrateAllFor(NULL, 0.0, 0.0); // delay emits 2 events
     Sleep(10);
@@ -70,6 +73,7 @@ TEST_CASE("Papyrus/poll_events_2_commands_produce_2_events") {
 
 TEST_CASE("Papyrus/poll_events_200_commands_produce_128_events") {
     ConnectAndScanForDevices(NULL);
+    Sleep(50);
     for (size_t i = 0; i < 200; i++) {
         StopAll(NULL);
     }
