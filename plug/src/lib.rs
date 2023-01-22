@@ -3,8 +3,7 @@ use std::{
     mem::forget,
     time::Duration,
 };
-use telekinesis::Telekinesis;
-use telekinesis::TkEventEnum;
+use telekinesis::{Telekinesis, TkEvent};
 use tracing::error;
 mod logging;
 mod telekinesis;
@@ -89,5 +88,5 @@ pub trait Tk {
     fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool;
     fn stop_all(&self) -> bool;
     fn disconnect(&mut self);
-    fn get_next_event(&mut self) -> Option<TkEventEnum>;
+    fn get_next_event(&mut self) -> Option<TkEvent>;
 }

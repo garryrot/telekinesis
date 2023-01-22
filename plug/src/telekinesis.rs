@@ -1,5 +1,4 @@
 use std::{sync::Arc, fmt::{self, Display}};
-
 use buttplug::{
     client::{
         ButtplugClient, ButtplugClientDevice, ButtplugClientEvent
@@ -13,22 +12,15 @@ use buttplug::{
 use futures::{Future, StreamExt};
 use tokio::{runtime::Runtime};
 use tracing::{debug, error, info, instrument, warn};
-
-use crate::{util::Narrow, commands::{create_cmd_handling_thread, TkCommand}, Tk};
+use crate::{util::Narrow, commands::{create_cmd_handling_thread, TkAction}, Tk};
 
 pub struct Telekinesis {
     pub runtime: Runtime,
-    pub event_receiver: tokio::sync::mpsc::Receiver<TkEventEnum>,
-    pub command_sender: tokio::sync::mpsc::Sender<TkCommand>,
-}
-impl fmt::Debug for Telekinesis 
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Telekinesis").finish()
-    }
+    pub event_receiver: tokio::sync::mpsc::Receiver<TkEvent>,
+    pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
 }
 
-pub enum TkEventEnum {
+pub enum TkEvent {
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
     DeviceVibrated(i32),
@@ -37,28 +29,28 @@ pub enum TkEventEnum {
     Other(ButtplugClientEvent),
 }
 
-impl Display for TkEventEnum 
+impl Display for TkEvent 
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _ = match self {
-            TkEventEnum::DeviceAdded(device) => write!(f, "Device '{}' connected.", device.name()),
-            TkEventEnum::DeviceRemoved(device) => write!(f, "Device '{}' Removed.", device.name()),
-            TkEventEnum::DeviceVibrated(speed)=> write!(f, "Vibrating '{}' devices.", speed),
-            TkEventEnum::DeviceStopped(speed) => write!(f, "Stopping '{}' devices.", speed),
-            TkEventEnum::TkError(err) => write!(f, "Error '{:?}'", err),
-            TkEventEnum::Other(other) => write!(f, "{:?}", other),
+            TkEvent::DeviceAdded(device) => write!(f, "Device '{}' connected.", device.name()),
+            TkEvent::DeviceRemoved(device) => write!(f, "Device '{}' Removed.", device.name()),
+            TkEvent::DeviceVibrated(speed)=> write!(f, "Vibrating '{}' devices.", speed),
+            TkEvent::DeviceStopped(speed) => write!(f, "Stopping '{}' devices.", speed),
+            TkEvent::TkError(err) => write!(f, "Error '{:?}'", err),
+            TkEvent::Other(other) => write!(f, "{:?}", other),
         };
         Ok(())
     }
 }
 
-impl TkEventEnum {
-    fn from_event(event: ButtplugClientEvent) -> TkEventEnum {
+impl TkEvent {
+    fn from_event(event: ButtplugClientEvent) -> TkEvent {
         match event {
-            ButtplugClientEvent::DeviceAdded(device) => TkEventEnum::DeviceAdded(device),
-            ButtplugClientEvent::DeviceRemoved(device) => TkEventEnum::DeviceRemoved(device),
-            ButtplugClientEvent::Error(err) => TkEventEnum::TkError(err),
-            other => TkEventEnum::Other(other),
+            ButtplugClientEvent::DeviceAdded(device) => TkEvent::DeviceAdded(device),
+            ButtplugClientEvent::DeviceRemoved(device) => TkEvent::DeviceRemoved(device),
+            ButtplugClientEvent::Error(err) => TkEvent::TkError(err),
+            other => TkEvent::Other(other),
         }
     }
 }
@@ -67,8 +59,8 @@ pub fn create_event_handling_thread(
     runtime: &Runtime,
     client: &ButtplugClient,
 ) -> (
-    tokio::sync::mpsc::Receiver<TkEventEnum>,
-    tokio::sync::mpsc::Sender<TkEventEnum>,
+    tokio::sync::mpsc::Receiver<TkEvent>,
+    tokio::sync::mpsc::Sender<TkEvent>,
 ) {
     let (event_sender, event_receiver) = tokio::sync::mpsc::channel(2048); // big in case events are not consumed
     let sender_clone = event_sender.clone();
@@ -77,7 +69,7 @@ pub fn create_event_handling_thread(
         info!("Event polling thread started");
         while let Some(event) = events.next().await {
             event_sender
-                .send(TkEventEnum::from_event(event))
+                .send(TkEvent::from_event(event))
                 .await
                 .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
         }
@@ -117,11 +109,18 @@ impl Telekinesis
     }
 }
 
+impl fmt::Debug for Telekinesis 
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Telekinesis").finish()
+    }
+}
+
 impl Tk for Telekinesis {
     #[instrument]
     fn scan_for_devices(&self) -> bool {
         info!("Sending Command: Scan for devices");
-        if let Err(_) = self.command_sender.blocking_send(TkCommand::TkScan) {
+        if let Err(_) = self.command_sender.blocking_send(TkAction::TkScan) {
             error!("Failed to send vibrate_all"); // whats skyrim gonna do about it
             return false;
         }
@@ -134,7 +133,7 @@ impl Tk for Telekinesis {
         info!("Sending Command: Vibrate all");
         if let Err(_) = self
             .command_sender
-            .blocking_send(TkCommand::TkVibrateAll( speed.narrow( 0.0, 1.0 )))
+            .blocking_send(TkAction::TkVibrateAll( speed.narrow( 0.0, 1.0 )))
         {
             error!("Failed to send vibrate_all");
             return false;
@@ -147,7 +146,7 @@ impl Tk for Telekinesis {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
             .command_sender
-            .blocking_send(TkCommand::TkVibrateAllDelayed( speed.narrow( 0.0, 1.0 ), duration))
+            .blocking_send(TkAction::TkVibrateAllDelayed( speed.narrow( 0.0, 1.0 ), duration))
         {
             error!("Failed to send delayed command");
             return false;
@@ -158,7 +157,7 @@ impl Tk for Telekinesis {
     #[instrument]
     fn stop_all(&self) -> bool {
         info!("Sending Command: Stop all");
-        if let Err(_) = self.command_sender.blocking_send(TkCommand::TkStopAll) {
+        if let Err(_) = self.command_sender.blocking_send(TkAction::TkStopAll) {
             error!("Failed to send stop_all");
             return false;
         }
@@ -168,13 +167,13 @@ impl Tk for Telekinesis {
     #[instrument]
     fn disconnect(&mut self) {
         info!("Sending Command: Disconnecting client");
-        if let Err(_) = self.command_sender.blocking_send(TkCommand::TkDiscconect) {
+        if let Err(_) = self.command_sender.blocking_send(TkAction::TkDiscconect) {
             error!("Failed to send disconnect");
         }
     }
 
     #[instrument]
-    fn get_next_event(&mut self) -> Option<TkEventEnum> {
+    fn get_next_event(&mut self) -> Option<TkEvent> {
         debug!("get_next_event");
         if let Ok(msg) = self.event_receiver.try_recv() {
             debug!("Got event {}", msg.to_string());

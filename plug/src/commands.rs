@@ -2,10 +2,10 @@ use buttplug::client::{ButtplugClient, VibrateCommand};
 use tokio::{select, runtime::Runtime, time::sleep};
 use tracing::{error, info, span, debug, Level};
 
-use crate::telekinesis::TkEventEnum;
+use crate::telekinesis::TkEvent;
 
 #[derive(Debug)]
-pub enum TkCommand {
+pub enum TkAction {
     TkScan,
     TkVibrateAll(f64),
     TkVibrateAllDelayed(f64, std::time::Duration),
@@ -60,20 +60,20 @@ pub async fn cmd_stop_all(client: &ButtplugClient) -> i32 {
 pub fn create_cmd_handling_thread(
     runtime: &Runtime,
     client: ButtplugClient,
-    event_sender: tokio::sync::mpsc::Sender<TkEventEnum>,
-) -> tokio::sync::mpsc::Sender<TkCommand> {
+    event_sender: tokio::sync::mpsc::Sender<TkEvent>,
+) -> tokio::sync::mpsc::Sender<TkAction> {
     let (command_sender, mut command_receiver) = tokio::sync::mpsc::channel(128); // shouldn't be big, we consume cmds immediately
     runtime.spawn(async move {
         info!("Comand worker thread started");
         let _ = span!(Level::INFO, "cmd_handling_thread").entered();
 
-        let mut delayed_cmd: Option<TkCommand> = None;
+        let mut delayed_cmd: Option<TkAction> = None;
         loop {
             let recv_fut = command_receiver.recv();
-            let cmd = if let Some(TkCommand::TkVibrateAllDelayed(speed, duration)) = delayed_cmd {
+            let cmd = if let Some(TkAction::TkVibrateAllDelayed(speed, duration)) = delayed_cmd {
                 debug!("Select delayed command");
                 select! {
-                    () = sleep(duration) => Some(TkCommand::TkVibrateAll(speed)),
+                    () = sleep(duration) => Some(TkAction::TkVibrateAll(speed)),
                     cmd = recv_fut => cmd
                 }
             } else {
@@ -84,30 +84,30 @@ pub fn create_cmd_handling_thread(
             if let Some(cmd) = cmd {
                 info!("Executing command {:?}", cmd);
                 match cmd {
-                    TkCommand::TkScan => {
+                    TkAction::TkScan => {
                         cmd_scan_for_devices(&client).await;
                     }
-                    TkCommand::TkVibrateAll(speed) => {
+                    TkAction::TkVibrateAll(speed) => {
                         let vibrated = cmd_vibrate_all(&client, speed).await;
                         event_sender
-                            .send(TkEventEnum::DeviceVibrated(vibrated))
+                            .send(TkEvent::DeviceVibrated(vibrated))
                             .await
                             .unwrap_or_else(|_| error!("Queue full"));
                     }
-                    TkCommand::TkStopAll => {
+                    TkAction::TkStopAll => {
                         let stopped = cmd_stop_all(&client).await;
                         event_sender
-                            .send(TkEventEnum::DeviceStopped(stopped))
+                            .send(TkEvent::DeviceStopped(stopped))
                             .await
                             .unwrap_or_else(|_| error!("Queue full"));
                     }
-                    TkCommand::TkDiscconect => {
+                    TkAction::TkDiscconect => {
                         client
                             .disconnect()
                             .await
                             .unwrap_or_else(|_| error!("Failed to send disconnect to queue."));
                     }
-                    TkCommand::TkVibrateAllDelayed(_, duration) => {
+                    TkAction::TkVibrateAllDelayed(_, duration) => {
                         info!("Delayed command {:?}", duration);
                         delayed_cmd = Some(cmd);
                     }
