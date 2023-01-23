@@ -19,6 +19,7 @@ fn enable_log() {
     .unwrap();
 }
 
+// Asserts that exactly one device is connected
 #[test]
 #[nonparallel(M)]
 fn scan_vibrate_and_stop_events_are_returned_e2e() {

@@ -7,6 +7,8 @@ use std::sync::Mutex;
 
 lazy_static! { static ref M: Mutex<()> = Mutex::new(()); }
 
+// Asserts that exactly one device is connected
+
 #[test]
 #[nonparallel(M)]
 fn ffi_connect_scan_and_vibrate_devices_2e2() {
