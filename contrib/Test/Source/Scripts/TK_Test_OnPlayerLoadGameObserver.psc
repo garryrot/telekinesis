@@ -11,8 +11,9 @@ EndEvent
 
 Event OnHit(ObjectReference aggressor, Form source, Projectile projectile, bool powerAttack, bool sneakAttack, bool bashAttack, bool blocked)
 	Actor actorRef = PlayerRef.GetActorRef()
-	Float strength = 1 - (actorRef.GetActorValue("Health") / actorRef.GetBaseActorValue("Health"))
-	Float duration = strength * 2
+	Float lostHealth = 1 - (actorRef.GetActorValue("Health") / actorRef.GetBaseActorValue("Health"))
+	Int strength = Math.Floor(100 * lostHealth);
+	Float duration = strength / 50
 	if (duration < 0.5)
 		duration = 0.5
 	endif

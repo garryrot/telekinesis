@@ -24,20 +24,20 @@ namespace Telekinesis {
         return true;
     }
 
-    __declspec(dllexport) bool VibrateAll(StaticFunctionTag*, float_t speed) {
+    __declspec(dllexport) bool VibrateAll(StaticFunctionTag*, int speed) {
         log::info("Telekinesis::VibrateAll ( speed={} ) ", speed );
         if (_tk == NULL)
             return false;
 
-        tk_vibrate_all(_tk, speed);
+        tk_vibrate_all(_tk, (float_t)speed / 100.0);
         return true;
     }
 
-    __declspec(dllexport) bool VibrateAllFor(StaticFunctionTag*, float_t speed, float_t time_sec) {
+    __declspec(dllexport) bool VibrateAllFor(StaticFunctionTag*, int speed, float_t time_sec) {
         log::info("Telekinesis::VibrateAllFor ( speed={}, time_sec={} ) ", speed, time_sec);
         if (_tk == NULL) return false;
 
-        tk_vibrate_all_for(_tk, speed, time_sec);
+        tk_vibrate_all_for(_tk, (float_t)speed / 100.0, time_sec);
         return true;
     }
 

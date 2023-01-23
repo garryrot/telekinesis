@@ -44,7 +44,7 @@ If Telekinesis wasn't started, the other functions will not have any effect.
 Call `VibrateAll(speed)` to vibrate all devices.
 
 ```cs
-int vibrated = Tele.VibrateAll(1.0) // speed can be any float from 0 to (1.0=full speed)
+int vibrated = Tele.VibrateAll(100) // speed can be any int from 0 to (100=full speed)
 Debug.Notification( "Vibrating" + vibrated + " device(s)..." )
 ```
 
@@ -162,10 +162,17 @@ This if free software. If you want to change this, redistribute it, or integrate
 
 ### 0.3.0
 
+**Features**:
+- Add `Tele.VibrateAllFor` to vibrate for a specific duration and then stop
+- Reworked/broke entire API
+    - Vibration speed is now value between 0 and 100
+    - Shorter functions i.e. `Tele.VibrateAll` instead of `Tk_Telekinesis.Tk_VibrateAll`
+
+**Fixes**:
 - Now loads on AE (as intended)
-- Support vibrating for a certain duration
-- Actually link against the correct rust library, so the stutter fix from 0.2.0 is now correctly included
-- Reworked/Broke entire API
+- More stability/stutter fixes
+    - Not a single possibly blocking call left in papyrus thread
+    - Actually link against updated rust lib, so the fix from 0.2.0 is now correctly included
 
 ### 0.2.0
 
@@ -175,4 +182,3 @@ This if free software. If you want to change this, redistribute it, or integrate
 ### 0.1.0
 
 - Initial Version
-

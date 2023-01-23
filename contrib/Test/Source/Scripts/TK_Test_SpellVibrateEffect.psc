@@ -1,7 +1,7 @@
 Scriptname TK_Test_SpellVibrateEffect extends ActiveMagicEffect  
 Event OnEffectStart(Actor target, Actor caster)
 	Log("Vibrate Spell");
-	Bool vibrated = Tele.VibrateAll(1.0)
+	Bool vibrated = Tele.VibrateAll(100)
 EndEvent
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)

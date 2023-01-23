@@ -8,15 +8,15 @@ scriptName Tele hidden
 Bool function ScanForDevices() global native
 
 ; Vibrate all devices that are currently connected (until stopped manually).
-; Speed is any float between 0.0(=off) and 1.0(=full power)
+; Speed is any float between 0(=off) and 100(=full power)
 ; `VibrateAll(0)` should also be used for stopping the vibration,
 ; as it provides a smoother experience than StopAll
-Bool function VibrateAll(Float speed) global native
+Bool function VibrateAll(Int speed) global native
 
 ; Vibrate all devices that are currently connected for `duration_sec` seconds
 ; Calls to `TK_VibrateAll` or `VibrateAllFor` that happen before `duration_sec` 
 ; has ended will owerwrite `speed` and `duration_sec` to the new calls value.
-Bool function VibrateAllFor(Float speed, Float duration_sec) global native
+Bool function VibrateAllFor(Int speed, Float duration_sec) global native
 
 ; Immediately stops all connected devices. This can be used for
 ; shutdown of ALL device actions before calling `Close` to assure that

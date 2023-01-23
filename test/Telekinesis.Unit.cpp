@@ -20,15 +20,15 @@ TEST_CASE("Connection/Connecting_Works") {
 }
 
 TEST_CASE("Controlls/NotConnected_ReturnFalse") { 
-    REQUIRE_FALSE(VibrateAll(NULL, 0.0));
-    REQUIRE_FALSE(VibrateAllFor(NULL, 0.0, 0.0));
+    REQUIRE_FALSE(VibrateAll(NULL, 0));
+    REQUIRE_FALSE(VibrateAllFor(NULL, 0, 0.0));
     REQUIRE_FALSE(StopAll(NULL));
     REQUIRE_FALSE(Close(NULL));
 }
 
 TEST_CASE("Controlls/Connected_ReturnTrue") {
     ConnectAndScanForDevices(NULL);
-    REQUIRE(VibrateAll(NULL, 0.0) == true);
+    REQUIRE(VibrateAll(NULL, 0) == true);
     REQUIRE(StopAll(NULL) == true);
     Sleep(10);
     Close(NULL);
@@ -38,7 +38,7 @@ TEST_CASE("Controlls/ConnectAndDisconnect_ReturnsFalse") {
     ConnectAndScanForDevices(NULL);
     Sleep(50);
     Close(NULL);
-    REQUIRE_FALSE(VibrateAll(NULL, 0.0));
+    REQUIRE_FALSE(VibrateAll(NULL, 0));
     REQUIRE_FALSE(StopAll(NULL));
     REQUIRE_FALSE(Close(NULL));
 }
@@ -53,7 +53,7 @@ TEST_CASE("Papyrus/poll_events_nothing_happened_returns_empty_list") {
 TEST_CASE("Papyrus/poll_commands_produce_1_event") {
     ConnectAndScanForDevices(NULL);
     Sleep(50);
-    VibrateAll(NULL, 0.0);
+    VibrateAll(NULL, 0);
     Sleep(1);
     auto list = PollEventsStdString();
     REQUIRE(list.size() == 1);
@@ -63,8 +63,8 @@ TEST_CASE("Papyrus/poll_commands_produce_1_event") {
 TEST_CASE("Papyrus/poll_events_2_commands_produce_2_events") {
     ConnectAndScanForDevices(NULL);
     Sleep(50);
-    VibrateAll(NULL, 0.0);
-    VibrateAllFor(NULL, 0.0, 0.0); // delay emits 2 events
+    VibrateAll(NULL, 0);
+    VibrateAllFor(NULL, 0, 0.0); // delay emits 2 events
     Sleep(10);
     auto list = PollEventsStdString();
     REQUIRE(list.size() == 3);
