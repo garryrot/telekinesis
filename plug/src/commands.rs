@@ -2,7 +2,7 @@ use buttplug::client::{ButtplugClient, VibrateCommand};
 use tokio::{select, runtime::Handle, time::sleep};
 use tracing::{error, info, span, debug, Level};
 
-use crate::telekinesis::TkEvent;
+use crate::event::TkEvent;
 
 #[derive(Debug)]
 pub enum TkAction {

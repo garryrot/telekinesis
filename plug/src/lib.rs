@@ -3,10 +3,13 @@ use std::{
     mem::forget,
     time::Duration,
 };
-use telekinesis::{Telekinesis, TkEvent};
+use event::TkEvent;
+use telekinesis::{Telekinesis};
 use tracing::error;
+
 mod logging;
 mod telekinesis;
+mod event;
 mod util;
 mod commands;
 mod tests;
