@@ -5,44 +5,50 @@ use crate::{
 };
 use buttplug::{
     client::ButtplugClient,
-    core::connector::{ButtplugInProcessClientConnectorBuilder},
+    core::connector::ButtplugInProcessClientConnectorBuilder,
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
         ButtplugServerBuilder,
     },
 };
-use futures::{StreamExt};
+use futures::{Future, StreamExt};
 use std::fmt::{self};
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info, warn};
 
 pub struct Telekinesis {
-    pub event_receiver: tokio::sync::mpsc::Receiver<TkEvent>,
+    pub event_receiver: tokio::sync::mpsc::UnboundedReceiver<TkEvent>,
     pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
     pub thread: Runtime,
 }
 
+pub async fn in_process_server() -> ButtplugClient {
+    let connector = ButtplugInProcessClientConnectorBuilder::default()
+        .server(
+            ButtplugServerBuilder::default()
+                .comm_manager(BtlePlugCommunicationManagerBuilder::default())
+                .finish()
+                .expect("Could not create in-process-server."),
+        )
+        .finish();
+
+    let buttplug = ButtplugClient::new("Telekinesis");
+    buttplug
+        .connect(connector)
+        .await
+        .expect("Could not connect client");
+    buttplug
+}
+
 impl Telekinesis {
-    pub fn connect_with_default_settings() -> Result<Telekinesis, anyhow::Error> {
-        let (event_sender, event_receiver) = tokio::sync::mpsc::channel(2048); // big, we dont know if client reads them fast
-        let (command_sender, command_receiver) = tokio::sync::mpsc::channel(128); // small, we handle them immediately
+    pub fn connect_with(
+        connector: impl Future<Output = ButtplugClient> + Send + 'static,
+    ) -> Result<Telekinesis, anyhow::Error> {
+        let (event_sender, event_receiver) = unbounded_channel();
+        let (command_sender, command_receiver) = channel(256); // we handle them immediately
         let runtime = Runtime::new()?;
         runtime.spawn(async move {
-            let connector = ButtplugInProcessClientConnectorBuilder::default()
-                .server(
-                    ButtplugServerBuilder::default()
-                        .comm_manager(BtlePlugCommunicationManagerBuilder::default())
-                        .finish()
-                        .expect("Could not create in-process-server."),
-                )
-                .finish();
-
-            let buttplug = ButtplugClient::new("Telekinesis");
-            buttplug
-                .connect(connector)
-                .await
-                .expect("Could not connect client");
-
+            let buttplug = connector.await;
             info!("Main thread started");
             let mut events = buttplug.event_stream();
             create_cmd_thread(buttplug, event_sender.clone(), command_receiver);
@@ -50,14 +56,13 @@ impl Telekinesis {
             while let Some(event) = events.next().await {
                 event_sender
                     .send(TkEvent::from_event(event))
-                    .await
                     .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
             }
         });
         Ok(Telekinesis {
             command_sender: command_sender,
             event_receiver: event_receiver,
-            thread: runtime
+            thread: runtime,
         })
     }
 }

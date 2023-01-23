@@ -1,6 +1,7 @@
 use std::{sync::Arc, fmt::Display, fmt};
 use buttplug::{client::{ButtplugClientDevice, ButtplugClientEvent}, core::errors::ButtplugError};
 
+#[derive(Debug)]
 pub enum TkEvent {
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),

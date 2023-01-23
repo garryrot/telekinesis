@@ -7,17 +7,17 @@ use event::TkEvent;
 use telekinesis::{Telekinesis};
 use tracing::error;
 
+mod commands;
+mod event;
 mod logging;
 mod telekinesis;
-mod event;
-mod util;
-mod commands;
 mod tests;
+mod util;
 
 // Export as C FFI
 #[no_mangle]
 pub extern "C" fn tk_connect() -> *mut c_void {
-    match Telekinesis::connect_with_default_settings() {
+    match Telekinesis::connect_with( telekinesis::in_process_server() ) {
         Ok(unwrapped) => Box::into_raw(Box::new(unwrapped)) as *mut c_void,
         Err(_) => {
             error!("Failed creating server.");
@@ -79,10 +79,10 @@ fn get_handle_unsafe(tk: *const c_void) -> &'static Telekinesis {
     unsafe { &*(tk as *const Telekinesis) }
 }
 
-// Export as rust library
+// Export as rust library (for tests)
 pub fn new_with_default_settings() -> impl Tk
 {
-    Telekinesis::connect_with_default_settings().unwrap() 
+    Telekinesis::connect_with(telekinesis::in_process_server()).unwrap() 
 }
 
 pub trait Tk {

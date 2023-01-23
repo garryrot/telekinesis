@@ -31,7 +31,7 @@ mod tests {
 
     #[test]
     fn vibrate_delayer_applied_after_timeout() {
-        let mut tk = Telekinesis::connect_with_default_settings().unwrap();
+        let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
         _sleep(200);
 
         tk.vibrate_all(0.0);
@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn vibrate_delayed_command_is_overwritten() {
-        let mut tk = Telekinesis::connect_with_default_settings().unwrap();
+        let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
         _sleep(200);
 
         tk.vibrate_all_delayed(0.22, Duration::from_millis(50));

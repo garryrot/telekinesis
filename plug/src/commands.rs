@@ -1,6 +1,6 @@
 use buttplug::client::{ButtplugClient, VibrateCommand};
-use tokio::{select, runtime::Handle, time::sleep};
-use tracing::{error, info, span, debug, Level};
+use tokio::{runtime::Handle, select, time::sleep};
+use tracing::{debug, error, info, span, Level};
 
 use crate::event::TkEvent;
 
@@ -59,8 +59,8 @@ pub async fn cmd_stop_all(client: &ButtplugClient) -> i32 {
 
 pub fn create_cmd_thread(
     client: ButtplugClient,
-    event_sender: tokio::sync::mpsc::Sender<TkEvent>,
-    mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>
+    event_sender: tokio::sync::mpsc::UnboundedSender<TkEvent>,
+    mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>,
 ) {
     Handle::current().spawn(async move {
         info!("Comand handling thread started");
@@ -89,24 +89,21 @@ pub fn create_cmd_thread(
                         let vibrated = cmd_vibrate_all(&client, speed).await;
                         event_sender
                             .send(TkEvent::DeviceVibrated(vibrated))
-                            .await
-                            .unwrap_or_else(|_| error!("Queue full"));
+                            .expect("Open");
                     }
                     TkAction::TkStopAll => {
                         let stopped = cmd_stop_all(&client).await;
                         event_sender
                             .send(TkEvent::DeviceStopped(stopped))
-                            .await
-                            .unwrap_or_else(|_| error!("Queue full"));
+                            .expect("Open");
                     }
                     TkAction::TkDiscconect => {
                         client
                             .disconnect()
                             .await
-                            .unwrap_or_else(|_| error!("Failed to send disconnect to queue."));
+                            .unwrap_or_else(|_| error!("Failed to disconnect."));
                     }
-                    TkAction::TkVibrateAllDelayed(_, duration) => {
-                        info!("Delayed command {:?}", duration);
+                    TkAction::TkVibrateAllDelayed(_, _) => {
                         delayed_cmd = Some(cmd);
                     }
                 }
