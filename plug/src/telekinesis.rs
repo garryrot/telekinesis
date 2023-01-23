@@ -5,7 +5,7 @@ use crate::{
 };
 use buttplug::{
     client::ButtplugClient,
-    core::connector::{ButtplugInProcessClientConnectorBuilder, ButtplugConnector},
+    core::connector::{ButtplugInProcessClientConnectorBuilder},
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
         ButtplugServerBuilder,
