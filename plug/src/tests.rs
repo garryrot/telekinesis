@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use tracing::Level;
-
     use crate::logging::{tk_init_logging, LogLevel};
     use crate::*;
     use std::ptr::null;
@@ -69,5 +68,4 @@ mod tests {
         _sleep(10);
         assert!( tk.get_next_event().is_none() );
     }
-
 }

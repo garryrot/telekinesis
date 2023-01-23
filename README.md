@@ -162,7 +162,7 @@ This if free software. If you want to change this, redistribute it, or integrate
 
 ### 0.3.0
 
-- Fix AE support
+- Now loads on AE (as intended)
 - Support vibrating for a certain duration
 - Actually link against the correct rust library, so the stutter fix from 0.2.0 is now correctly included
 - Reworked/Broke entire API
