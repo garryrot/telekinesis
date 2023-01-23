@@ -52,7 +52,7 @@ namespace Telekinesis {
 
     __declspec(dllexport) std::vector<std::string> PollEventsStdString() {
         std::vector<std::string> output;
-        log::info("Telekinesis::PollEvents");
+        log::debug("Telekinesis::PollEvents");
         if (_tk == NULL) {
             return output;
         }
@@ -63,7 +63,7 @@ namespace Telekinesis {
             std::string evtstr((char*)evt);
             output.push_back(evtstr);
             tk_free_event(_tk, evt);
-            log::info("Received event: {}.", evtstr);
+            log::info("Received Event: {}.", evtstr);
         }
         return output; 
     }
