@@ -1,4 +1,4 @@
-scriptName Tele hidden
+ScriptName Tele hidden
 
 ; Sets up a new connection and starts scanning for devices. This will 
 ; automatically connect to every single bluetooth toy Buttplug.io knows about.

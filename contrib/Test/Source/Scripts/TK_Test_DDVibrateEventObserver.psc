@@ -6,8 +6,6 @@ Bool SexSceneControl = False
 Int SexSceneArousal = 1
 
 Event OnInit()
-	Log("OnInit")
-	ScanForDevices();
 	; Devious Devices
 	RegisterForModEvent("DeviceVibrateEffectStart", "OnVibrateEffectStart")
 	RegisterForModEvent("DeviceVibrateEffectStop", "OnVibrateEffectStop")
@@ -40,18 +38,7 @@ Event OnInit()
 	SexSceneArousal = 1
 EndEvent
 
-Function ScanForDevices()
-	Log("Scanning for devices...")
-	Tele.ScanForDevices();
-EndFunction
-
 Event OnUpdate()
-	String[] evts = Tele.PollEvents();
-	Int i = 0;
-	While (i < evts.Length) 
-		Log(evts[0])
-		i += 1
-	EndWhile
 	If InSexScene
 		If SexSceneControl 
 			Log("Controlled Scene. Arousal: " + SexSceneArousal + "/ 100")
