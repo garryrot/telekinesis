@@ -1,4 +1,4 @@
-use buttplug::client::{ButtplugClient, VibrateCommand};
+use buttplug::{client::{ButtplugClient, ScalarCommand}, core::message::ActuatorType};
 use tokio::{runtime::Handle, select, time::sleep};
 use tracing::{debug, error, info, span, Level};
 
@@ -29,7 +29,7 @@ pub async fn cmd_vibrate_all(client: &ButtplugClient, speed: f64) -> i32 {
         .filter(|d| d.message_attributes().scalar_cmd().is_some())
     {
         debug!("Vibrating device {} with speed {}", device.name(), speed);
-        match device.vibrate(&VibrateCommand::Speed(speed)).await {
+        match device.scalar(&ScalarCommand::Scalar((speed, ActuatorType::Vibrate))).await {
             Ok(_) => vibrated += 1,
             Err(err) => error!(
                 dev = device.name(),
