@@ -122,7 +122,7 @@ function(TEST_EXECUTABLE TEST_NAME)
     target_precompile_headers(${PROJECT_NAME}.${TEST_NAME}
         PRIVATE
         src/PCH.h)
-    # catch_discover_tests(${PROJECT_NAME}.${TEST_NAME})
+    catch_discover_tests(${PROJECT_NAME}.${TEST_NAME})
     # add_test(NAME ${PROJECT_NAME}.${TEST_NAME} COMMAND ${PROJECT_NAME}.${TEST_NAME})
     
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
