@@ -1,11 +1,16 @@
+use event::TkEvent;
+use lazy_static::lazy_static;
+use tracing::{
+    error,
+    debug, info
+};
 use std::{
-    ffi::{c_float, c_void, CString},
-    mem::forget,
+    ffi::{c_float, CString, c_int},
+    sync::RwLock,
     time::Duration,
 };
-use event::TkEvent;
-use telekinesis::{Telekinesis};
-use tracing::error;
+
+use telekinesis::Telekinesis;
 
 mod commands;
 mod event;
@@ -14,75 +19,110 @@ mod telekinesis;
 mod tests;
 mod util;
 
-// Export as C FFI
-#[no_mangle]
-pub extern "C" fn tk_connect() -> *mut c_void {
-    match Telekinesis::connect_with( telekinesis::in_process_server() ) {
-        Ok(unwrapped) => Box::into_raw(Box::new(unwrapped)) as *mut c_void,
-        Err(_) => {
-            error!("Failed creating server.");
-            std::ptr::null_mut()
+lazy_static! {
+    static ref TK: RwLock<Option<Telekinesis>> = RwLock::new(None);
+}
+macro_rules! tk_ffi (
+    ($call:ident, $( $arg:ident ),* ) => {
+        match TK.read().unwrap().as_ref() {
+            None => { 
+                error!("[Papyrus] {}(): TK None", stringify!($call));
+                false
+            }, 
+            Some(tk) => { 
+                debug!("[Papyrus] {:?}({:?}) !!!!!!!!!!!-----", stringify!($call), stringify!($( $arg:ident ),*));
+                tk.$call( $( $arg ),* )
+            }
         }
+    };
+);
+
+// FFI Library
+#[no_mangle]
+pub extern "C" fn tk_connect_and_scan() -> bool {
+    tk_connect() &&
+    tk_scan_for_devices()
+}
+
+#[no_mangle]
+pub extern "C" fn tk_connect() -> bool {
+    match Telekinesis::connect_with(telekinesis::in_process_server()) {
+        Ok(tk) => {
+            TK.write().unwrap().replace(tk);
+            true
+        }
+        Err(e) => {
+             error!("tk_connect error {:?}", e); 
+             false
+        }, 
     }
 }
 
 #[no_mangle]
-pub extern "C" fn tk_scan_for_devices(_tk: *const c_void) -> bool {
-    get_handle_unsafe(_tk).scan_for_devices()
+pub extern "C" fn tk_scan_for_devices() -> bool {
+    tk_ffi!(scan_for_devices,)
 }
 
 #[no_mangle]
-pub extern "C" fn tk_vibrate_all(_tk: *const c_void, speed: c_float) -> bool {
-    get_handle_unsafe(_tk).vibrate_all(speed.into())
+pub extern "C" fn tk_vibrate_all(speed: c_int) -> bool {
+    let sp: f64 = speed as f64;
+    tk_ffi!(vibrate_all, sp)
 }
 
 #[no_mangle]
-pub extern "C" fn tk_vibrate_all_for(_tk: *const c_void, speed: c_float, dur_sec: c_float) -> bool {
-    let handle = get_handle_unsafe(_tk);
+pub extern "C" fn tk_vibrate_all_for(
+    speed: c_int,
+    duration_sec: c_float,
+) -> bool {
+    let duration_ms = Duration::from_millis((duration_sec * 1000.0) as u64);
+    let sp = speed as f64;
+    let stop = 0.0 as f64;
 
-    handle.vibrate_all(speed.into() )
-        && handle.vibrate_all_delayed(0.0, Duration::from_millis((dur_sec * 1000.0) as u64))
+    tk_ffi!(vibrate_all, sp) &&
+        tk_ffi!(vibrate_all_delayed, stop, duration_ms)
 }
 
 #[no_mangle]
-pub extern "C" fn tk_try_get_next_event(_tk: *const c_void) -> *mut i8 {
-    assert!(false == _tk.is_null());
-    let mut tk = unsafe { Box::from_raw(_tk as *mut Telekinesis) };
-    let evt = tk.get_next_event();
-    forget(tk);
-    if let Some(ok) = evt {
-        CString::new(ok.to_string()).unwrap().into_raw() as *mut i8
-    } else {
-        std::ptr::null_mut()
+pub extern "C" fn tk_stop_all() -> bool {
+    tk_ffi!(stop_all,)
+}
+
+#[no_mangle]
+pub extern "C" fn tk_close() {
+    let tk = TK.write().unwrap().take();
+    if let None = tk {
+        return;
     }
+    tk.unwrap().disconnect();
+}
+
+// PollEvents
+
+#[no_mangle]
+pub extern "C" fn tk_try_get_next_event() -> *mut i8 {
+    info!("tk_try_get_next_event");
+
+    let mut str = std::ptr::null_mut();
+    let mut aa = TK.write().unwrap();
+    if let Some(mut tk) = aa.take() {
+        if let Some(ok) = tk.get_next_event() {
+            str = CString::new(ok.to_string()).unwrap().into_raw() as *mut i8;
+        }
+        aa.replace(tk); // put it back
+    }
+    str
 }
 
 #[no_mangle]
-pub extern "C" fn tk_free_event(_: *const c_void, event: *mut i8) {
+pub extern "C" fn tk_free_event(event: *mut i8) {
     assert!(false == event.is_null());
-    unsafe { CString::from_raw(event) }; // dealloc string
+    unsafe { CString::from_raw(event) }; // deallocs string
 }
 
-#[no_mangle]
-pub extern "C" fn tk_stop_all(_tk: *const c_void) -> bool {
-    get_handle_unsafe(_tk).stop_all()
-}
+// Rust Library
 
-#[no_mangle]
-pub extern "C" fn tk_close(_tk: *mut c_void) {
-    let mut tk = unsafe { Box::from_raw(_tk as *mut Telekinesis) };
-    tk.disconnect();
-}
-
-fn get_handle_unsafe(tk: *const c_void) -> &'static Telekinesis {
-    assert!(false == tk.is_null());
-    unsafe { &*(tk as *const Telekinesis) }
-}
-
-// Export as rust library (for tests)
-pub fn new_with_default_settings() -> impl Tk
-{
-    Telekinesis::connect_with(telekinesis::in_process_server()).unwrap() 
+pub fn new_with_default_settings() -> impl Tk {
+    Telekinesis::connect_with(telekinesis::in_process_server()).unwrap()
 }
 
 pub trait Tk {

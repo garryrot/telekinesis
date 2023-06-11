@@ -17,6 +17,21 @@ pub enum LogLevel {
 }
 
 #[no_mangle]
+pub extern "C" fn tk_init_logging_stdout(level: LogLevel) -> bool {
+    let subscriber = tracing_subscriber::fmt()
+        .with_max_level(level.to_tracing_level())
+        .with_ansi(false)
+        .with_thread_ids(true)
+        .finish();
+
+    if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+        eprintln!("Setting global tracing subscriber failed.");
+        return false;
+    }
+    return true;
+}
+
+#[no_mangle]
 pub extern "C" fn tk_init_logging(level: LogLevel, _path: *const c_char) -> bool {
     if _path.is_null() {
         return false;

@@ -14,21 +14,25 @@ enum class LogLevel {
 
 extern "C" {
 
-void *tk_connect();
+bool tk_connect_and_scan();
 
-bool tk_scan_for_devices(const void *_tk);
+bool tk_connect();
 
-bool tk_vibrate_all(const void *_tk, float speed);
+bool tk_scan_for_devices();
 
-bool tk_vibrate_all_for(const void *_tk, float speed, float dur_sec);
+bool tk_vibrate_all(int speed);
 
-int8_t *tk_try_get_next_event(const void *_tk);
+bool tk_vibrate_all_for(int speed, float duration_sec);
 
-void tk_free_event(const void*, int8_t *event);
+bool tk_stop_all();
 
-bool tk_stop_all(const void *_tk);
+void tk_close();
 
-void tk_close(void *_tk);
+int8_t *tk_try_get_next_event();
+
+void tk_free_event(int8_t *event);
+
+bool tk_init_logging_stdout(LogLevel level);
 
 bool tk_init_logging(LogLevel level, const char *_path);
 

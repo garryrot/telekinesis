@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use tracing::Level;
-    use crate::logging::{tk_init_logging, LogLevel};
+    use crate::logging::{tk_init_logging, LogLevel, tk_init_logging_stdout};
     use crate::*;
-    use std::ptr::null;
+    use std::ptr::{null};
     use std::thread;
     use std::time::Duration;
         
@@ -24,8 +24,21 @@ mod tests {
 
     #[test]
     fn connect_and_scan() {
-        let tk = tk_connect();
-        tk_scan_for_devices(tk);
+        assert_eq!( tk_connect(), true);
+        tk_scan_for_devices();
+    }
+
+    #[test]
+    fn some_test() {
+        tk_init_logging_stdout(LogLevel::Trace);
+        tk_connect_and_scan();
+        _sleep(500);
+        tk_vibrate_all(0);
+        _sleep(500);
+        let m = tk_try_get_next_event();
+        assert!( !m.is_null() );
+        _sleep(500);
+        tk_close();
     }
 
     #[test]
