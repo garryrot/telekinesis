@@ -37,10 +37,5 @@ namespace Telekinesis {
         log::info("Log started. Logging level: '{}' ({}).", logLevel, logLevelStr);
 
         auto rustLog = GetLogFile("Plug");
-        if (tk_init_logging(static_cast<LogLevel>(logLevel), rustLog.c_str())) {
-            log::info("Rust logging started. Logging level: '{}' ({})", logLevel, logLevelStr);
-        } else {
-            log::error("Initialising rust logging failed.");
-        }
     }
 }

@@ -6,7 +6,7 @@ message("Using toolchain file ${CMAKE_TOOLCHAIN_FILE}.")
 ########################################################################################################################
 project(
         Telekinesis
-        VERSION 0.3.0
+        VERSION 0.4.0
         DESCRIPTION "Papyrus remote control API for bluetooth toys."
         LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
@@ -93,7 +93,7 @@ target_link_libraries(${PROJECT_NAME}
         optimized "${CMAKE_SOURCE_DIR}/plug/target/release/${RUST_LIBRARY}.lib"
         ${STATIC_LINK_LIBS}
         ryml::ryml)
-
+ 
 target_precompile_headers(${PROJECT_NAME}
         PRIVATE
         src/PCH.h)

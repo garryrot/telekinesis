@@ -5,8 +5,9 @@ use tracing::{
     debug, info
 };
 use std::{
-    ffi::{c_float, CString, c_int},
+    ffi::{c_float, c_int},
     sync::RwLock,
+    sync::RwLockWriteGuard,
     time::Duration,
 };
 
@@ -18,6 +19,20 @@ mod logging;
 mod telekinesis;
 mod tests;
 mod util;
+
+#[cxx::bridge]
+mod ffi {
+    extern "Rust" {
+        fn tk_connect() -> bool;
+        fn tk_connect_and_scan() -> bool;
+        fn tk_scan_for_devices() -> bool; 
+        fn tk_vibrate_all(speed: i32) -> bool;
+        fn tk_vibrate_all_for(speed: i32, duration_sec: f32) -> bool;
+        fn tk_stop_all() -> bool;
+        fn tk_close() -> bool;
+        fn tk_poll_events() -> Vec<String>;
+    }
+}
 
 lazy_static! {
     static ref TK: RwLock<Option<Telekinesis>> = RwLock::new(None);
@@ -38,14 +53,12 @@ macro_rules! tk_ffi (
 );
 
 // FFI Library
-#[no_mangle]
-pub extern "C" fn tk_connect_and_scan() -> bool {
+pub fn tk_connect_and_scan() -> bool {
     tk_connect() &&
     tk_scan_for_devices()
 }
 
-#[no_mangle]
-pub extern "C" fn tk_connect() -> bool {
+pub fn tk_connect() -> bool {
     match Telekinesis::connect_with(telekinesis::in_process_server()) {
         Ok(tk) => {
             TK.write().unwrap().replace(tk);
@@ -58,19 +71,16 @@ pub extern "C" fn tk_connect() -> bool {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn tk_scan_for_devices() -> bool {
+pub fn tk_scan_for_devices() -> bool {
     tk_ffi!(scan_for_devices,)
 }
 
-#[no_mangle]
-pub extern "C" fn tk_vibrate_all(speed: c_int) -> bool {
+pub fn tk_vibrate_all(speed: c_int) -> bool {
     let sp: f64 = speed as f64;
     tk_ffi!(vibrate_all, sp)
 }
 
-#[no_mangle]
-pub extern "C" fn tk_vibrate_all_for(
+pub fn tk_vibrate_all_for(
     speed: c_int,
     duration_sec: c_float,
 ) -> bool {
@@ -82,45 +92,45 @@ pub extern "C" fn tk_vibrate_all_for(
         tk_ffi!(vibrate_all_delayed, stop, duration_ms)
 }
 
-#[no_mangle]
-pub extern "C" fn tk_stop_all() -> bool {
+pub fn tk_stop_all() -> bool {
     tk_ffi!(stop_all,)
 }
 
-#[no_mangle]
-pub extern "C" fn tk_close() {
+pub fn tk_close() -> bool {
     let tk = TK.write().unwrap().take();
     if let None = tk {
-        return;
+        return false;
     }
     tk.unwrap().disconnect();
+    return true;
 }
 
 // PollEvents
-
-#[no_mangle]
-pub extern "C" fn tk_try_get_next_event() -> *mut i8 {
+pub fn tk_try_get_next_event() -> Option<String> {
     info!("tk_try_get_next_event");
-
-    let mut str = std::ptr::null_mut();
-    let mut aa = TK.write().unwrap();
-    if let Some(mut tk) = aa.take() {
+    let mut evt = None;
+    let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap();
+    if let Some(mut tk) = guard.take() {
         if let Some(ok) = tk.get_next_event() {
-            str = CString::new(ok.to_string()).unwrap().into_raw() as *mut i8;
+            evt = Some(ok.to_string());
         }
-        aa.replace(tk); // put it back
+        guard.replace(tk);
     }
-    str
+    evt
 }
 
-#[no_mangle]
-pub extern "C" fn tk_free_event(event: *mut i8) {
-    assert!(false == event.is_null());
-    unsafe { CString::from_raw(event) }; // deallocs string
+pub fn tk_poll_events() -> Vec<String> {
+    info!("tk_poll_events");
+    let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap();
+    if let Some(mut tk) = guard.take() {
+        let events = tk.get_next_events().iter().map(|evt| evt.to_string()).collect::<Vec<String>>();             
+        guard.replace(tk);
+        return events;
+    }
+    vec![]
 }
 
 // Rust Library
-
 pub fn new_with_default_settings() -> impl Tk {
     Telekinesis::connect_with(telekinesis::in_process_server()).unwrap()
 }
@@ -132,4 +142,5 @@ pub trait Tk {
     fn stop_all(&self) -> bool;
     fn disconnect(&mut self);
     fn get_next_event(&mut self) -> Option<TkEvent>;
+    fn get_next_events(&mut self) -> Vec<TkEvent>;
 }

@@ -136,6 +136,18 @@ impl Tk for Telekinesis {
         None
     }
 
+    fn get_next_events(&mut self) -> Vec<TkEvent> {
+        debug!("get_next_events");
+        let mut events = vec![];
+        while let Some(event) = self.get_next_event() {
+            events.push(event);
+            if events.len() >= 128 {
+                break;
+            }
+        }
+        events
+    }
+
     // pub fn tk_get_connected_devices(&self) {
     //     self.runtime.block_on(async {
     //         self.client

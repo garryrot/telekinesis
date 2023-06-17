@@ -1,9 +1,8 @@
-use std::env;
-
-extern crate cbindgen;
 
 fn main() {
-    cbindgen::generate(env::var("CARGO_MANIFEST_DIR").unwrap())
-                .expect("Unable to generate bindings")
-                .write_to_file("include/telekinesis_plug.h");
+    cxx_build::bridge("src/lib.rs")
+        .file("src/api.cc")
+        .compile("telekinesis_plug");
+    println!("cargo:rerun-if-changed=src/lib.rs");
+    println!("cargo:rerun-if-changed=src/api.cc");
 }

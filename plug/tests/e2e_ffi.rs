@@ -1,7 +1,7 @@
 use telekinesis_plug::*;
 use tracing::Level;
 
-use std::{ffi::{CString}, time::Duration, thread};
+use std::{time::Duration, thread};
 use lazy_static::lazy_static;
 use nonparallel::nonparallel;
 use std::sync::Mutex;
@@ -23,14 +23,14 @@ fn enable_log() {
 #[test]
 #[nonparallel(M)]
 fn ffi_connect_scan_and_vibrate_devices_2e2() {
-    enable_log();
+    // enable_log();
     _ffi_connect_scan_and_vibrate_devices();
 }
 
 #[test]
 #[nonparallel(M)]
 fn ffi_connect_scan_and_vibrate_devices_works_after_reconnect_e2e() {
-    enable_log();
+    // enable_log();
     _ffi_connect_scan_and_vibrate_devices();
     _ffi_connect_scan_and_vibrate_devices();
     _ffi_connect_scan_and_vibrate_devices();
@@ -38,35 +38,37 @@ fn ffi_connect_scan_and_vibrate_devices_works_after_reconnect_e2e() {
     _ffi_connect_scan_and_vibrate_devices();
 }
 
-fn _poll_next_event() -> CString {
-    loop {
-        let event = tk_try_get_next_event();
-        if event.is_null() {
-            println!("Polling...");
-            thread::sleep(Duration::from_secs(1));
-        } else {
-            let raw_string = unsafe { CString::from_raw(event) };
-            return raw_string;
-        }
-    }
-}
-
-fn _assert_event(raw_string: CString, starts_with: &str) {
-    assert!(raw_string.to_str().unwrap().starts_with(starts_with));
-    tk_free_event(raw_string.into_raw());
+#[test]
+#[nonparallel(M)]
+fn ffi_test_event_polling() {    
+    // enable_log();
+    tk_connect();
+    tk_scan_for_devices();
+    thread::sleep(Duration::from_secs(5));
+    tk_vibrate_all(100 );
+    thread::sleep(Duration::from_millis(200));
+    tk_stop_all();
+    thread::sleep(Duration::from_millis(200));
+    let events = tk_poll_events();
+    assert!(events[0].starts_with("Device"));
+    assert!(events[1].starts_with("Vibrating"));
+    assert!(events[2].starts_with("Stopping"));
+    tk_close();
+    thread::sleep(Duration::from_secs(5));
 }
 
 fn _ffi_connect_scan_and_vibrate_devices() {
     tk_connect();
     tk_scan_for_devices();
     thread::sleep(Duration::from_secs(5));
-    _assert_event(_poll_next_event(), "Device");
+    assert!(tk_try_get_next_event().unwrap().starts_with("Device"));
     tk_vibrate_all(100 );
     thread::sleep(Duration::from_millis(200));
-    _assert_event(_poll_next_event(), "Vibrating");
+    assert!(tk_try_get_next_event().unwrap().starts_with("Vibrating"));
     tk_stop_all();
     thread::sleep(Duration::from_millis(200));
-    _assert_event(_poll_next_event(), "Stopping");
+    assert!(tk_try_get_next_event().unwrap().starts_with("Stopping"));
     tk_close();
+    thread::sleep(Duration::from_secs(5));
 }
  

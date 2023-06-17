@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use tracing::Level;
-    use crate::logging::{tk_init_logging, LogLevel, tk_init_logging_stdout};
+    use crate::logging::{tk_init_logging, LogLevel};
     use crate::*;
     use std::ptr::{null};
     use std::thread;
@@ -29,19 +29,6 @@ mod tests {
     }
 
     #[test]
-    fn some_test() {
-        tk_init_logging_stdout(LogLevel::Trace);
-        tk_connect_and_scan();
-        _sleep(500);
-        tk_vibrate_all(0);
-        _sleep(500);
-        let m = tk_try_get_next_event();
-        assert!( !m.is_null() );
-        _sleep(500);
-        tk_close();
-    }
-
-    #[test]
     fn vibrate_delayer_applied_after_timeout() {
         let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
         _sleep(200);
@@ -66,6 +53,56 @@ mod tests {
         tk.vibrate_all(0.33);
         _assert_one_event(&mut tk);
     }
+
+    #[test]
+    fn get_next_events_empty_when_nothing_happens() 
+    {
+        let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
+        _sleep(200); // TODO: Finally needs a mocked version
+
+        assert_eq!( tk.get_next_events().len(), 0);
+    }
+
+    #[test]
+    fn get_next_events_after_action_returns_1() 
+    {
+        let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
+        _sleep(200);
+
+        tk.vibrate_all(0.22);
+        _sleep(200);
+
+        assert_eq!( tk.get_next_events().len(), 1);
+    }
+
+    #[test]
+    fn get_next_events_multiple_actions_are_returned_in_correct_order() 
+    {
+        let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
+        _sleep(200); 
+
+        tk.vibrate_all(0.2);
+        tk.stop_all();
+
+        _sleep(200);
+
+        let events = tk.get_next_events();
+        assert!( events[0].to_string().starts_with("Vibrating") );
+        assert!( events[1].to_string().starts_with("Stopping") );
+    }
+
+    #[test]
+    fn get_next_events_over_128_actions_respects_papyrus_limits_and_does_not_return_more_than_128_events() 
+    {
+        let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
+        _sleep(200);
+        for _ in 1..200 {
+            tk.stop_all();
+        }
+        _sleep(200);
+        assert_eq!( tk.get_next_events().len(), 128 );
+    }
+
 
     fn _sleep( milliseconds: u64 ) {
         thread::sleep(Duration::from_millis(milliseconds));
