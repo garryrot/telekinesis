@@ -30,7 +30,6 @@ configure_file(
 
 set(sources
         src/Main.cpp
-        src/Papyrus.cpp
         ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 
 source_group(
