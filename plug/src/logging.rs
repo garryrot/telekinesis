@@ -3,14 +3,19 @@ use std::{
     sync::Mutex,
 };
 
-use tracing::Level;
+use tracing::{Level, info};
 
 #[cxx::bridge]
 mod ffi {
     extern "Rust" {
         fn tk_init_logging(logPath: String) -> bool;
         fn tk_init_logging_stdout() -> bool;
+        fn tk_log_info(message: String);
     }
+}
+
+pub fn tk_log_info(message: String) {
+    info!(message);
 }
 
 pub fn tk_init_logging_stdout() -> bool {

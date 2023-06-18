@@ -1,12 +1,14 @@
-#include "Config.h"
-#include "Papyrus.h"
-#include "Logging.h"
-
 #include <stddef.h>
 
+#include "Papyrus.h"
+#include "../plug/include/telekinesis_plug.h"
+#include "../plug/target/cxxbridge/plug/src/logging.rs.h"
+
 using namespace RE::BSScript;
-using namespace Telekinesis;
+using namespace SKSE::log;
+using namespace SKSE::stl;
 using namespace SKSE;
+using namespace Telekinesis;
 
 namespace Telekinesis {
     void InitializePapyrus() {
@@ -17,18 +19,26 @@ namespace Telekinesis {
             stl::report_and_fail("Failure to register Papyrus bindings.");
         }
     }
+
+    std::string GetLogFile() {
+        auto path = log_directory();
+        if (!path) {
+            report_and_fail("Unable to lookup SKSE logs directory.");
+        }
+        return std::format("{}\\{}.log", path->string(), PluginDeclaration::GetSingleton()->GetName());
+    }
 }
 
 SKSEPluginLoad(const LoadInterface* skse) {
-    InitializeLogging();
+    tk_init_logging(::rust::String(GetLogFile())); 
 
     auto* plugin = PluginDeclaration::GetSingleton();
     auto version = plugin->GetVersion();
-    log::info("{} {} is loading...", plugin->GetName(), version);
+    tk_log_info(std::format("{} {} is loading...", plugin->GetName(), version));
 
     Init(skse);
     InitializePapyrus();
 
-    log::info("{} has finished loading.", plugin->GetName());
+    tk_log_info(std::format("{} has finished loading.", plugin->GetName()));
     return true;
 }

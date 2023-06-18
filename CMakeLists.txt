@@ -29,10 +29,8 @@ configure_file(
         @ONLY)
 
 set(sources
-        src/Config.cpp
         src/Main.cpp
         src/Papyrus.cpp
-        src/Logging.cpp
         ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 
 source_group(
@@ -100,55 +98,6 @@ target_precompile_headers(${PROJECT_NAME}
 
 install(TARGETS ${PROJECT_NAME}
         DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-
-########################################################################################################################
-## Configure unit tests
-########################################################################################################################
-
-function(TEST_EXECUTABLE TEST_NAME) 
-    add_executable(
-        ${PROJECT_NAME}.${TEST_NAME}
-        ${headers}
-        ${ARGN})
-
-    target_link_libraries(
-        ${PROJECT_NAME}.${TEST_NAME}
-        PRIVATE
-        ${PROJECT_NAME}
-        debug "${CMAKE_SOURCE_DIR}/plug/target/debug/${RUST_LIBRARY}.lib"
-        optimized "${CMAKE_SOURCE_DIR}/plug/target/release/${RUST_LIBRARY}.lib"
-        ${STATIC_LINK_LIBS}
-        Catch2::Catch2WithMain)
-    target_precompile_headers(${PROJECT_NAME}.${TEST_NAME}
-        PRIVATE
-        src/PCH.h)
-    catch_discover_tests(${PROJECT_NAME}.${TEST_NAME})
-    # add_test(NAME ${PROJECT_NAME}.${TEST_NAME} COMMAND ${PROJECT_NAME}.${TEST_NAME})
-    
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message("USING DEBUG BUILD Cause ${CMAKE_BUILD_TYPE} == Debug")
-        add_custom_command(TARGET ${PROJECT_NAME}.${TEST_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/plug/target/debug/${RUST_LIBRARY}.lib" "${CMAKE_BINARY_DIR}/")
-    else()
-        message("USING RELEASE BUILD Cause ${CMAKE_BUILD_TYPE} != Debug")
-        add_custom_command(TARGET ${PROJECT_NAME}.${TEST_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/plug/target/release/${RUST_LIBRARY}.lib" "${CMAKE_BINARY_DIR}/")
-    endif()
-endfunction()
-
-if(BUILD_TESTS)
-    find_package(Catch2 CONFIG REQUIRED)
-    include(CTest)
-    include(Catch)
-
-    TEST_EXECUTABLE("Unit"
-        test/Telekinesis.Unit.cpp)
-    TEST_EXECUTABLE("Int"
-        test/Telekinesis.Int.cpp)
-
-    add_custom_command(TARGET ${PROJECT_NAME}.Unit POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/plug/target/debug/${RUST_LIBRARY}.lib" "${CMAKE_BINARY_DIR}/")
-endif()
 
 ########################################################################################################################
 ## Automatic plugin deployment

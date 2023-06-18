@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use tracing::{Level, instrument};
+    use tracing::{Level};
     use crate::*;
     use std::thread;
     use std::time::Duration;
