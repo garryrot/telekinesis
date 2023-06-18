@@ -2,7 +2,7 @@ use event::TkEvent;
 use lazy_static::lazy_static;
 use tracing::{
     error,
-    debug, info
+    info, instrument
 };
 use std::{
     ffi::{c_float, c_int},
@@ -41,11 +41,11 @@ macro_rules! tk_ffi (
     ($call:ident, $( $arg:ident ),* ) => {
         match TK.read().unwrap().as_ref() {
             None => { 
-                error!("[Papyrus] {}(): TK None", stringify!($call));
+                error!("FFI call on missing TK instance {}()", stringify!($call));
                 false
             }, 
             Some(tk) => { 
-                debug!("[Papyrus] {:?}({:?}) !!!!!!!!!!!-----", stringify!($call), stringify!($( $arg:ident ),*));
+                info!("FFI");
                 tk.$call( $( $arg ),* )
             }
         }
@@ -53,12 +53,15 @@ macro_rules! tk_ffi (
 );
 
 // FFI Library
+#[instrument]
 pub fn tk_connect_and_scan() -> bool {
     tk_connect() &&
     tk_scan_for_devices()
 }
 
+#[instrument]
 pub fn tk_connect() -> bool {
+    info!("Creating new connection");
     match Telekinesis::connect_with(telekinesis::in_process_server()) {
         Ok(tk) => {
             TK.write().unwrap().replace(tk);
@@ -71,15 +74,18 @@ pub fn tk_connect() -> bool {
     }
 }
 
+#[instrument]
 pub fn tk_scan_for_devices() -> bool {
     tk_ffi!(scan_for_devices,)
 }
 
+#[instrument]
 pub fn tk_vibrate_all(speed: c_int) -> bool {
     let sp: f64 = speed as f64;
     tk_ffi!(vibrate_all, sp)
 }
 
+#[instrument]
 pub fn tk_vibrate_all_for(
     speed: c_int,
     duration_sec: c_float,
@@ -92,11 +98,14 @@ pub fn tk_vibrate_all_for(
         tk_ffi!(vibrate_all_delayed, stop, duration_ms)
 }
 
+#[instrument]
 pub fn tk_stop_all() -> bool {
     tk_ffi!(stop_all,)
 }
 
+#[instrument]
 pub fn tk_close() -> bool {
+    info!("Closing connection");
     let tk = TK.write().unwrap().take();
     if let None = tk {
         return false;
@@ -106,8 +115,9 @@ pub fn tk_close() -> bool {
 }
 
 // PollEvents
-pub fn tk_try_get_next_event() -> Option<String> {
-    info!("tk_try_get_next_event");
+#[instrument]
+pub fn tk_poll_event() -> Option<String> {
+    info!("Polling event");
     let mut evt = None;
     let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap();
     if let Some(mut tk) = guard.take() {
@@ -119,8 +129,9 @@ pub fn tk_try_get_next_event() -> Option<String> {
     evt
 }
 
+#[instrument]
 pub fn tk_poll_events() -> Vec<String> {
-    info!("tk_poll_events");
+    info!("Polling all events");
     let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap();
     if let Some(mut tk) = guard.take() {
         let events = tk.get_next_events().iter().map(|evt| evt.to_string()).collect::<Vec<String>>();             

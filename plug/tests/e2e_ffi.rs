@@ -12,7 +12,7 @@ lazy_static! { static ref M: Mutex<()> = Mutex::new(()); }
 fn enable_log() {
     tracing::subscriber::set_global_default(
         tracing_subscriber::fmt()
-            .with_max_level(Level::INFO)
+            .with_max_level(Level::DEBUG)
             .finish(),
     )
     .unwrap();
@@ -41,11 +41,11 @@ fn ffi_connect_scan_and_vibrate_devices_works_after_reconnect_e2e() {
 #[test]
 #[nonparallel(M)]
 fn ffi_test_event_polling() {    
-    // enable_log();
+    enable_log();
     tk_connect();
     tk_scan_for_devices();
     thread::sleep(Duration::from_secs(5));
-    tk_vibrate_all(100 );
+    tk_vibrate_all(100);
     thread::sleep(Duration::from_millis(200));
     tk_stop_all();
     thread::sleep(Duration::from_millis(200));
@@ -61,13 +61,13 @@ fn _ffi_connect_scan_and_vibrate_devices() {
     tk_connect();
     tk_scan_for_devices();
     thread::sleep(Duration::from_secs(5));
-    assert!(tk_try_get_next_event().unwrap().starts_with("Device"));
+    assert!(tk_poll_event().unwrap().starts_with("Device"));
     tk_vibrate_all(100 );
     thread::sleep(Duration::from_millis(200));
-    assert!(tk_try_get_next_event().unwrap().starts_with("Vibrating"));
+    assert!(tk_poll_event().unwrap().starts_with("Vibrating"));
     tk_stop_all();
     thread::sleep(Duration::from_millis(200));
-    assert!(tk_try_get_next_event().unwrap().starts_with("Stopping"));
+    assert!(tk_poll_event().unwrap().starts_with("Stopping"));
     tk_close();
     thread::sleep(Duration::from_secs(5));
 }

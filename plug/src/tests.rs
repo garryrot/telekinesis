@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use tracing::Level;
-    use crate::logging::{tk_init_logging, LogLevel};
+    use tracing::{Level, instrument};
     use crate::*;
-    use std::ptr::{null};
     use std::thread;
     use std::time::Duration;
         
@@ -16,12 +14,7 @@ mod tests {
         )
         .unwrap();
     }
-
-    #[test]
-    fn init_logging_handles_nullpointr_without_panic() {
-        tk_init_logging(LogLevel::Trace, null());
-    }
-
+    
     #[test]
     fn connect_and_scan() {
         assert_eq!( tk_connect(), true);

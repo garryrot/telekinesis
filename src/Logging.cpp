@@ -1,6 +1,7 @@
 #include "Config.h"
 #include "Papyrus.h"
 #include "../plug/include/telekinesis_plug.h"
+#include "../plug/target/cxxbridge/plug/src/logging.rs.h"
 
 using namespace RE::BSScript;
 using namespace SKSE::log;
@@ -8,7 +9,7 @@ using namespace SKSE::stl;
 using namespace SKSE;
 
 namespace Telekinesis {
-    std::string GetLogFile( std::string context ) {
+    std::string GetLogFile(std::string context) {
         auto path = log_directory();
         if (!path) {
             report_and_fail("Unable to lookup SKSE logs directory.");
@@ -37,5 +38,6 @@ namespace Telekinesis {
         log::info("Log started. Logging level: '{}' ({}).", logLevel, logLevelStr);
 
         auto rustLog = GetLogFile("Plug");
+        tk_init_logging(::rust::String(rustLog));
     }
 }

@@ -128,7 +128,6 @@ impl Tk for Telekinesis {
     }
 
     fn get_next_event(&mut self) -> Option<TkEvent> {
-        debug!("get_next_event");
         if let Ok(msg) = self.event_receiver.try_recv() {
             debug!("Got event {}", msg.to_string());
             return Some(msg);
@@ -137,7 +136,6 @@ impl Tk for Telekinesis {
     }
 
     fn get_next_events(&mut self) -> Vec<TkEvent> {
-        debug!("get_next_events");
         let mut events = vec![];
         while let Some(event) = self.get_next_event() {
             events.push(event);
