@@ -85,12 +85,11 @@ impl Tk for Telekinesis {
         true
     }
 
-    // TODO: Drop messages if event queue is full
     fn vibrate_all(&self, speed: Speed) -> bool {
         info!("Sending Command: Vibrate all");
         if let Err(_) = self
             .command_sender
-            .blocking_send(TkAction::TkVibrateAll(speed))
+            .try_send(TkAction::TkVibrateAll(speed))
         {
             error!("Failed to send vibrate_all");
             return false;
@@ -102,7 +101,7 @@ impl Tk for Telekinesis {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
             .command_sender
-            .blocking_send(TkAction::TkVibrateAllDelayed(
+            .try_send(TkAction::TkVibrateAllDelayed(
                 speed,
                 duration,
             ))
