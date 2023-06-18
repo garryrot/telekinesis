@@ -173,7 +173,7 @@ impl Speed {
         Speed { value: 0 }
     }
     pub fn as_0_to_1_f64(self) -> f64 {
-        (self.value / 100) as f64
+        self.value as f64 / 100.0
     } 
 }
 impl Display for Speed {
