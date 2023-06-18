@@ -2,13 +2,13 @@ use buttplug::{client::{ButtplugClient, ScalarCommand}, core::message::ActuatorT
 use tokio::{runtime::Handle, select, time::sleep};
 use tracing::{debug, error, info, span, Level};
 
-use crate::event::TkEvent;
+use crate::{event::TkEvent, telekinesis::Speed};
 
 #[derive(Debug)]
 pub enum TkAction {
     TkScan,
-    TkVibrateAll(f64),
-    TkVibrateAllDelayed(f64, std::time::Duration),
+    TkVibrateAll(Speed),
+    TkVibrateAllDelayed(Speed, std::time::Duration),
     TkStopAll,
     TkDiscconect,
 }
@@ -21,7 +21,7 @@ pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
     true
 }
 
-pub async fn cmd_vibrate_all(client: &ButtplugClient, speed: f64) -> i32 {
+pub async fn cmd_vibrate_all(client: &ButtplugClient, speed: Speed) -> i32 {
     let mut vibrated = 0;
     for device in client
         .devices()
@@ -29,7 +29,7 @@ pub async fn cmd_vibrate_all(client: &ButtplugClient, speed: f64) -> i32 {
         .filter(|d| d.message_attributes().scalar_cmd().is_some())
     {
         debug!("Vibrating device {} with speed {}", device.name(), speed);
-        match device.scalar(&ScalarCommand::Scalar((speed, ActuatorType::Vibrate))).await {
+        match device.scalar(&ScalarCommand::Scalar((speed.as_0_to_1_f64(), ActuatorType::Vibrate))).await {
             Ok(_) => vibrated += 1,
             Err(err) => error!(
                 dev = device.name(),

@@ -1,8 +1,3 @@
-use crate::{
-    commands::{create_cmd_thread, TkAction},
-    util::Narrow,
-    Tk, TkEvent,
-};
 use buttplug::{
     client::ButtplugClient,
     core::connector::ButtplugInProcessClientConnectorBuilder,
@@ -12,9 +7,16 @@ use buttplug::{
     },
 };
 use futures::{Future, StreamExt};
-use std::fmt::{self};
+use std::{fmt::{self}};
+use std::fmt::Display;
 use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info, warn};
+
+use crate::{
+    commands::{create_cmd_thread, TkAction},
+    util::Narrow,
+    Tk, TkEvent,
+};
 
 pub struct Telekinesis {
     pub event_receiver: tokio::sync::mpsc::UnboundedReceiver<TkEvent>,
@@ -84,11 +86,11 @@ impl Tk for Telekinesis {
     }
 
     // TODO: Drop messages if event queue is full
-    fn vibrate_all(&self, speed: f64) -> bool {
+    fn vibrate_all(&self, speed: Speed) -> bool {
         info!("Sending Command: Vibrate all");
         if let Err(_) = self
             .command_sender
-            .blocking_send(TkAction::TkVibrateAll((speed / 100.0).narrow(0.0, 1.0)))
+            .blocking_send(TkAction::TkVibrateAll(speed))
         {
             error!("Failed to send vibrate_all");
             return false;
@@ -96,12 +98,12 @@ impl Tk for Telekinesis {
         true
     }
 
-    fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool {
+    fn vibrate_all_delayed(&self, speed: Speed, duration: std::time::Duration) -> bool {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
             .command_sender
             .blocking_send(TkAction::TkVibrateAllDelayed(
-                (speed / 100.0).narrow(0.0, 1.0),
+                speed,
                 duration,
             ))
         {
@@ -156,4 +158,27 @@ impl Tk for Telekinesis {
     //                .collect::<Vec<String>>()
     //     });
     // }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Speed {
+    pub value: u16 
+}
+impl Speed {
+    pub fn new(percentage: i64) -> Speed {
+        Speed { 
+            value: percentage.narrow(0, 100) as u16
+        }
+    }
+    pub fn min() -> Speed {
+        Speed { value: 0 }
+    }
+    pub fn as_0_to_1_f64(self) -> f64 {
+        (self.value / 100) as f64
+    } 
+}
+impl Display for Speed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }

@@ -1,11 +1,11 @@
 
 
 pub trait Narrow<T> {
-    fn narrow( self, above: T, below: T) -> T;
+    fn narrow(self, above: T, below: T) -> T;
 }
 
-impl Narrow<f64> for f64 {
-    fn narrow( self, above: f64, below: f64) -> f64 {
+impl Narrow<i64> for i64 {
+    fn narrow( self, above: i64, below: i64) -> i64 {
         match self {
             a if a < above => above,
             a if a > below => below,

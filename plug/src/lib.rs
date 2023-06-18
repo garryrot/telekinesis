@@ -5,13 +5,12 @@ use tracing::{
     info, instrument
 };
 use std::{
-    ffi::{c_float, c_int},
     sync::RwLock,
     sync::RwLockWriteGuard,
     time::Duration,
 };
 
-use telekinesis::Telekinesis;
+use telekinesis::{Telekinesis, Speed};
 
 mod commands;
 mod event;
@@ -26,8 +25,8 @@ mod ffi {
         fn tk_connect() -> bool;
         fn tk_connect_and_scan() -> bool;
         fn tk_scan_for_devices() -> bool; 
-        fn tk_vibrate_all(speed: i32) -> bool;
-        fn tk_vibrate_all_for(speed: i32, duration_sec: f32) -> bool;
+        fn tk_vibrate_all(speed: i64) -> bool;
+        fn tk_vibrate_all_for(speed: i64, duration_sec: u64) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
@@ -38,7 +37,7 @@ lazy_static! {
     static ref TK: RwLock<Option<Telekinesis>> = RwLock::new(None);
 }
 macro_rules! tk_ffi (
-    ($call:ident, $( $arg:ident ),* ) => {
+    ($call:ident, $( $arg:tt ),* ) => {
         match TK.read().unwrap().as_ref() {
             None => { 
                 error!("FFI call on missing TK instance {}()", stringify!($call));
@@ -80,21 +79,20 @@ pub fn tk_scan_for_devices() -> bool {
 }
 
 #[instrument]
-pub fn tk_vibrate_all(speed: c_int) -> bool {
-    let sp: f64 = speed as f64;
-    tk_ffi!(vibrate_all, sp)
+pub fn tk_vibrate_all(speed: i64) -> bool {
+    let s = Speed::new(speed);
+    tk_ffi!(vibrate_all, s)
 }
 
 #[instrument]
 pub fn tk_vibrate_all_for(
-    speed: c_int,
-    duration_sec: c_float,
+    speed: i64,
+    duration_sec: u64,
 ) -> bool {
-    let duration_ms = Duration::from_millis((duration_sec * 1000.0) as u64);
-    let sp = speed as f64;
-    let stop = 0.0 as f64;
-
-    tk_ffi!(vibrate_all, sp) &&
+    let duration_ms = Duration::from_millis(duration_sec * 1000.0 as u64);
+    let s = Speed::new(speed);
+    let stop = Speed::new(0);
+    tk_ffi!(vibrate_all, s) &&
         tk_ffi!(vibrate_all_delayed, stop, duration_ms)
 }
 
@@ -148,8 +146,8 @@ pub fn new_with_default_settings() -> impl Tk {
 
 pub trait Tk {
     fn scan_for_devices(&self) -> bool;
-    fn vibrate_all(&self, speed: f64) -> bool;
-    fn vibrate_all_delayed(&self, speed: f64, duration: std::time::Duration) -> bool;
+    fn vibrate_all(&self, speed: Speed) -> bool;
+    fn vibrate_all_delayed(&self, speed: Speed, duration: std::time::Duration) -> bool;
     fn stop_all(&self) -> bool;
     fn disconnect(&mut self);
     fn get_next_event(&mut self) -> Option<TkEvent>;

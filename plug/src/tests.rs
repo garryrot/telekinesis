@@ -17,7 +17,7 @@ mod tests {
     
     #[test]
     fn connect_and_scan() {
-        assert_eq!( tk_connect(), true);
+        assert_eq!(tk_connect(), true);
         tk_scan_for_devices();
     }
 
@@ -26,10 +26,10 @@ mod tests {
         let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
         _sleep(200);
 
-        tk.vibrate_all(0.0);
+        tk.vibrate_all(Speed::new(0));
         _assert_one_event(&mut tk);
 
-        tk.vibrate_all_delayed(0.22, Duration::from_millis(50));
+        tk.vibrate_all_delayed(Speed::new(22), Duration::from_millis(50));
         _sleep(25);
         _assert_no_event(&mut tk);
 
@@ -42,8 +42,8 @@ mod tests {
         let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
         _sleep(200);
 
-        tk.vibrate_all_delayed(0.22, Duration::from_millis(50));
-        tk.vibrate_all(0.33);
+        tk.vibrate_all_delayed(Speed::new(22), Duration::from_millis(50));
+        tk.vibrate_all(Speed::new(33));
         _assert_one_event(&mut tk);
     }
 
@@ -62,7 +62,7 @@ mod tests {
         let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
         _sleep(200);
 
-        tk.vibrate_all(0.22);
+        tk.vibrate_all(Speed::new(22));
         _sleep(200);
 
         assert_eq!( tk.get_next_events().len(), 1);
@@ -74,7 +74,7 @@ mod tests {
         let mut tk = Telekinesis::connect_with(telekinesis::in_process_server()).unwrap();
         _sleep(200); 
 
-        tk.vibrate_all(0.2);
+        tk.vibrate_all(Speed::new(20));
         tk.stop_all();
 
         _sleep(200);
@@ -95,7 +95,6 @@ mod tests {
         _sleep(200);
         assert_eq!( tk.get_next_events().len(), 128 );
     }
-
 
     fn _sleep( milliseconds: u64 ) {
         thread::sleep(Duration::from_millis(milliseconds));

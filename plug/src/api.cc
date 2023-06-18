@@ -13,10 +13,10 @@ DllExport bool ConnectAndScanForDevices(void*) {
     return tk_connect_and_scan(); 
 }
 DllExport bool VibrateAll(void*, int speed) { 
-    return tk_vibrate_all((float_t)speed / 100.0); // TODO: : warning C4244: "Argument": Konvertierung von "double" in "int32_t", m�glicher Datenverlust
+    return tk_vibrate_all(speed);
 }
 DllExport bool VibrateAllFor(void*, int speed, float time_sec) {
-    return tk_vibrate_all_for((float_t)speed / 100.0, time_sec);  // TODO: : warning C4244: "Argument": Konvertierung von "double" in "int32_t", m�glicher Datenverlust
+    return tk_vibrate_all_for(speed, time_sec);
 }
 DllExport bool StopAll(void*) {
     return tk_stop_all(); 
