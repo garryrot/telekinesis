@@ -18,30 +18,24 @@ fn enable_log() {
     .unwrap();
 }
 
-// Asserts that exactly one device is connected
-
+// These tests asserts that exactly one vibrating device is connected
+// and will not work without actual hardwarce connected via usb
 #[test]
 #[nonparallel(M)]
-fn ffi_connect_scan_and_vibrate_devices_2e2() {
-    // enable_log();
-    _ffi_connect_scan_and_vibrate_devices();
-}
-
-#[test]
-#[nonparallel(M)]
-fn ffi_connect_scan_and_vibrate_devices_works_after_reconnect_e2e() {
-    // enable_log();
-    _ffi_connect_scan_and_vibrate_devices();
-    _ffi_connect_scan_and_vibrate_devices();
-    _ffi_connect_scan_and_vibrate_devices();
-    _ffi_connect_scan_and_vibrate_devices();
-    _ffi_connect_scan_and_vibrate_devices();
-}
-
-#[test]
-#[nonparallel(M)]
-fn ffi_test_event_polling() {    
+fn ffi_test_multiple_reconnects() {
     enable_log();
+    _ffi_test_event_polling();
+    _ffi_test_event_polling();
+    _ffi_test_event_polling();
+}
+
+#[test]
+#[nonparallel(M)]
+fn ffi_test_event_polling() {
+    _ffi_test_event_polling();
+}
+
+fn _ffi_test_event_polling() {
     tk_connect();
     tk_scan_for_devices();
     thread::sleep(Duration::from_secs(5));
@@ -53,21 +47,6 @@ fn ffi_test_event_polling() {
     assert!(events[0].starts_with("Device"));
     assert!(events[1].starts_with("Vibrating"));
     assert!(events[2].starts_with("Stopping"));
-    tk_close();
-    thread::sleep(Duration::from_secs(5));
-}
-
-fn _ffi_connect_scan_and_vibrate_devices() {
-    tk_connect();
-    tk_scan_for_devices();
-    thread::sleep(Duration::from_secs(5));
-    assert!(tk_poll_event().unwrap().starts_with("Device"));
-    tk_vibrate_all(100 );
-    thread::sleep(Duration::from_millis(200));
-    assert!(tk_poll_event().unwrap().starts_with("Vibrating"));
-    tk_stop_all();
-    thread::sleep(Duration::from_millis(200));
-    assert!(tk_poll_event().unwrap().starts_with("Stopping"));
     tk_close();
     thread::sleep(Duration::from_secs(5));
 }
