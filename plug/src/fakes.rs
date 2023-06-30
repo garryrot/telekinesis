@@ -40,6 +40,7 @@ pub struct FakeDeviceConnector {
     call_registry: FakeConnectorCallRegistry,
 }
 
+#[allow(dead_code)]
 impl FakeConnectorCallRegistry {
     fn default() -> Self {
         Self {
@@ -70,6 +71,7 @@ impl FakeConnectorCallRegistry {
 }
 
 // Connector that allows to instantiate various fake devices for testing purposes
+#[allow(dead_code)]
 impl FakeDeviceConnector {
     pub fn new(devices: Vec<DeviceAdded>) -> Self {
         let (server_outbound_sender, _) = channel(256);
