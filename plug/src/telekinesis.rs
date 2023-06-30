@@ -1,21 +1,22 @@
 use buttplug::{
     client::ButtplugClient,
-    core::connector::ButtplugInProcessClientConnectorBuilder,
+    core::{
+        connector::{ButtplugConnector, ButtplugInProcessClientConnectorBuilder},
+        message::{ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage},
+    },
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
         ButtplugServerBuilder,
     },
 };
 use futures::{Future, StreamExt};
-use std::{fmt::{self}};
-use std::fmt::Display;
+use std::fmt::{self};
 use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info, warn};
 
 use crate::{
     commands::{create_cmd_thread, TkAction},
-    util::Narrow,
-    Tk, TkEvent,
+    Speed, Tk, TkEvent,
 };
 
 pub struct Telekinesis {
@@ -24,8 +25,21 @@ pub struct Telekinesis {
     pub thread: Runtime,
 }
 
+pub async fn with_connector<T>(connector: T) -> ButtplugClient
+where
+    T: ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage>
+        + 'static,
+{
+    let buttplug = ButtplugClient::new("Telekinesis");
+    buttplug
+        .connect(connector)
+        .await
+        .expect("Could not connect client");
+    buttplug
+}
+
 pub async fn in_process_server() -> ButtplugClient {
-    let connector = ButtplugInProcessClientConnectorBuilder::default()
+    let in_process_connector = ButtplugInProcessClientConnectorBuilder::default()
         .server(
             ButtplugServerBuilder::default()
                 .comm_manager(BtlePlugCommunicationManagerBuilder::default())
@@ -34,12 +48,7 @@ pub async fn in_process_server() -> ButtplugClient {
         )
         .finish();
 
-    let buttplug = ButtplugClient::new("Telekinesis");
-    buttplug
-        .connect(connector)
-        .await
-        .expect("Could not connect client");
-    buttplug
+    with_connector(in_process_connector).await
 }
 
 impl Telekinesis {
@@ -87,10 +96,7 @@ impl Tk for Telekinesis {
 
     fn vibrate_all(&self, speed: Speed) -> bool {
         info!("Sending Command: Vibrate all");
-        if let Err(_) = self
-            .command_sender
-            .try_send(TkAction::TkVibrateAll(speed))
-        {
+        if let Err(_) = self.command_sender.try_send(TkAction::TkVibrateAll(speed)) {
             error!("Failed to send vibrate_all");
             return false;
         }
@@ -101,10 +107,7 @@ impl Tk for Telekinesis {
         info!("Sending Command: Vibrate all delayed");
         if let Err(_) = self
             .command_sender
-            .try_send(TkAction::TkVibrateAllDelayed(
-                speed,
-                duration,
-            ))
+            .try_send(TkAction::TkVibrateAllDelayed(speed, duration))
         {
             error!("Failed to send delayed command");
             return false;
@@ -157,27 +160,4 @@ impl Tk for Telekinesis {
     //                .collect::<Vec<String>>()
     //     });
     // }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Speed {
-    pub value: u16 
-}
-impl Speed {
-    pub fn new(percentage: i64) -> Speed {
-        Speed { 
-            value: percentage.narrow(0, 100) as u16
-        }
-    }
-    pub fn min() -> Speed {
-        Speed { value: 0 }
-    }
-    pub fn as_0_to_1_f64(self) -> f64 {
-        self.value as f64 / 100.0
-    } 
-}
-impl Display for Speed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
-    }
 }

@@ -1,18 +1,26 @@
+use buttplug::client::ButtplugClient;
+use commands::TkAction;
 use event::TkEvent;
+use futures::Future;
 use lazy_static::lazy_static;
+use tokio::{runtime::Runtime, sync::mpsc::{unbounded_channel, channel}};
 use tracing::{
     error,
     info, instrument
 };
+use util::Narrow;
 use std::{
     sync::RwLock,
     sync::RwLockWriteGuard,
-    time::Duration,
+    time::Duration, fmt::{Display, self},
 };
 
-use telekinesis::{Telekinesis, Speed};
+use telekinesis::{Telekinesis};
+
+use crate::commands::create_cmd_thread;
 
 mod commands;
+mod fakes;
 mod event;
 mod logging;
 mod telekinesis;
@@ -55,7 +63,7 @@ macro_rules! tk_ffi (
 #[instrument]
 pub fn tk_connect_and_scan() -> bool {
     tk_connect() &&
-    tk_scan_for_devices()
+        tk_scan_for_devices()
 }
 
 #[instrument]
@@ -152,4 +160,27 @@ pub trait Tk {
     fn disconnect(&mut self);
     fn get_next_event(&mut self) -> Option<TkEvent>;
     fn get_next_events(&mut self) -> Vec<TkEvent>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Speed {
+    pub value: u16 
+}
+impl Speed {
+    pub fn new(percentage: i64) -> Speed {
+        Speed { 
+            value: percentage.narrow(0, 100) as u16
+        }
+    }
+    pub fn min() -> Speed {
+        Speed { value: 0 }
+    }
+    pub fn as_0_to_1_f64(self) -> f64 {
+        self.value as f64 / 100.0
+    } 
+}
+impl Display for Speed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }

@@ -2,7 +2,7 @@ use buttplug::{client::{ButtplugClient, ScalarCommand}, core::message::ActuatorT
 use tokio::{runtime::Handle, select, time::sleep};
 use tracing::{debug, error, info, span, Level};
 
-use crate::{event::TkEvent, telekinesis::Speed};
+use crate::{event::TkEvent, Speed};
 
 #[derive(Debug)]
 pub enum TkAction {
