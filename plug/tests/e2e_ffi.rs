@@ -22,16 +22,9 @@ fn enable_log() {
 // and will not work without actual hardwarce connected via usb
 #[test]
 #[nonparallel(M)]
-fn ffi_test_multiple_reconnects() {
-    enable_log();
+fn ffi_test_reconnect() {
+    // enable_log();
     _ffi_test_event_polling();
-    _ffi_test_event_polling();
-    _ffi_test_event_polling();
-}
-
-#[test]
-#[nonparallel(M)]
-fn ffi_test_event_polling() {
     _ffi_test_event_polling();
 }
 

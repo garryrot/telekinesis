@@ -1,9 +1,6 @@
-use buttplug::client::ButtplugClient;
-use commands::TkAction;
+use buttplug::{core::connector::ButtplugInProcessClientConnectorBuilder, server::{ButtplugServerBuilder, device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder}};
 use event::TkEvent;
-use futures::Future;
 use lazy_static::lazy_static;
-use tokio::{runtime::Runtime, sync::mpsc::{unbounded_channel, channel}};
 use tracing::{
     error,
     info, instrument
@@ -15,9 +12,10 @@ use std::{
     time::Duration, fmt::{Display, self},
 };
 
-use telekinesis::{Telekinesis};
-
-use crate::commands::create_cmd_thread;
+use telekinesis::{
+    Telekinesis,
+    in_process_connector
+};
 
 mod commands;
 mod fakes;
@@ -69,7 +67,17 @@ pub fn tk_connect_and_scan() -> bool {
 #[instrument]
 pub fn tk_connect() -> bool {
     info!("Creating new connection");
-    match Telekinesis::connect_with(telekinesis::in_process_server()) {
+
+    let muh_callback = || async move { ButtplugInProcessClientConnectorBuilder::default()
+        .server(
+            ButtplugServerBuilder::default()
+                .comm_manager(BtlePlugCommunicationManagerBuilder::default())
+                .finish()
+                .expect("Could not create in-process-server."),
+        )
+        .finish()
+    };
+    match Telekinesis::connect_with(muh_callback) {
         Ok(tk) => {
             TK.write().unwrap().replace(tk);
             true
@@ -149,7 +157,7 @@ pub fn tk_poll_events() -> Vec<String> {
 
 // Rust Library
 pub fn new_with_default_settings() -> impl Tk {
-    Telekinesis::connect_with(telekinesis::in_process_server()).unwrap()
+    Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap()
 }
 
 pub trait Tk {

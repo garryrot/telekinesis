@@ -1,7 +1,10 @@
 use buttplug::{
     client::ButtplugClient,
     core::{
-        connector::{ButtplugConnector, ButtplugInProcessClientConnectorBuilder},
+        connector::{
+            ButtplugConnector, ButtplugInProcessClientConnector,
+            ButtplugInProcessClientConnectorBuilder,
+        },
         message::{ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage},
     },
     server::{
@@ -9,7 +12,7 @@ use buttplug::{
         ButtplugServerBuilder,
     },
 };
-use futures::{Future, StreamExt};
+use futures::{StreamExt, Future};
 use std::fmt::{self};
 use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info, warn};
@@ -25,42 +28,31 @@ pub struct Telekinesis {
     pub thread: Runtime,
 }
 
-pub async fn with_connector<T>(connector: T) -> ButtplugClient
-where
-    T: ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage>
-        + 'static,
-{
-    let buttplug = ButtplugClient::new("Telekinesis");
-    buttplug
-        .connect(connector)
-        .await
-        .expect("Could not connect client");
-    buttplug
-}
-
-pub async fn in_process_server() -> ButtplugClient {
-    let in_process_connector = ButtplugInProcessClientConnectorBuilder::default()
+pub fn in_process_connector() -> ButtplugInProcessClientConnector {
+    ButtplugInProcessClientConnectorBuilder::default()
         .server(
             ButtplugServerBuilder::default()
                 .comm_manager(BtlePlugCommunicationManagerBuilder::default())
                 .finish()
                 .expect("Could not create in-process-server."),
         )
-        .finish();
-
-    with_connector(in_process_connector).await
+        .finish()
 }
 
 impl Telekinesis {
-    pub fn connect_with(
-        connector: impl Future<Output = ButtplugClient> + Send + 'static,
-    ) -> Result<Telekinesis, anyhow::Error> {
+    pub fn connect_with<T, Fn, Fut>(connector_factory: Fn) -> Result<Telekinesis, anyhow::Error>
+    where
+        Fn: FnOnce() -> Fut + Send + 'static,
+        Fut: Future<Output = T> + Send,
+        T: ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage>
+            + 'static,
+    {
         let (event_sender, event_receiver) = unbounded_channel();
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
         let runtime = Runtime::new()?;
         runtime.spawn(async move {
             info!("Main thread started");
-            let buttplug = connector.await;
+            let buttplug = with_connector(connector_factory().await).await;
             let mut events = buttplug.event_stream();
             create_cmd_thread(buttplug, event_sender.clone(), command_receiver);
 
@@ -160,4 +152,90 @@ impl Tk for Telekinesis {
     //                .collect::<Vec<String>>()
     //     });
     // }
+}
+
+async fn with_connector<T>(connector: T) -> ButtplugClient
+where
+    T: ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage>
+        + 'static,
+{
+    let buttplug = ButtplugClient::new("Telekinesis");
+    let bp =  buttplug
+        .connect(connector)
+        .await;
+    match bp {
+        Ok(_) => {
+            info!("Connected client.")
+        },
+        Err(err) => {
+            error!("Could not connect client. Error: {}.", err);
+        },
+    }
+    buttplug
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{thread, time::Duration, vec};
+
+    use buttplug::core::message::ActuatorType;
+    use tracing::Level;
+
+    use crate::fakes::{FakeDeviceConnector, scalar};
+
+    use super::*;
+    
+    #[allow(dead_code)]
+    fn enable_log() {
+        tracing::subscriber::set_global_default(
+            tracing_subscriber::fmt()
+                .with_max_level(Level::INFO)
+                .finish(),
+        )
+        .unwrap();
+    }
+    
+    #[test]
+    fn test_regular_connection() {
+        // arrange
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
+        tk.stop_all();
+        thread::sleep(Duration::from_millis(200));
+        assert!(tk.get_next_event().is_some())
+    }
+
+    #[test]
+    fn test_demo_vibrate_only_vibrators() {
+        // arrange
+        enable_log();
+        let (connector, call_registry) = FakeDeviceConnector::device_demo();
+
+        // act
+        let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
+        
+        tk.vibrate_all(Speed::new(100));
+        thread::sleep(Duration::from_millis(500));
+
+        // assert
+        assert_eq!(call_registry.get_record(1).len(), 1);
+        assert_eq!(call_registry.get_record(4).len(), 0);
+    }
+
+    #[test]
+    fn test_demo_vibrate_only_vibrates_actuator_vibrate() {
+        // arrange
+        let (connector, call_registry) = FakeDeviceConnector::new( vec![
+            scalar(1, "vib1", ActuatorType::Vibrate),
+            scalar(2, "vib2", ActuatorType::Inflate)
+        ]);
+
+        // act
+        let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
+        tk.vibrate_all(Speed::new(100));
+        thread::sleep(Duration::from_millis(500));
+
+        // assert
+        assert_eq!(call_registry.get_record(1).len(), 1);
+        assert_eq!(call_registry.get_record(2).len(), 0);
+    }
 }

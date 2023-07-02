@@ -1,6 +1,8 @@
 use buttplug::core::connector::ButtplugConnectorResult;
 use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes};
-use buttplug::server::device::configuration::{ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes};
+use buttplug::server::device::configuration::{
+    ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes,
+};
 use lazy_static::__Deref;
 use serde::Serialize;
 use tokio::sync::mpsc::channel;
@@ -73,25 +75,27 @@ impl FakeConnectorCallRegistry {
 // Connector that allows to instantiate various fake devices for testing purposes
 #[allow(dead_code)]
 impl FakeDeviceConnector {
-    pub fn new(devices: Vec<DeviceAdded>) -> Self {
+    pub fn new(devices: Vec<DeviceAdded>) -> (Self, FakeConnectorCallRegistry) {
         let (server_outbound_sender, _) = channel(256);
-        FakeDeviceConnector {
+        let connector = FakeDeviceConnector {
             devices: devices,
             server_outbound_sender: server_outbound_sender,
             call_registry: FakeConnectorCallRegistry::default(),
-        }
+        };
+        let calls = connector.get_call_registry();
+        (connector, calls)
     }
 
     // A demo configuration that exposes various devices
-    pub fn device_demo() -> Self {
-        Self::new( vec![
+    pub fn device_demo() -> (Self, FakeConnectorCallRegistry) {
+        Self::new(vec![
             vibrator(1, "Vibator 1"),
             vibrator(2, "Vibrator 2"),
             vibrator(3, "Vibrator 3"),
             linear(4, "Linear 1"),
             linear(5, "Linear 2"),
             linear(6, "Linear 3"),
-            rotate(4, "Rotatr 1")
+            rotate(7, "Rotator 1"),
         ])
     }
 
@@ -214,6 +218,7 @@ where
     value[key].to_string().parse().unwrap()
 }
 
+#[allow(dead_code)]
 pub fn vibrator(id: u32, name: &str) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
         .scalar_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
@@ -231,6 +236,25 @@ pub fn vibrator(id: u32, name: &str) -> DeviceAdded {
     )
 }
 
+#[allow(dead_code)]
+pub fn scalar(id: u32, name: &str, actuator: ActuatorType) -> DeviceAdded {
+    let attributes = ServerDeviceMessageAttributesBuilder::default()
+        .scalar_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
+            &format!("Vibrator {}", id),
+            &RangeInclusive::new(0, 10),
+            actuator,
+        )])
+        .finish();
+    DeviceAdded::new(
+        id,
+        name,
+        &None,
+        &None,
+        &ClientDeviceMessageAttributes::from(attributes),
+    )
+}
+
+#[allow(dead_code)]
 pub fn linear(id: u32, name: &str) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
         .linear_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
@@ -248,6 +272,7 @@ pub fn linear(id: u32, name: &str) -> DeviceAdded {
     )
 }
 
+#[allow(dead_code)]
 pub fn rotate(id: u32, name: &str) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
         .rotate_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
@@ -265,16 +290,13 @@ pub fn rotate(id: u32, name: &str) -> DeviceAdded {
     )
 }
 
-
 #[cfg(test)]
 mod tests {
-    
-
     use buttplug::{
         client::{
             ButtplugClient, ButtplugClientDevice, LinearCommand, RotateCommand, ScalarCommand,
         },
-        core::message::{ActuatorType},
+        core::message::ActuatorType,
     };
     use futures::Future;
     use tracing::Level;
@@ -296,7 +318,7 @@ mod tests {
         async_manager::block_on(async {
             // arrange
             let buttplug = ButtplugClient::new("Foobar");
-            let connector = FakeDeviceConnector::new(vec![
+            let (connector, _) = FakeDeviceConnector::new(vec![
                 vibrator(1, "eins"),
                 vibrator(2, "zwei"),
                 vibrator(3, "drei"),
@@ -344,9 +366,8 @@ mod tests {
     fn call_registry_stores_vibrate() {
         async_manager::block_on(async {
             // arrange
-            let connector =
+            let (connector, call_registry) =
                 FakeDeviceConnector::new(vec![vibrator(1, "vibrator"), linear(2, "oscillator")]);
-            let call_registry = connector.get_call_registry();
 
             // act
             execute_test(connector, |x| {
@@ -366,9 +387,8 @@ mod tests {
     fn call_registry_stores_linear() {
         async_manager::block_on(async {
             // arrange
-            let connector =
+            let (connector, call_registry) =
                 FakeDeviceConnector::new(vec![vibrator(1, "vibrator"), linear(2, "oscillator")]);
-            let call_registry = connector.get_call_registry();
 
             // act
             execute_test(connector, |x| x.linear(&LinearCommand::Linear(88, 0.9))).await;
@@ -385,9 +405,9 @@ mod tests {
     fn call_registry_stores_rotate() {
         async_manager::block_on(async {
             // arrange
-            let connector =
+            let (connector, call_registry) =
+                
                 FakeDeviceConnector::new(vec![vibrator(1, "vibrator"), rotate(2, "rotator")]);
-            let call_registry = connector.get_call_registry();
 
             // act
             execute_test(connector, |x| x.rotate(&RotateCommand::Rotate(0.9, true))).await;

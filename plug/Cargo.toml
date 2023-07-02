@@ -16,6 +16,9 @@ tokio = { version = "1.23.0", features = ["full", "sync"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
 cxx = "1.0.95"
+tokio-test = "0.4.2"
+serde = "1.0.164"
+serde_json = "1.0.99"
 
 [dev-dependencies]
 nonparallel = "0.1.0"
