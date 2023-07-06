@@ -1,11 +1,11 @@
 use buttplug::{
-    client::ButtplugClient,
+    client::{ButtplugClient, ButtplugClientEvent, ButtplugClientDevice},
     core::{
         connector::{
             ButtplugConnector, ButtplugInProcessClientConnector,
             ButtplugInProcessClientConnectorBuilder,
         },
-        message::{ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage},
+        message::{ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage, DeviceAdded},
     },
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
@@ -13,8 +13,9 @@ use buttplug::{
     },
 };
 use futures::{StreamExt, Future};
-use std::fmt::{self};
-use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
+use std::{fmt::{self}, sync::{Arc, Mutex}, ops::DerefMut};
+use std::time::Instant;
+use tokio::{runtime::Runtime, sync::{mpsc::{channel}}, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -25,6 +26,7 @@ use crate::{
 pub struct Telekinesis {
     pub event_receiver: tokio::sync::mpsc::UnboundedReceiver<TkEvent>,
     pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
+    pub devices: Arc<Mutex<Vec<Arc<ButtplugClientDevice>>>>,
     pub thread: Runtime,
 }
 
@@ -49,14 +51,29 @@ impl Telekinesis {
     {
         let (event_sender, event_receiver) = unbounded_channel();
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
+        let devices = Arc::new(Mutex::new(vec![]));
+        let devices_clone = devices.clone();
+
         let runtime = Runtime::new()?;
         runtime.spawn(async move {
             info!("Main thread started");
             let buttplug = with_connector(connector_factory().await).await;
             let mut events = buttplug.event_stream();
             create_cmd_thread(buttplug, event_sender.clone(), command_receiver);
-
             while let Some(event) = events.next().await {
+                match event.clone() {
+                    ButtplugClientEvent::DeviceAdded(device) => {
+                        let mut device_list = devices_clone.lock().unwrap();
+                        device_list.push(device);
+                    },
+                    ButtplugClientEvent::DeviceRemoved(device) => {
+                        let mut device_list = devices_clone.lock().unwrap();
+                        if let Some(i) = device_list.iter().position(|x| x.index() == device.index()) {
+                            device_list.remove(i);
+                        }
+                    },
+                    _ => {}
+                };
                 event_sender
                     .send(TkEvent::from_event(event))
                     .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
@@ -65,6 +82,7 @@ impl Telekinesis {
         Ok(Telekinesis {
             command_sender: command_sender,
             event_receiver: event_receiver,
+            devices: devices,
             thread: runtime,
         })
     }
@@ -141,17 +159,6 @@ impl Tk for Telekinesis {
         }
         events
     }
-
-    // pub fn tk_get_connected_devices(&self) {
-    //     self.runtime.block_on(async {
-    //         self.client
-    //                .devices()
-    //                .iter()
-    //                .filter( |f| self.is_vibrator(&f))
-    //                .map(|f| f.name().clone() )
-    //                .collect::<Vec<String>>()
-    //     });
-    // }
 }
 
 async fn with_connector<T>(connector: T) -> ButtplugClient
@@ -179,46 +186,32 @@ mod tests {
     use std::{thread, time::Duration, vec};
 
     use buttplug::core::message::ActuatorType;
-    use tracing::Level;
-
-    use crate::fakes::{FakeDeviceConnector, scalar};
+    use lazy_static::__Deref;
+    use crate::{fakes::{FakeDeviceConnector, scalar, FakeConnectorCallRegistry}, util::{assert_timeout, enable_log}};
 
     use super::*;
-    
-    #[allow(dead_code)]
-    fn enable_log() {
-        tracing::subscriber::set_global_default(
-            tracing_subscriber::fmt()
-                .with_max_level(Level::INFO)
-                .finish(),
-        )
-        .unwrap();
-    }
-    
-    #[test]
-    fn test_regular_connection() {
-        // arrange
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
-        tk.stop_all();
-        thread::sleep(Duration::from_millis(200));
-        assert!(tk.get_next_event().is_some())
+
+    impl Telekinesis {
+        pub fn await_connect(&self, devices: usize) {
+            assert_timeout!(self.devices.deref().lock().unwrap().deref().len() == devices, "Awaiting connect");
+        }
     }
 
     #[test]
     fn test_demo_vibrate_only_vibrators() {
         // arrange
-        enable_log();
         let (connector, call_registry) = FakeDeviceConnector::device_demo();
+        let count = connector.devices.len();
 
         // act
         let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
-        
+        tk.await_connect(count);
         tk.vibrate_all(Speed::new(100));
-        thread::sleep(Duration::from_millis(500));
 
         // assert
-        assert_eq!(call_registry.get_record(1).len(), 1);
-        assert_eq!(call_registry.get_record(4).len(), 0);
+        assert_timeout!(call_registry.get_record(1).len() == 1, "Scalar activates");
+        assert_timeout!(call_registry.get_record(4).len() == 0, "Linear does not vibrate");
+        assert_timeout!(call_registry.get_record(7).len() == 0, "Rotator does not activate");
     }
 
     #[test]
@@ -228,14 +221,32 @@ mod tests {
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Inflate)
         ]);
+        let count = connector.devices.len();
 
         // act
         let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
+        tk.await_connect(count);
         tk.vibrate_all(Speed::new(100));
-        thread::sleep(Duration::from_millis(500));
 
         // assert
-        assert_eq!(call_registry.get_record(1).len(), 1);
-        assert_eq!(call_registry.get_record(2).len(), 0);
+        assert_timeout!(call_registry.get_record(1).len() == 1, "Vibrator activates");
+        assert_timeout!(call_registry.get_record(2).len() == 0, "Other does not activate");
+    }
+
+    #[test]
+    fn test_get_devices() {
+        // arrange
+        let (connector, call_registry) = FakeDeviceConnector::new( vec![
+            scalar(1, "vib1", ActuatorType::Vibrate),
+            scalar(2, "vib2", ActuatorType::Inflate)
+        ]);
+        let count = connector.devices.len();
+
+        // act
+        let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
+        tk.await_connect(count);
+
+        // assert
+        assert_timeout!(tk.devices.deref().lock().unwrap().deref().len() == 2, "Enough devices connected");
     }
 }

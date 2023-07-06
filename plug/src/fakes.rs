@@ -1,5 +1,5 @@
 use buttplug::core::connector::ButtplugConnectorResult;
-use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes};
+use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes, DeviceMessageInfo};
 use buttplug::server::device::configuration::{
     ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes,
 };
@@ -8,7 +8,7 @@ use serde::Serialize;
 use tokio::sync::mpsc::channel;
 use tokio::{
     sync::mpsc::Sender,
-    time::{sleep, Duration},
+    time::sleep
 };
 
 use buttplug::{
@@ -27,9 +27,13 @@ use buttplug::core::{
 };
 use futures::{future::BoxFuture, lock::Mutex, FutureExt};
 use std::ops::{DerefMut, RangeInclusive};
-use std::vec;
+use std::time::Duration;
+use std::{vec, thread};
 use std::{collections::HashMap, sync::Arc};
 use tracing::error;
+
+use crate::util::assert_timeout;
+use std::time::Instant;
 
 #[derive(Clone)]
 pub struct FakeConnectorCallRegistry {
@@ -129,6 +133,9 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
         self.server_outbound_sender = message_sender.clone();
         async move {
             async_manager::spawn(async move {
+                // assure that other thread has registered listener when the test devices
+                // are added. Quick and dirty but its just test code anyways
+                sleep(Duration::from_millis(100)).await; 
                 for device in devices {
                     if send
                         .send(ButtplugSpecV3ServerMessage::DeviceAdded(device))
@@ -138,7 +145,6 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                         panic!();
                     }
                 }
-                sleep(Duration::from_millis(1)).await;
             });
             Ok(())
         }
@@ -166,8 +172,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                     )))
                     .await
                     .map_err(|_| ButtplugConnectorError::ConnectorNotConnected)
-            }
-            .boxed(),
+            }.boxed(),
             ButtplugSpecV3ClientMessage::RequestDeviceList(_) => async move {
                 let mut response: ButtplugSpecV3ServerMessage =
                     ButtplugSpecV3ServerMessage::DeviceList(DeviceList::new(vec![]));
@@ -176,8 +181,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                     .send(response)
                     .await
                     .map_err(|_| ButtplugConnectorError::ConnectorNotConnected)
-            }
-            .boxed(),
+            }.boxed(),
             ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
                 self.call_registry.store_record(&cmd, msg_clone);
                 self.ok_response(msg_id)
@@ -313,6 +317,10 @@ mod tests {
         .unwrap();
     }
 
+    pub fn await_devices(buttplug: &ButtplugClient, devices: usize) {
+        assert_timeout!(buttplug.devices().len() == devices, "Awaiting devices connected");
+    }
+
     #[test]
     fn adding_test_devices_works() {
         async_manager::block_on(async {
@@ -326,6 +334,7 @@ mod tests {
 
             // act
             buttplug.connect(connector).await.expect("connects");
+            await_devices(&buttplug, 3);
 
             // assert
             assert_eq!(
@@ -406,7 +415,6 @@ mod tests {
         async_manager::block_on(async {
             // arrange
             let (connector, call_registry) =
-                
                 FakeDeviceConnector::new(vec![vibrator(1, "vibrator"), rotate(2, "rotator")]);
 
             // act
@@ -425,8 +433,10 @@ mod tests {
         F: Fn(&Arc<ButtplugClientDevice>) -> Fut,
         Fut: Future,
     {
+        let device_count = connector.devices.len();
         let buttplug = ButtplugClient::new("Foobar");
         buttplug.connect(connector).await.expect("connects");
+        await_devices(&buttplug, device_count);
         for device in buttplug.devices().iter() {
             func(device).await;
         }
