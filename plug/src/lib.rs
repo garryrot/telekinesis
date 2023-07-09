@@ -94,10 +94,12 @@ pub fn tk_scan_for_devices() -> bool {
     tk_ffi!(scan_for_devices,)
 }
 
+// deprecated
 #[instrument]
 pub fn tk_vibrate_all(speed: i64) -> bool {
     let s = Speed::new(speed);
-    tk_ffi!(vibrate_all, s)
+    let duration = Duration::from_secs(30);
+    tk_ffi!(vibrate_all, s, duration)
 }
 
 #[instrument]
@@ -107,9 +109,7 @@ pub fn tk_vibrate_all_for(
 ) -> bool {
     let duration_ms = Duration::from_millis(duration_sec * 1000.0 as u64);
     let s = Speed::new(speed);
-    let stop = Speed::new(0);
-    tk_ffi!(vibrate_all, s) &&
-        tk_ffi!(vibrate_all_delayed, stop, duration_ms)
+    tk_ffi!(vibrate_all, s, duration_ms)
 }
 
 #[instrument]
@@ -162,8 +162,8 @@ pub fn new_with_default_settings() -> impl Tk {
 
 pub trait Tk {
     fn scan_for_devices(&self) -> bool;
-    fn vibrate_all(&self, speed: Speed) -> bool;
-    fn vibrate_all_delayed(&self, speed: Speed, duration: std::time::Duration) -> bool;
+    fn vibrate(&self, speed: Speed, duration: Duration, devices: Vec<String>) -> bool;
+    fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool;
     fn stop_all(&self) -> bool;
     fn disconnect(&mut self);
     fn get_next_event(&mut self) -> Option<TkEvent>;

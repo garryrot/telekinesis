@@ -23,7 +23,6 @@ fn enable_log() {
 #[test]
 #[nonparallel(M)]
 fn ffi_test_reconnect() {
-    // enable_log();
     _ffi_test_event_polling();
     _ffi_test_event_polling();
 }

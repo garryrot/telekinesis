@@ -1,11 +1,13 @@
 use std::{sync::Arc, fmt::Display, fmt};
 use buttplug::{client::{ButtplugClientDevice, ButtplugClientEvent}, core::errors::ButtplugError};
 
+use crate::Speed;
+
 #[derive(Debug)]
 pub enum TkEvent {
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
-    DeviceVibrated(i32),
+    DeviceVibrated(i32, Speed),
     DeviceStopped(i32),
     TkError(ButtplugError),
     Other(ButtplugClientEvent),
@@ -16,7 +18,7 @@ impl Display for TkEvent {
         let _ = match self {
             TkEvent::DeviceAdded(device) => write!(f, "Device '{}' connected.", device.name()),
             TkEvent::DeviceRemoved(device) => write!(f, "Device '{}' Removed.", device.name()),
-            TkEvent::DeviceVibrated(speed) => write!(f, "Vibrating '{}' devices.", speed),
+            TkEvent::DeviceVibrated(count, speed) => write!(f, "Vibrating '{}' devices {}/100.", count, speed),
             TkEvent::DeviceStopped(speed) => write!(f, "Stopping '{}' devices.", speed),
             TkEvent::TkError(err) => write!(f, "Error '{:?}'", err),
             TkEvent::Other(other) => write!(f, "{:?}", other),

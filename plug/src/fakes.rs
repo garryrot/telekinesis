@@ -1,5 +1,5 @@
 use buttplug::core::connector::ButtplugConnectorResult;
-use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes, DeviceMessageInfo};
+use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes};
 use buttplug::server::device::configuration::{
     ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes,
 };
@@ -22,7 +22,7 @@ use buttplug::core::{
     connector::{ButtplugConnector, ButtplugConnectorError},
     message::{
         ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage,
-        ButtplugSpecV3ClientMessage, ButtplugSpecV3ServerMessage, DeviceAdded,
+       ButtplugSpecV3ServerMessage, DeviceAdded,
     },
 };
 use futures::{future::BoxFuture, lock::Mutex, FutureExt};
@@ -37,13 +37,32 @@ use std::time::Instant;
 
 #[derive(Clone)]
 pub struct FakeConnectorCallRegistry {
-    pub actions: Arc<Mutex<HashMap<u32, Box<Vec<ButtplugCurrentSpecClientMessage>>>>>,
+    pub actions: Arc<Mutex<HashMap<u32, Box<Vec<FakeMessage>>>>>,
 }
 
 pub struct FakeDeviceConnector {
     pub devices: Vec<DeviceAdded>,
     server_outbound_sender: Sender<ButtplugCurrentSpecServerMessage>,
     call_registry: FakeConnectorCallRegistry,
+}
+
+#[derive(Clone)]
+pub struct FakeMessage {
+    pub message: ButtplugCurrentSpecClientMessage,
+    pub time: Instant
+}
+
+impl FakeMessage {
+    pub fn new(msg: ButtplugCurrentSpecClientMessage) -> Self {
+        FakeMessage { message: msg, time: Instant::now() }
+    }
+
+    pub fn assert_vibrated(&self) {
+        matches!(
+            self.message,
+            ButtplugCurrentSpecClientMessage::ScalarCmd(..)
+        );
+    }
 }
 
 #[allow(dead_code)]
@@ -54,23 +73,24 @@ impl FakeConnectorCallRegistry {
         }
     }
 
-    pub fn store_record<T>(&self, imp: &T, cmd: ButtplugSpecV3ClientMessage)
+    pub fn store_record<T>(&self, imp: &T, cmd: FakeMessage)
     where
         T: Serialize,
     {
         let mut calls = self.actions.try_lock().unwrap();
         let device_id = get_value(imp, "DeviceIndex").parse().unwrap();
-        let mut bucket = match calls.deref().get(&device_id) {
+        let mut bucket = match calls.get(&device_id) {
             Some(some) => some.clone(),
             None => Box::new(vec![]),
         };
+        // let box_copy = *bucket.clone();
         bucket.deref_mut().push(cmd);
         calls.deref_mut().insert(device_id, bucket);
     }
 
-    pub fn get_record(&self, device_id: u32) -> Vec<ButtplugSpecV3ClientMessage> {
+    pub fn get_record(&self, device_id: u32) -> Vec<FakeMessage> {
         match self.actions.try_lock().unwrap().deref().get(&device_id) {
-            Some(some) => *some.clone(),
+            Some(some) => * some.clone(),
             None => vec![],
         }
     }
@@ -163,7 +183,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
         let msg_clone = msg.clone();
         let sender = self.server_outbound_sender.clone();
         match msg {
-            ButtplugSpecV3ClientMessage::RequestServerInfo(_) => async move {
+            ButtplugCurrentSpecClientMessage::RequestServerInfo(_) => async move {
                 sender
                     .send(ButtplugSpecV3ServerMessage::ServerInfo(ServerInfo::new(
                         "test server",
@@ -173,7 +193,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                     .await
                     .map_err(|_| ButtplugConnectorError::ConnectorNotConnected)
             }.boxed(),
-            ButtplugSpecV3ClientMessage::RequestDeviceList(_) => async move {
+            ButtplugCurrentSpecClientMessage::RequestDeviceList(_) => async move {
                 let mut response: ButtplugSpecV3ServerMessage =
                     ButtplugSpecV3ServerMessage::DeviceList(DeviceList::new(vec![]));
                 response.set_id(msg_id);
@@ -182,28 +202,28 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                     .await
                     .map_err(|_| ButtplugConnectorError::ConnectorNotConnected)
             }.boxed(),
-            ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
-                self.call_registry.store_record(&cmd, msg_clone);
+            ButtplugCurrentSpecClientMessage::ScalarCmd(cmd) => {
+                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
                 self.ok_response(msg_id)
             }
-            ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
-                self.call_registry.store_record(&cmd, msg_clone);
+            ButtplugCurrentSpecClientMessage::LinearCmd(cmd) => {
+                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
                 self.ok_response(msg_id)
             }
-            ButtplugSpecV3ClientMessage::RotateCmd(cmd) => {
-                self.call_registry.store_record(&cmd, msg_clone);
+            ButtplugCurrentSpecClientMessage::RotateCmd(cmd) => {
+                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
                 self.ok_response(msg_id)
             }
-            ButtplugSpecV3ClientMessage::StopAllDevices(cmd) => {
-                self.call_registry.store_record(&cmd, msg_clone);
+            ButtplugCurrentSpecClientMessage::StopAllDevices(cmd) => {
+                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
                 self.ok_response(msg_id)
             }
-            ButtplugSpecV3ClientMessage::StartScanning(cmd) => {
-                self.call_registry.store_record(&cmd, msg_clone);
+            ButtplugCurrentSpecClientMessage::StartScanning(cmd) => {
+                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
                 self.ok_response(msg_id)
             }
-            ButtplugSpecV3ClientMessage::StopScanning(cmd) => {
-                self.call_registry.store_record(&cmd, msg_clone);
+            ButtplugCurrentSpecClientMessage::StopScanning(cmd) => {
+                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
                 self.ok_response(msg_id)
             }
             _ => {
@@ -386,8 +406,8 @@ mod tests {
 
             // assert
             assert!(matches!(
-                call_registry.get_record(1).first().unwrap(),
-                ButtplugSpecV3ClientMessage::ScalarCmd(..)
+                call_registry.get_record(1).first().unwrap().message,
+                ButtplugCurrentSpecClientMessage::ScalarCmd(..)
             ));
         });
     }
@@ -404,8 +424,8 @@ mod tests {
 
             // asert
             assert!(matches!(
-                call_registry.get_record(2).first().unwrap(),
-                ButtplugSpecV3ClientMessage::LinearCmd(..)
+                call_registry.get_record(2).first().unwrap().message,
+                ButtplugCurrentSpecClientMessage::LinearCmd(..)
             ));
         });
     }
@@ -422,8 +442,8 @@ mod tests {
 
             // asert
             assert!(matches!(
-                call_registry.get_record(2)[0],
-                ButtplugSpecV3ClientMessage::RotateCmd(..)
+                call_registry.get_record(2)[0].message,
+                ButtplugCurrentSpecClientMessage::RotateCmd(..)
             ));
         });
     }
