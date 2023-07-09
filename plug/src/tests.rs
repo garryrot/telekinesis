@@ -3,7 +3,6 @@ mod tests {
     use crate::telekinesis::in_process_connector;
     use crate::*;
     use crate::util::assert_timeout;
-    use crate::util::enable_log;
     use std::thread;
     use std::time::Duration;
     use std::time::Instant;

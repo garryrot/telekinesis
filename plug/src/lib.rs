@@ -183,6 +183,9 @@ impl Speed {
     pub fn min() -> Speed {
         Speed { value: 0 }
     }
+    pub fn max() -> Speed {
+        Speed { value: 100 }
+    }
     pub fn as_0_to_1_f64(self) -> f64 {
         self.value as f64 / 100.0
     } 

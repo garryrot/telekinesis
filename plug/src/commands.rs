@@ -46,16 +46,25 @@ pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
     true
 }
 
-pub async fn cmd_vibrate_all(client: &ButtplugClient, command: ScalarValueCommand) -> i32 {
+pub async fn cmd_vibrate_all(client: &ButtplugClient, command: ScalarValueCommand, selector: TkDeviceSelector) -> i32 {
     let mut vibrated = 0;
     for device in client
         .devices()
         .iter()
         .filter(|d| d.message_attributes().scalar_cmd().is_some())
+        .filter(|d| {
+            match &selector {
+                TkDeviceSelector::All => true,
+                TkDeviceSelector::ByNames(names) => { 
+                    let matches = names.iter().any( |x| x == d.name());
+                    matches
+                },
+            }
+        })
     {
         match command {
             ScalarValueCommand::ScalarValue(speed) => {
-                debug!("Vibrating device {} with speed {}", device.name(), speed);
+                info!("Vibrating device {} with speed {}", device.name(), speed);
                 match device.vibrate(&command).await {
                     Ok(_) => vibrated += 1,
                     Err(err) => error!(
@@ -132,7 +141,7 @@ pub fn create_cmd_thread(
                     TkAction::Control(control) => {
                         match control.action {
                             TkDeviceAction::Vibrate(speed) => {
-                                let vibrated = cmd_vibrate_all(&client, ScalarValueCommand::ScalarValue(speed.as_0_to_1_f64())).await;
+                                let vibrated = cmd_vibrate_all(&client, ScalarValueCommand::ScalarValue(speed.as_0_to_1_f64()), control.devices.clone()).await;
                                 event_sender
                                     .send(TkEvent::DeviceVibrated(vibrated, speed))
                                     .expect("Open");
