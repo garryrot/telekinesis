@@ -5,9 +5,7 @@ use buttplug::{
             ButtplugConnector, ButtplugInProcessClientConnector,
             ButtplugInProcessClientConnectorBuilder,
         },
-        message::{
-            ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage,
-        },
+        message::{ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage},
     },
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
@@ -198,7 +196,7 @@ mod tests {
 
     use crate::{
         fakes::{scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
-        util::{assert_timeout},
+        util::assert_timeout,
     };
     use buttplug::core::message::{ActuatorType, DeviceAdded};
     use lazy_static::__Deref;
@@ -213,7 +211,7 @@ mod tests {
             );
         }
     }
-    
+
     #[test]
     fn test_connection_assert_devices_connect() {
         // arrange
@@ -238,18 +236,12 @@ mod tests {
         // act
         let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
         tk.await_connect(count);
-        tk.vibrate_all(Speed::new(100), Duration::from_secs(10));
+        tk.vibrate_all(Speed::new(100), Duration::from_millis(1));
 
         // assert
-        assert_timeout!(call_registry.get_record(1).len() == 1, "Scalar activates");
-        assert_timeout!(
-            call_registry.get_record(4).len() == 0,
-            "Linear does not vibrate"
-        );
-        assert_timeout!(
-            call_registry.get_record(7).len() == 0,
-            "Rotator does not activate"
-        );
+        call_registry.assert_vibrated(1); // scalar
+        call_registry.assert_not_vibrated(4); // linear 
+        call_registry.assert_not_vibrated(7); // rotator
     }
 
     #[test]
@@ -260,66 +252,70 @@ mod tests {
             scalar(2, "vib2", ActuatorType::Inflate),
         ]);
 
-        tk.vibrate_all(Speed::new(100), Duration::from_secs(10));
+        tk.vibrate_all(Speed::new(100), Duration::from_millis(1));
 
         // assert
-        assert_timeout!(call_registry.get_record(1).len() == 1, "Vibrator activates");
-        assert_timeout!(
-            call_registry.get_record(2).len() == 0,
-            "Other does not activate"
-        );
+        call_registry.assert_vibrated(1);
+        call_registry.assert_not_vibrated(2);
     }
 
     #[test]
     fn vibrate_select_non_existing_devices() {
         // arrange
-        let (tk, call_registry ) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate)
-        ]);
+        let (tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
-        tk.vibrate(Speed::max(), Duration::from_millis(1), vec![String::from("does not exist")]);
+        tk.vibrate(
+            Speed::max(),
+            Duration::from_millis(1),
+            vec![String::from("does not exist")],
+        );
         thread::sleep(Duration::from_millis(50));
 
         // assert
-        assert_timeout!(call_registry.get_record(1).len() == 0, "Nothing happens");
+        call_registry.assert_not_vibrated(1);
     }
 
     #[test]
     fn vibrate_select_single_device() {
         // arrange
-        let (tk, call_registry ) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate)
-        ]);
+        let (tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
-        tk.vibrate(Speed::max(), Duration::from_millis(1), vec![String::from("vib1")]);
+        tk.vibrate(
+            Speed::max(),
+            Duration::from_millis(1),
+            vec![String::from("vib1")],
+        );
         thread::sleep(Duration::from_secs(1));
 
         // assert
-        assert_timeout!(call_registry.get_record(1).len() >= 1, "Selected vibrator activates");
+        call_registry.assert_vibrated(1);
     }
-    
+
     #[test]
     fn vibrate_multiple_existing_devices_vibrate() {
         // arrange
-        let (tk, call_registry ) = wait_for_connection(vec![
+        let (tk, call_registry) = wait_for_connection(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
-            scalar(3, "vib3", ActuatorType::Vibrate)
+            scalar(3, "vib3", ActuatorType::Vibrate),
         ]);
 
         // act
-        tk.vibrate(Speed::max(), Duration::from_millis(1), vec![
-            String::from("vib1"),
-            String::from("vib3")
-        ]);
+        tk.vibrate(
+            Speed::max(),
+            Duration::from_millis(1),
+            vec![String::from("vib1"), String::from("vib3")],
+        );
         thread::sleep(Duration::from_secs(1));
 
         // assert
-        assert_timeout!(call_registry.get_record(1).len() >= 1, "Selected vibrator activates");
-        assert_timeout!(call_registry.get_record(3).len() >= 1, "Selected vibrator activates");
-        assert_timeout!(call_registry.get_record(2).len() == 0, "Unselected vibrator does not activate");
+        call_registry.assert_vibrated(1);
+        call_registry.assert_vibrated(3);
+        call_registry.assert_not_vibrated(2);
     }
 
     fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {

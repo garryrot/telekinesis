@@ -57,11 +57,24 @@ impl FakeMessage {
         FakeMessage { message: msg, time: Instant::now() }
     }
 
-    pub fn assert_vibrated(&self) {
-        matches!(
-            self.message,
-            ButtplugCurrentSpecClientMessage::ScalarCmd(..)
-        );
+    pub fn vibration_started(&self) -> bool {
+        match self.message.clone() {
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => 
+            {
+                cmd.scalars().iter().any( |v| v.scalar() > 0.0 )
+            },
+            _ => panic!("Message is not scalar cmd")
+        }
+    }
+
+    pub fn vibration_stopped(&self) -> bool {
+        match self.message.clone() {
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => 
+            {
+                cmd.scalars().iter().all( |v| v.scalar() == 0.0 )
+            },
+            _ => panic!("Message is not scalar cmd")
+        }
     }
 }
 
@@ -88,11 +101,22 @@ impl FakeConnectorCallRegistry {
         calls.deref_mut().insert(device_id, bucket);
     }
 
-    pub fn get_record(&self, device_id: u32) -> Vec<FakeMessage> {
+    pub fn get_device(&self, device_id: u32) -> Vec<FakeMessage> {
         match self.actions.try_lock().unwrap().deref().get(&device_id) {
             Some(some) => * some.clone(),
             None => vec![],
         }
+    }
+
+    pub fn assert_vibrated( &self, device_id: u32 ) {
+        assert_timeout!(self.get_device(device_id).len() >= 2, "Device has vibrated");
+        self.get_device(device_id)[0].vibration_started();
+        self.get_device(device_id)[1].vibration_stopped();
+    }
+
+    pub fn assert_not_vibrated( &self, device_id: u32 ) {
+        thread::sleep(Duration::from_millis(100));
+        assert_eq!(self.get_device(device_id).len(), 0, "Device has not vibrated");
     }
 }
 
@@ -406,7 +430,7 @@ mod tests {
 
             // assert
             assert!(matches!(
-                call_registry.get_record(1).first().unwrap().message,
+                call_registry.get_device(1).first().unwrap().message,
                 ButtplugCurrentSpecClientMessage::ScalarCmd(..)
             ));
         });
@@ -424,7 +448,7 @@ mod tests {
 
             // asert
             assert!(matches!(
-                call_registry.get_record(2).first().unwrap().message,
+                call_registry.get_device(2).first().unwrap().message,
                 ButtplugCurrentSpecClientMessage::LinearCmd(..)
             ));
         });
@@ -442,7 +466,7 @@ mod tests {
 
             // asert
             assert!(matches!(
-                call_registry.get_record(2)[0].message,
+                call_registry.get_device(2)[0].message,
                 ButtplugCurrentSpecClientMessage::RotateCmd(..)
             ));
         });
