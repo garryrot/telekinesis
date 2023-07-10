@@ -8,7 +8,7 @@ pub enum TkEvent {
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
     DeviceVibrated(i32, Speed),
-    DeviceStopped(i32),
+    DeviceStopped(),
     TkError(ButtplugError),
     Other(ButtplugClientEvent),
 }
@@ -19,7 +19,7 @@ impl Display for TkEvent {
             TkEvent::DeviceAdded(device) => write!(f, "Device '{}' connected.", device.name()),
             TkEvent::DeviceRemoved(device) => write!(f, "Device '{}' Removed.", device.name()),
             TkEvent::DeviceVibrated(count, speed) => write!(f, "Vibrating '{}' devices {}/100.", count, speed),
-            TkEvent::DeviceStopped(speed) => write!(f, "Stopping '{}' devices.", speed),
+            TkEvent::DeviceStopped() => write!(f, "Stopping all devices."),
             TkEvent::TkError(err) => write!(f, "Error '{:?}'", err),
             TkEvent::Other(other) => write!(f, "{:?}", other),
         };

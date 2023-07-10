@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use buttplug::{client::{ButtplugClient, ScalarValueCommand}};
+use buttplug::client::{ButtplugClient, ScalarValueCommand};
 use tokio::{runtime::Handle, select, time::sleep};
 use tracing::{debug, error, info, span, Level};
 
@@ -8,18 +8,16 @@ use crate::{event::TkEvent, Speed};
 
 type DeviceNameList = Box<Vec<String>>;
 
-
 #[derive(Clone, Debug)]
 pub enum TkAction {
     Scan,
     Control(TkControl),
     StopAll,
-    Disconect
+    Disconect,
 }
 
 #[derive(Clone, Debug)]
-pub struct TkControl 
-{
+pub struct TkControl {
     pub duration: Duration,
     pub devices: TkDeviceSelector,
     pub action: TkDeviceAction,
@@ -28,14 +26,13 @@ pub struct TkControl
 #[derive(Clone, Debug)]
 pub enum TkDeviceSelector {
     All,
-    ByNames(DeviceNameList)
+    ByNames(DeviceNameList),
 }
 
 #[derive(Clone, Debug)]
-pub enum TkDeviceAction
-{
+pub enum TkDeviceAction {
     Vibrate(Speed),
-    VibratePattern(String)
+    VibratePattern(String),
 }
 
 pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
@@ -46,55 +43,51 @@ pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
     true
 }
 
-pub async fn cmd_vibrate_all(client: &ButtplugClient, command: ScalarValueCommand, selector: TkDeviceSelector) -> i32 {
-    let mut vibrated = 0;
-    for device in client
-        .devices()
-        .iter()
-        .filter(|d| d.message_attributes().scalar_cmd().is_some())
-        .filter(|d| {
-            match &selector {
-                TkDeviceSelector::All => true,
-                TkDeviceSelector::ByNames(names) => { 
-                    let matches = names.iter().any( |x| x == d.name());
-                    matches
-                },
-            }
+impl TkControl {
+    pub fn get_stop_action(&self) -> TkAction {
+        TkAction::Control(TkControl {
+            duration: Duration::ZERO,
+            devices: self.devices.clone(),
+            action: TkDeviceAction::Vibrate(Speed::min()),
         })
-    {
-        match command {
-            ScalarValueCommand::ScalarValue(speed) => {
-                info!("Vibrating device {} with speed {}", device.name(), speed);
-                match device.vibrate(&command).await {
-                    Ok(_) => vibrated += 1,
-                    Err(err) => error!(
-                        dev = device.name(),
-                        error = err.to_string(),
-                        "Failed to set device vibration speed."
-                    ),
+    }
+
+    pub async fn execute(&self, client: &ButtplugClient) -> TkEvent {
+        let devices = client.devices();
+        let selected_devices = devices
+            .iter()
+            .filter(|d| match &self.devices {
+                TkDeviceSelector::All => true,
+                TkDeviceSelector::ByNames(names) => {
+                    let matches = names.iter().any(|x| x == d.name());
+                    matches
                 }
-            },
+            });
+            
+        match self.action {
+            TkDeviceAction::Vibrate(speed) => {
+                let mut vibrated = 0;
+                let mut top_speed = Speed::min();
+                for device in selected_devices.filter(|d| d.message_attributes().scalar_cmd().is_some())
+                {
+                    info!("Vibrating device {} with speed {}", device.name(), speed);
+                    match device.vibrate(&ScalarValueCommand::ScalarValue(speed.as_float())).await {
+                        Ok(_) => vibrated += 1,
+                        Err(err) => error!(
+                            dev = device.name(),
+                            error = err.to_string(),
+                            "Failed to set device vibration speed."
+                        ),
+                    };
+                    if speed.value > top_speed.value {
+                        top_speed = speed;
+                    }
+                }
+                TkEvent::DeviceVibrated(vibrated, top_speed)
+            }
             _ => todo!(),
         }
-
     }
-    vibrated
-}
-
-pub async fn cmd_stop_all(client: &ButtplugClient) -> i32 {
-    let mut stopped = 0;
-    for device in client.devices() {
-        info!(dev = device.name(), "Stopping device.");
-        match device.stop().await {
-            Ok(_) => stopped += 1,
-            Err(err) => error!(
-                dev = device.name(),
-                error = err.to_string(),
-                "Failed to stop device."
-            ),
-        }
-    }
-    stopped
 }
 
 pub fn create_cmd_thread(
@@ -123,39 +116,27 @@ pub fn create_cmd_thread(
             if let Some(cmd) = cmd {
                 info!("Executing command {:?}", cmd);
                 match cmd {
-                    TkAction::Scan => { 
-                        cmd_scan_for_devices(&client).await; 
-                    },
+                    TkAction::Scan => {
+                        cmd_scan_for_devices(&client).await;
+                    }
                     TkAction::StopAll => {
-                        let stopped = cmd_stop_all(&client).await;
+                        client.stop_all_devices().await.unwrap_or_else(|_| error!("Failed to stop all devices."));
                         event_sender
-                            .send(TkEvent::DeviceStopped(stopped))
+                            .send(TkEvent::DeviceStopped())
                             .expect("Open");
-                    },
+                    }
                     TkAction::Disconect => {
                         client
                             .disconnect()
                             .await
                             .unwrap_or_else(|_| error!("Failed to disconnect."));
-                    },
+                    }
                     TkAction::Control(control) => {
-                        match control.action {
-                            TkDeviceAction::Vibrate(speed) => {
-                                let vibrated = cmd_vibrate_all(&client, ScalarValueCommand::ScalarValue(speed.as_0_to_1_f64()), control.devices.clone()).await;
-                                event_sender
-                                    .send(TkEvent::DeviceVibrated(vibrated, speed))
-                                    .expect("Open");
-                                if ! control.duration.is_zero() {
-                                    delayed_timer = control.duration;
-                                    delayed_cmd = Some( TkAction::Control(
-                                        TkControl { 
-                                            duration: Duration::ZERO, // control.duration, 
-                                            devices: control.devices.clone(), 
-                                            action: TkDeviceAction::Vibrate(Speed::min())
-                                        }) );
-                                }
-                            }
-                            _ => todo!(),
+                        let vibrated =  control.execute(&client).await;
+                        event_sender.send(vibrated).unwrap_or_else(|_| error!("Failed sending event."));
+                        if !control.duration.is_zero() {
+                            delayed_timer = control.duration;
+                            delayed_cmd = Some(control.get_stop_action());
                         }
                     }
                 }

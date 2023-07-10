@@ -13,7 +13,9 @@ use buttplug::{
     },
 };
 use futures::{Future, StreamExt};
+
 use std::time::Instant;
+
 use std::{
     fmt::{self},
     sync::{Arc, Mutex},
@@ -63,7 +65,7 @@ impl Telekinesis {
             info!("Main thread started");
             let buttplug = with_connector(connector_factory().await).await;
             let mut events = buttplug.event_stream();
-            create_cmd_thread(buttplug, event_sender.clone(), command_receiver);
+            create_cmd_thread(buttplug, event_sender.clone(), command_receiver);     
             while let Some(event) = events.next().await {
                 match event.clone() {
                     ButtplugClientEvent::DeviceAdded(device) => {
