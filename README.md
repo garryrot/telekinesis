@@ -1,4 +1,4 @@
-# Telekinesis (Bluetooth Toy Control for Papyrus) V0.3.0
+# Telekinesis (Bluetooth Toy Control for Papyrus) V0.4.0
 
 **In a Nutshell**
 

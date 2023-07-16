@@ -15,12 +15,16 @@ using namespace REL;
 constexpr std::string_view PapyrusClass = "Tele";
 
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
-    vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(StaticFunctionTag*))ConnectAndScanForDevices);
-    vm->RegisterFunction("VibrateAll", PapyrusClass, (bool (*)(StaticFunctionTag*, int))VibrateAll);
-    vm->RegisterFunction("VibrateAllFor", PapyrusClass, (bool (*)(StaticFunctionTag*, int, float))VibrateAllFor);
-    vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(StaticFunctionTag*))StopAll);
-    vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*))PollEvents);
-    vm->RegisterFunction("Close", PapyrusClass, (bool (*)(StaticFunctionTag*))Close);
+    vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(StaticFunctionTag*)) ConnectAndScanForDevices);
+    vm->RegisterFunction("GetDeviceNames", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*)) GetDeviceNames);
+    vm->RegisterFunction("GetDeviceCapabilities", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*, std::string)) GetDeviceCapabilities);
+    vm->RegisterFunction("GetDeviceConnected", PapyrusClass, (bool (*)(StaticFunctionTag*, std::string)) GetDeviceConnected);
+    vm->RegisterFunction("Vibrate", PapyrusClass, (bool (*)(StaticFunctionTag*, int, float, std::vector<std::string>))Vibrate);
+    vm->RegisterFunction("VibrateAll", PapyrusClass, (bool (*)(StaticFunctionTag*, int)) VibrateAll);
+    vm->RegisterFunction("VibrateAllFor", PapyrusClass, (bool (*)(StaticFunctionTag*, int, float)) VibrateAllFor);
+    vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(StaticFunctionTag*)) StopAll);
+    vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*)) PollEvents);
+    vm->RegisterFunction("Close", PapyrusClass, (bool (*)(StaticFunctionTag*)) Close);
     return true;
 }
 

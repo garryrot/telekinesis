@@ -1,4 +1,8 @@
 bool ConnectAndScanForDevices(void*);
+std::vector<std::string> GetDeviceNames(void*);
+std::vector<std::string> GetDeviceCapabilities(void*, std::string name);
+bool GetDeviceConnected(void*, std::string name);
+bool Vibrate(void*, int speed, float time_sec, std::vector<std::string> devices_names);
 bool VibrateAll(void*, int speed);
 bool VibrateAllFor(void*, int speed, float time_sec);
 bool StopAll(void*);

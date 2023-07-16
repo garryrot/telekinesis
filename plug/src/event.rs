@@ -18,7 +18,7 @@ impl Display for TkEvent {
         let _ = match self {
             TkEvent::DeviceAdded(device) => write!(f, "Device '{}' connected.", device.name()),
             TkEvent::DeviceRemoved(device) => write!(f, "Device '{}' Removed.", device.name()),
-            TkEvent::DeviceVibrated(count, speed) => write!(f, "Vibrating '{}' devices {}/100.", count, speed),
+            TkEvent::DeviceVibrated(count, speed) => write!(f, "Vibrating {} device(s) {}%.", count, speed),
             TkEvent::DeviceStopped() => write!(f, "Stopping all devices."),
             TkEvent::TkError(err) => write!(f, "Error '{:?}'", err),
             TkEvent::Other(other) => write!(f, "{:?}", other),

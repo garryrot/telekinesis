@@ -8,9 +8,22 @@
 
 // SKSE plugin loading requires us to declare all papyrus calls as
 // dllexports otherwise they won't be found
-
 DllExport bool ConnectAndScanForDevices(void*) {
     return tk_connect_and_scan(); 
+}
+DllExport std::vector<std::string> GetDeviceNames(void*) {
+    auto names = tk_get_device_names();
+    return std::vector<std::string>(names.begin(), names.end());
+}
+DllExport std::vector<std::string> GetDeviceCapabilities(void*, std::string name) {
+    auto names = tk_get_device_capabilities(name);
+    return std::vector<std::string>(names.begin(), names.end());
+}
+DllExport bool GetDeviceConnected(void*, std::string name) {
+    return tk_get_device_connected(name);
+}
+DllExport bool Vibrate(void*, int speed, float time_sec, std::vector<std::string> devices_names) { 
+    return tk_vibrate(speed, time_sec, devices_names);
 }
 DllExport bool VibrateAll(void*, int speed) { 
     return tk_vibrate_all(speed);
