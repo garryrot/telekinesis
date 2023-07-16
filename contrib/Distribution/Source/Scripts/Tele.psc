@@ -7,16 +7,26 @@ ScriptName Tele hidden
 ; devices might be added at any point in time automatically
 Bool function ScanForDevices() global native
 
-; Vibrate all devices that are currently connected (until stopped manually).
-; Speed is any float between 0(=off) and 100(=full power)
-; `VibrateAll(0)` should also be used for stopping the vibration,
-; as it provides a smoother experience than StopAll
-Bool function VibrateAll(Int speed) global native
+; Return a list of all connected device names
+; - These names can be used to call specific devices
+; - The list will include devices that have been previously and are now disconnected
+String[] function GetDeviceNames() global native
 
-; Vibrate all devices that are currently connected for `duration_sec` seconds
-; Calls to `TK_VibrateAll` or `VibrateAllFor` that happen before `duration_sec` 
-; has ended will owerwrite `speed` and `duration_sec` to the new calls value.
-Bool function VibrateAllFor(Int speed, Float duration_sec) global native
+; Return a list of all device capabilities
+; Only the capability "Vibrate" is avaiable right now
+String[] function GetDeviceCapabilities(String name) global native
+
+; Returns whether the device with the given name is connected.
+; Will also return false when the device does not exist
+bool function GetDeviceConnected(String name) global native
+
+; Vibrate all specified devices for the given duration
+; - speed (Percentage from 0=off to 100=full power)
+; - suration_sec (Duratation in seconds. You can specify split seconds)
+; - devices (A list of device names, as returned by `GetDeviceNames`)
+; To stop the vibration early, call this method with the same device list, specify speed=0
+; and any duration
+Bool function Vibrate(Int speed, Float duration_sec, String[] devices) global native
 
 ; Immediately stops all connected devices. This can be used for
 ; shutdown of ALL device actions before calling `Close` to assure that
@@ -37,8 +47,11 @@ String[] function PollEvents() global native
 ; a new connection and start over again.
 Bool function Close() global native
 
-; Note:
-; All functions return false when the command could not be sent
-; This is likely due to the input queue being full, which should
-; virtually never happen, unless you spam commands or something is very wrong
-; In all cases you should check the error log
+; DEPRECATED - FOR SAFETY REASONS, ONLY CONTROL DEVICES THAT ARE MANUALLY ACTIVATED
+; Vibrate all devices that are currently connected (until stopped manually).
+Bool function VibrateAll(Int speed) global native
+
+; DEPRECATED - FOR SAFETY REASONS, ONLY CONTROL DEVICES THAT ARE MANUALLY ACTIVATED
+; Calls to `TK_VibrateAll` or `VibrateAllFor` that happen before `duration_sec` 
+; has ended will owerwrite `speed` and `duration_sec` to the new calls value.
+Bool function VibrateAllFor(Int speed, Float duration_sec) global native
