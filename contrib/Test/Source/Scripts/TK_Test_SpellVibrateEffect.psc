@@ -1,12 +1,15 @@
-Scriptname TK_Test_SpellVibrateEffect extends ActiveMagicEffect  
+Scriptname TK_Test_SpellVibrateEffect extends ActiveMagicEffect
+
+Tele_Devices property TeleDevices Auto
+
 Event OnEffectStart(Actor target, Actor caster)
-	Log("Vibrate Spell");
-	Bool vibrated = Tele.VibrateAll(100)
+	String[] names = TeleDevices.GetUsedDevices()
+	Bool vibrated = Tele.Vibrate(100, 30, names)
 EndEvent
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)
-    Log("Spell Stop")
-	Bool vibrated = Tele.VibrateAll(0)
+	String[] names = TeleDevices.GetUsedDevices()
+	Bool vibrated = Tele.Vibrate(0, 0.1, names)
 endEvent
 
 Function Log(string textToPrint)

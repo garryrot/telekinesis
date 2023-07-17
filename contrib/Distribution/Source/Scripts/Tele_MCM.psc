@@ -2,57 +2,89 @@ ScriptName Tele_MCM extends SKI_ConfigBase
 
 Tele_Devices Property TeleDevices Auto
 
-Int mcmReconnectOid
-
 Int currenctConnection = 0
-Int ConnectionListId
 String[] ConnectionList
 
+Int connectionOid
+Int reconnectOid
+Int[] UseDeviceOids
+
 Int function GetVersion()
-	return -100
+	return 1
 endFunction
 
-event OnVersionUpdate(int aVersion)
-    if CurrentVersion < aVersion
+Event OnVersionUpdate(int aVersion)
+    If CurrentVersion < aVersion
 		Debug.Trace(self + " Updating MCM " + CurrentVersion + " to " + aVersion)
     EndIf
-endEvent
+    If CurrentVersion < 1
+        UseDeviceOids = new Int[32]
+    EndIf
+EndEvent
 
 Event OnConfigInit()
+    TeleDevices.Log("Tele_MCM OnConfigInit")
+
     ModName = "Telekinesis"
+
     Pages = new String[2]
     Pages[0] = "Connection"
     Pages[1] = "Devices"
 
     ConnectionList = new String[4]
 	ConnectionList[0] = "In-Process (Default)"
-	ConnectionList[1] = "Intiface Central"
-	ConnectionList[2] = "G.I.F.T"
-	ConnectionList[3] = "Test"
+	ConnectionList[1] = "Intiface (WebSocket)" ; Not supported right now
+	ConnectionList[2] = "Test Devices"         ; Not supported right now
+
+    UseDeviceOids = new Int[32]
 EndEvent
 
-event OnOptionMenuOpen(Int aOption)
-	if (aOption == connectionListId)
+Event OnOptionSelect(int aOption)
+    If (aOption == reconnectOid)
+        SetToggleOptionValue(aOption, true)
+        Debug.MessageBox("Reconnecting, close MCM now...")
+        Tele.Close()
+        Utility.Wait(5)
+        Tele.ScanForDevices()
+        SetToggleOptionValue(aOption, false)
+        
+    EndIf
+    
+    Int i = 0;
+    While (i < 32)
+        If (aOption == UseDeviceOids[i])
+            Bool isUsed = ! TeleDevices.GetUsed(i)
+            SetToggleOptionValue(aOption, isUsed)
+            TeleDevices.SetUsed(i, isUsed)
+        EndIf
+        i += 1
+    EndWhile
+EndEvent
+
+Event OnOptionMenuOpen(Int aOption)
+	If (aOption == connectionOid)
 		SetMenuDialogStartIndex(currenctConnection)
 		SetMenuDialogDefaultIndex(0)
 		SetMenuDialogOptions(connectionList)
-	endIf
-endEvent
+    EndIf
+EndEvent
 
-event OnOptionMenuAccept(Int aOption, Int aIndex)
-	if (aOption == connectionListId)
+Event OnOptionMenuAccept(Int aOption, Int aIndex)
+	if (aOption == connectionOid)
 		currenctConnection = aIndex
 		SetMenuOptionValue(aOption, connectionList[currenctConnection])
+        Debug.MessageBox("Please reconnect now...")
 	endIf
-endEvent
+EndEvent
 
 Event OnPageReset(String page)
-
     If page == "Connection"
 		SetCursorFillMode(TOP_TO_BOTTOM)
+
         AddHeaderOption("General")
-        connectionListId = AddMenuOption("Type", connectionList[currenctConnection])
-        mcmReconnectOid = AddToggleOption("Reconnect...", false)
+
+        connectionOid = AddMenuOption("Type", connectionList[currenctConnection])
+        reconnectOid = AddToggleOption("Reconnect...", false)
 
         ; AddHeaderOption("In-Process")
         ; AddEmptyOption()
@@ -68,24 +100,34 @@ Event OnPageReset(String page)
 
     If page == "Devices"
 		SetCursorFillMode(TOP_TO_BOTTOM)
-        String[] devices = TeleDevices.GetDevices()
-        Int i = 0;
-        While (i < TeleDevices.DevicesLength) 
-            String device = devices[i]
+        String[] names = TeleDevices.GetDevices()
+        Int i = 0
+        Int deviceCount = 0
+        While (i < names.Length) 
+            String name = names[i]
+            
+            If name != ""
+                deviceCount += 1
+                Bool connected = Tele.GetDeviceConnected(name)
 
-            String status = "Disconnected"
-            Int flags = OPTION_FLAG_DISABLED
-            If TeleDevices.GetConnected(device)
-                status = "Connected"
-                flags = OPTION_FLAG_NONE
+                AddHeaderOption(name)
+                AddTextOption(Key(i, "Connected"), connected, OPTION_FLAG_DISABLED)
+                AddTextOption(Key(i, "Actions"), Tele.GetDeviceCapabilities(name), OPTION_FLAG_DISABLED)
+
+                Int flags = OPTION_FLAG_DISABLED
+                If connected
+                    flags = OPTION_FLAG_NONE
+                EndIf
+
+                UseDeviceOids[i] = AddToggleOption(Key(i, "Use"), TeleDevices.IsUsed(name), flags)
             EndIf
 
-            AddHeaderOption(device)
-            AddTextOption( Key( i, "Connection"), status)
-            AddToggleOption( Key( i, "Vibrator"),TeleDevices.CanVibrate(device), OPTION_FLAG_DISABLED)
-            AddToggleOption( Key( i, "Use"), TeleDevices.GetUsed(device), flags)
             i += 1
-        EndWhile 
+        EndWhile
+
+        If deviceCount == 0
+            AddHeaderOption("No Devices Connected...")
+        EndIf
     EndIf
 EndEvent
 
