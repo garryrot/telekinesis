@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, RwLockWriteGuard},
     time::Duration,
 };
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, debug};
 
 use cxx::{CxxString, CxxVector};
 use telekinesis::{in_process_connector, Telekinesis};
@@ -21,6 +21,7 @@ mod logging;
 mod telekinesis;
 mod tests;
 mod util;
+mod settings;
 
 #[cxx::bridge]
 mod ffi {
@@ -31,12 +32,15 @@ mod ffi {
         fn tk_get_device_names() -> Vec<String>;
         fn tk_get_device_connected(name: &str) -> bool;
         fn tk_get_device_capabilities(name: &str) -> Vec<String>;
-        fn tk_vibrate(speed: i64, duration_sec: u64, devices: &CxxVector<CxxString>) -> bool;
+        fn tk_vibrate(speed: i64, duration_sec: u64) -> bool;
+        fn tk_vibrate_events(speed: i64, duration_sec: u64, devices: &CxxVector<CxxString>) -> bool;
         fn tk_vibrate_all(speed: i64) -> bool;
         fn tk_vibrate_all_for(speed: i64, duration_sec: u64) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
+        fn tk_settings_set_enabled(name: &str, enabled: bool);
+        fn tk_settings_get_enabled(name: &str) -> bool;
     }
 }
 
@@ -57,10 +61,13 @@ pub trait Tk {
     fn disconnect(&mut self);
     fn get_next_event(&mut self) -> Option<TkEvent>;
     fn get_next_events(&mut self) -> Vec<TkEvent>;
+    fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
+    fn settings_get_enabled(&self, device_name: &str) -> bool;
 }
 
 lazy_static! {
-    static ref TK: RwLock<Option<Telekinesis>> = RwLock::new(None);
+    static ref TK: RwLock<Option<Telekinesis>> = RwLock::new(None); // Mutex?
+    //static ref CONFIG_PATH: Mutex<Option<String>> = Mutex::new(None);
 }
 
 macro_rules! tk_ffi (
@@ -104,11 +111,19 @@ pub fn tk_scan_for_devices() -> bool {
 }
 
 #[instrument]
-pub fn tk_vibrate(speed: i64, secs: u64, device_names: &CxxVector<CxxString>) -> bool {
+pub fn tk_vibrate(speed: i64, secs: u64) -> bool {
+    tk_vibrate_evts(speed, secs, vec![])
+}
+
+#[instrument]
+pub fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>) -> bool {
+    tk_vibrate_evts(speed, secs, as_string_list(&events))
+}
+
+pub fn tk_vibrate_evts(speed: i64, secs: u64, events: Vec<String>) -> bool {
     let speed = Speed::new(speed);
     let duration = Duration::from_secs(secs as u64);
-    let devices = as_string_list(device_names);
-    tk_ffi!(vibrate, speed, duration, devices)
+    tk_ffi!(vibrate, speed, duration, events)
 }
 
 // deprecated
@@ -128,7 +143,7 @@ pub fn tk_vibrate_all_for(speed: i64, secs: u64) -> bool {
 
 #[instrument]
 pub fn tk_get_device_names() -> Vec<String> {
-    if let Some(tk) = TK.write().unwrap().as_ref() {
+    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
         return tk.get_device_names()
     }
     vec![]
@@ -136,7 +151,7 @@ pub fn tk_get_device_names() -> Vec<String> {
 
 #[instrument]
 pub fn tk_get_device_connected(name: &str) -> bool {
-    if let Some(tk) = TK.write().unwrap().as_ref() {
+    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
         return tk.get_device_connected(name);
     }
     false
@@ -144,7 +159,7 @@ pub fn tk_get_device_connected(name: &str) -> bool {
 
 #[instrument]
 pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
-    if let Some(tk) = TK.write().unwrap().as_ref() {
+    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
         return tk.get_device_capabilities(name);
     }
     vec![]
@@ -195,4 +210,23 @@ pub fn tk_poll_events() -> Vec<String> {
         return events;
     }
     vec![]
+}
+
+#[instrument]
+pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
+    info!("Setting '{}' enabled={}", device_name, enabled);
+    let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap(); // TODO: Don't crash on mutex block
+    if let Some(mut tk) = guard.take() {
+        tk.settings_set_enabled(device_name, enabled);
+        guard.replace(tk);
+    }
+}
+
+#[instrument]
+pub fn tk_settings_get_enabled(device_name: &str) -> bool {
+    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
+        let enabled = tk.settings_get_enabled(device_name);
+        debug!("Getting setting '{}' enabled={}", device_name, enabled);
+    }
+    false
 }

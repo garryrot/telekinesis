@@ -41,21 +41,26 @@ EndEvent
 
 Event OnOptionSelect(int aOption)
     If (aOption == reconnectOid)
-        SetToggleOptionValue(aOption, true)
         Debug.MessageBox("Reconnecting, close MCM now...")
+        SetToggleOptionValue(aOption, true)
+
         Tele.Close()
         Utility.Wait(5)
         Tele.ScanForDevices()
-        SetToggleOptionValue(aOption, false)
         
+        SetToggleOptionValue(aOption, false)
     EndIf
     
+    String[] names = TeleDevices.GetDevices()
     Int i = 0;
     While (i < 32)
         If (aOption == UseDeviceOids[i])
-            Bool isUsed = ! TeleDevices.GetUsed(i)
-            SetToggleOptionValue(aOption, isUsed)
-            TeleDevices.SetUsed(i, isUsed)
+            If (i < names.Length)
+                String device = names[i]
+                Bool isUsed = ! Tele.GetEnabled(device)
+                SetToggleOptionValue(aOption, isUsed)
+                Tele.SetEnabled(device, isUsed)
+            EndIf
         EndIf
         i += 1
     EndWhile
@@ -100,7 +105,7 @@ Event OnPageReset(String page)
 
     If page == "Devices"
 		SetCursorFillMode(TOP_TO_BOTTOM)
-        String[] names = TeleDevices.GetDevices()
+        String[] names = TeleDevices.GetDevices() ; TODO: Use stored devices from settings
         Int i = 0
         Int deviceCount = 0
         While (i < names.Length) 
@@ -118,8 +123,7 @@ Event OnPageReset(String page)
                 If connected
                     flags = OPTION_FLAG_NONE
                 EndIf
-
-                UseDeviceOids[i] = AddToggleOption(Key(i, "Use"), TeleDevices.IsUsed(name), flags)
+                UseDeviceOids[i] = AddToggleOption(Key(i, "Use"), Tele.GetEnabled(name), flags)
             EndIf
 
             i += 1

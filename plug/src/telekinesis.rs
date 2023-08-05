@@ -5,7 +5,9 @@ use buttplug::{
             ButtplugConnector, ButtplugInProcessClientConnector,
             ButtplugInProcessClientConnectorBuilder,
         },
-        message::{ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage, ActuatorType},
+        message::{
+            ActuatorType, ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage,
+        },
     },
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
@@ -14,7 +16,7 @@ use buttplug::{
 };
 use futures::{Future, StreamExt};
 
-use std::{time::Instant, fmt::Display};
+use std::{fmt::Display, time::Instant};
 
 use std::{
     fmt::{self},
@@ -26,10 +28,12 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     commands::{create_cmd_thread, TkAction, TkControl, TkDeviceAction, TkDeviceSelector},
+    settings::TkSettings,
     Speed, Tk, TkEvent,
 };
 
 pub struct Telekinesis {
+    pub settings: TkSettings,
     pub event_receiver: tokio::sync::mpsc::UnboundedReceiver<TkEvent>,
     pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
     pub devices: Arc<Mutex<Vec<Arc<ButtplugClientDevice>>>>,
@@ -70,16 +74,12 @@ impl Telekinesis {
                 match event.clone() {
                     ButtplugClientEvent::DeviceAdded(device) => {
                         let mut device_list = devices_clone.lock().unwrap();
-                        device_list.push(device);
-                    }
-                    ButtplugClientEvent::DeviceRemoved(_device) => {
-                        // keep removed devices around so the client can still display them as disconnected
-                        //     let mut device_list = devices_clone.lock().unwrap();
-                        //     if let Some(i) =
-                        //         device_list.iter().position(|x| x.index() == device.index())
-                        //     {
-                        //         device_list.remove(i);
-                        //     }
+                        if !device_list
+                            .iter()
+                            .any(|d: &Arc<ButtplugClientDevice>| d.index() == device.index())
+                        {
+                            device_list.push(device);
+                        }
                     }
                     _ => {}
                 };
@@ -93,6 +93,7 @@ impl Telekinesis {
             event_receiver: event_receiver,
             devices: devices,
             thread: runtime,
+            settings: TkSettings::default(), // TODO Parse settings
         })
     }
 }
@@ -138,22 +139,26 @@ impl Tk for Telekinesis {
             .filter(|d| d.name() == name)
             .any(|device| {
                 if let Some(scalar) = device.message_attributes().scalar_cmd() {
-                    if scalar.iter().any(|a| *a.actuator_type() == ActuatorType::Vibrate) {
-                        return true
+                    if scalar
+                        .iter()
+                        .any(|a| *a.actuator_type() == ActuatorType::Vibrate)
+                    {
+                        return true;
                     }
                 }
                 false
-            }) {
-            return vec![ActuatorType::Vibrate.to_string()]
+            })
+        {
+            return vec![ActuatorType::Vibrate.to_string()];
         }
         vec![]
     }
-
-    fn vibrate(&self, speed: Speed, duration: Duration, device_names: Vec<String>) -> bool {
+    
+    fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool {
         info!("Sending Command: Vibrate");
-        info!("device_names: {:?}", device_names);
+        info!("events: {:?}", events);
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
-            devices: TkDeviceSelector::ByNames(Box::new(device_names)),
+            devices: (&self.settings).into(),
             duration: duration,
             action: TkDeviceAction::Vibrate(speed),
         })) {
@@ -211,8 +216,18 @@ impl Tk for Telekinesis {
         events
     }
 
-    fn get_device_connected(&self, name: &str) -> bool {
-        self.get_devices().iter().any(|d| d.name() == name)
+    fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
+        let mut settings = self.settings.clone();
+        settings.set_enabled(device_name, enabled);
+        self.settings = settings;
+    }
+
+    fn get_device_connected(&self, device_name: &str) -> bool {
+        self.get_devices().iter().any(|d| d.name() == device_name)
+    }
+
+    fn settings_get_enabled(&self, device_name: &str) -> bool {
+        self.settings.is_enabled(device_name)
     }
 }
 
@@ -239,7 +254,7 @@ mod tests {
     use std::{thread, time::Duration, vec};
 
     use crate::{
-        fakes::{scalar, FakeConnectorCallRegistry, FakeDeviceConnector, linear},
+        fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,
     };
     use buttplug::core::message::{ActuatorType, DeviceAdded};
@@ -330,37 +345,22 @@ mod tests {
     }
 
     #[test]
-    fn vibrate_select_single_device() {
+    fn vibrate_only_enabled_devices() {
         // arrange
-        let (tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-
-        // act
-        tk.vibrate(
-            Speed::max(),
-            Duration::from_millis(1),
-            vec![String::from("vib1")],
-        );
-        thread::sleep(Duration::from_secs(1));
-
-        // assert
-        call_registry.assert_vibrated(1);
-    }
-
-    #[test]
-    fn vibrate_multiple_existing_devices_vibrate() {
-        // arrange
-        let (tk, call_registry) = wait_for_connection(vec![
+        let (mut tk, call_registry) = wait_for_connection(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
             scalar(3, "vib3", ActuatorType::Vibrate),
         ]);
+        
+        tk.settings_set_enabled("vib1", true);
+        tk.settings_set_enabled("vib3", true);
 
         // act
         tk.vibrate(
             Speed::max(),
             Duration::from_millis(1),
-            vec![String::from("vib1"), String::from("vib3")],
+            vec![],
         );
         thread::sleep(Duration::from_secs(1));
 
@@ -376,7 +376,7 @@ mod tests {
         let (tk, _) = wait_for_connection(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Constrict),
-            linear(3, "lin2")
+            linear(3, "lin2"),
         ]);
 
         // assert
@@ -401,12 +401,17 @@ mod tests {
 
     #[test]
     fn get_device_connected() {
-        let (tk, _) = wait_for_connection(vec![
-            scalar(1, "existing", ActuatorType::Vibrate)
-        ]);
+        let (tk, _) = wait_for_connection(vec![scalar(1, "existing", ActuatorType::Vibrate)]);
 
-        assert!(tk.get_device_connected("existing"), "Existing device returns true");
-        assert_eq!(tk.get_device_connected("not existing"), false, "Non-existing device returns false");
+        assert!(
+            tk.get_device_connected("existing"),
+            "Existing device returns true"
+        );
+        assert_eq!(
+            tk.get_device_connected("not existing"),
+            false,
+            "Non-existing device returns false"
+        );
     }
 
     fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {

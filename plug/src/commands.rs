@@ -4,7 +4,7 @@ use buttplug::client::{ButtplugClient, ScalarValueCommand};
 use tokio::{runtime::Handle, select, time::sleep};
 use tracing::{debug, error, info, span, Level};
 
-use crate::{event::TkEvent, Speed};
+use crate::{event::TkEvent, Speed, settings::TkSettings};
 
 type DeviceNameList = Box<Vec<String>>;
 
@@ -27,6 +27,18 @@ pub struct TkControl {
 pub enum TkDeviceSelector {
     All,
     ByNames(DeviceNameList),
+}
+
+impl From<&TkSettings> for TkDeviceSelector {
+    fn from(settings: &TkSettings) -> Self {
+        TkDeviceSelector::ByNames(Box::new(
+            settings
+                .get_enabled_devices()
+                .iter()
+                .map(|d| d.name.clone())
+                .collect(),
+        ))
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -7,6 +7,11 @@ ScriptName Tele hidden
 ; devices might be added at any point in time automatically
 Bool function ScanForDevices() global native
 
+; Close the connection and dispose all structures. Telekinesis will not be
+; usable from this point on. However, you may run ScanForDevices to create
+; a new connection and start over again.
+Bool function Close() global native
+
 ; Return a list of all connected device names
 ; - These names can be used to call specific devices
 ; - The list will include devices that have been previously and are now disconnected
@@ -28,6 +33,15 @@ bool function GetDeviceConnected(String name) global native
 ; and any duration
 Bool function Vibrate(Int speed, Float duration_sec, String[] devices) global native
 
+; DEPRECATED - FOR SAFETY REASONS, ONLY CONTROL DEVICES THAT ARE MANUALLY ACTIVATED
+; Vibrate all devices that are currently connected (until stopped manually).
+Bool function VibrateAll(Int speed) global native
+
+; DEPRECATED - FOR SAFETY REASONS, ONLY CONTROL DEVICES THAT ARE MANUALLY ACTIVATED
+; Calls to `TK_VibrateAll` or `VibrateAllFor` that happen before `duration_sec` 
+; has ended will owerwrite `speed` and `duration_sec` to the new calls value.
+Bool function VibrateAllFor(Int speed, Float duration_sec) global native
+
 ; Immediately stops all connected devices. This can be used for
 ; shutdown of ALL device actions before calling `Close` to assure that
 ; everything stopped.
@@ -42,16 +56,11 @@ Bool function StopAll() global native
 ; When multiple Mods consume this, they will steal each others events
 String[] function PollEvents() global native
 
-; Close the connection and dispose all structures. Telekinesis will not be
-; usable from this point on. However, you may run ScanForDevices to create
-; a new connection and start over again.
-Bool function Close() global native
 
-; DEPRECATED - FOR SAFETY REASONS, ONLY CONTROL DEVICES THAT ARE MANUALLY ACTIVATED
-; Vibrate all devices that are currently connected (until stopped manually).
-Bool function VibrateAll(Int speed) global native
+; Enable device by `name` in settings
+; This settings is permanently stored
+Bool function GetEnabled(String device_name) global native
 
-; DEPRECATED - FOR SAFETY REASONS, ONLY CONTROL DEVICES THAT ARE MANUALLY ACTIVATED
-; Calls to `TK_VibrateAll` or `VibrateAllFor` that happen before `duration_sec` 
-; has ended will owerwrite `speed` and `duration_sec` to the new calls value.
-Bool function VibrateAllFor(Int speed, Float duration_sec) global native
+; Enable device by `name` in settings
+; This setting is permanently stored
+function SetEnabled(String device_name, Bool enabled) global native

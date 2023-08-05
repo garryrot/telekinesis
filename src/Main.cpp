@@ -15,7 +15,8 @@ using namespace REL;
 constexpr std::string_view PapyrusClass = "Tele";
 
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
-    vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(StaticFunctionTag*)) ConnectAndScanForDevices);
+    vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(StaticFunctionTag*))ConnectAndScanForDevices);
+    vm->RegisterFunction("Close", PapyrusClass, (bool (*)(StaticFunctionTag*))Close);
     vm->RegisterFunction("GetDeviceNames", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*)) GetDeviceNames);
     vm->RegisterFunction("GetDeviceCapabilities", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*, std::string)) GetDeviceCapabilities);
     vm->RegisterFunction("GetDeviceConnected", PapyrusClass, (bool (*)(StaticFunctionTag*, std::string)) GetDeviceConnected);
@@ -23,8 +24,9 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("VibrateAll", PapyrusClass, (bool (*)(StaticFunctionTag*, int)) VibrateAll);
     vm->RegisterFunction("VibrateAllFor", PapyrusClass, (bool (*)(StaticFunctionTag*, int, float)) VibrateAllFor);
     vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(StaticFunctionTag*)) StopAll);
-    vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*)) PollEvents);
-    vm->RegisterFunction("Close", PapyrusClass, (bool (*)(StaticFunctionTag*)) Close);
+    vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*))PollEvents);
+    vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(StaticFunctionTag*, std::string))GetEnabled);
+    vm->RegisterFunction("SetEnabled", PapyrusClass, (void (*)(StaticFunctionTag*, std::string, bool))SetEnabled);
     return true;
 }
 

@@ -120,6 +120,7 @@ impl FakeConnectorCallRegistry {
     }
 }
 
+
 // Connector that allows to instantiate various fake devices for testing purposes
 #[allow(dead_code)]
 impl FakeDeviceConnector {
