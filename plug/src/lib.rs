@@ -2,27 +2,36 @@ use buttplug::client::ButtplugClientDevice;
 use event::TkEvent;
 use lazy_static::lazy_static;
 use std::{
-    sync::RwLock,
-    sync::{Arc, RwLockWriteGuard},
+    sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{error, info, instrument, debug};
+use tracing::{error, info, instrument};
 
 use cxx::{CxxString, CxxVector};
 use telekinesis::{in_process_connector, Telekinesis};
 
-use crate::inputs::{as_string_list, Speed};
+use crate::{
+    inputs::{as_string_list, Speed},
+    settings::{SETTINGS_FILE, SETTINGS_PATH},
+};
 
 mod commands;
 mod event;
 mod fakes;
 mod inputs;
 mod logging;
+mod settings;
 mod telekinesis;
 mod tests;
 mod util;
-mod settings;
 
+/// The ffi interfaces called as papyrus native functions. This is very thin glue code to
+/// store the global singleton state in a mutex and handle error conditions, and then
+/// acess the functionality in the main Telekinesis struct
+///
+/// - All ffi methods are non-blocking, triggering an async action somewhere in the future
+/// - All all error conditions during the function call (i.e. mutex not available) will
+///   be swallowed and logged to Telekinesis.log
 #[cxx::bridge]
 mod ffi {
     extern "Rust" {
@@ -33,7 +42,8 @@ mod ffi {
         fn tk_get_device_connected(name: &str) -> bool;
         fn tk_get_device_capabilities(name: &str) -> Vec<String>;
         fn tk_vibrate(speed: i64, duration_sec: u64) -> bool;
-        fn tk_vibrate_events(speed: i64, duration_sec: u64, devices: &CxxVector<CxxString>) -> bool;
+        fn tk_vibrate_events(speed: i64, duration_sec: u64, devices: &CxxVector<CxxString>)
+            -> bool;
         fn tk_vibrate_all(speed: i64) -> bool;
         fn tk_vibrate_all_for(speed: i64, duration_sec: u64) -> bool;
         fn tk_stop_all() -> bool;
@@ -44,11 +54,7 @@ mod ffi {
     }
 }
 
-// Rust Library
-pub fn new_with_default_settings() -> impl Tk {
-    Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap()
-}
-
+/// access to Telekinesis struct from within foreign rust modules and tests
 pub trait Tk {
     fn scan_for_devices(&self) -> bool;
     fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>>;
@@ -65,29 +71,29 @@ pub trait Tk {
     fn settings_get_enabled(&self, device_name: &str) -> bool;
 }
 
-lazy_static! {
-    static ref TK: RwLock<Option<Telekinesis>> = RwLock::new(None); // Mutex?
-    //static ref CONFIG_PATH: Mutex<Option<String>> = Mutex::new(None);
+pub fn new_with_default_settings() -> impl Tk {
+    Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap()
 }
 
-macro_rules! tk_ffi (
-    ($call:ident, $( $arg:tt ),* ) => {
-        match TK.read().unwrap().as_ref() {
-            None => {
-                error!("FFI call on missing TK instance {}()", stringify!($call));
-                false
-            },
-            Some(tk) => {
-                info!("FFI");
-                tk.$call( $( $arg ),* )
-            }
-        }
-    };
-);
+lazy_static! {
+    static ref TK: Mutex<Option<Telekinesis>> = Mutex::new(None);
+}
 
-#[instrument]
-pub fn tk_connect_and_scan() -> bool {
-    tk_connect() && tk_scan_for_devices()
+fn access_mutex<F, R>(func: F) -> Option<R>
+where
+    F: FnOnce(&mut Telekinesis) -> R,
+{
+    if let Ok(mut guard) = TK.try_lock() {
+        match guard.take() {
+            Some(mut tk) => {
+                let result = Some(func(&mut tk));
+                guard.replace(tk);
+                return result;
+            }
+            None => error!("Trying to call method on non-initialized tk"),
+        }
+    }
+    None
 }
 
 #[instrument]
@@ -95,138 +101,129 @@ pub fn tk_connect() -> bool {
     info!("Creating new connection");
     match Telekinesis::connect_with(|| async move { in_process_connector() }) {
         Ok(tk) => {
-            TK.write().unwrap().replace(tk);
+            match TK.try_lock() {
+                Ok(mut guard) => {
+                    guard.replace(tk);
+                }
+                Err(err) => error!("Failed locking mutex: {}", err),
+            }
             true
         }
-        Err(e) => {
-            error!("tk_connect error {:?}", e);
+        Err(err) => {
+            error!("tk_connect error {:?}", err);
             false
         }
     }
 }
 
 #[instrument]
+pub fn tk_close() -> bool {
+    info!("Closing connection");
+    match TK.try_lock() {
+        Ok(mut guard) => {
+            if let Some(mut tk) = guard.take() {
+                tk.disconnect();
+                return true;
+            }
+        }
+        Err(err) => error!("Failed locking mutex: {}", err),
+    }
+    false
+}
+
+#[instrument]
+pub fn tk_connect_and_scan() -> bool {
+    tk_connect() && tk_scan_for_devices()
+}
+
+#[instrument]
 pub fn tk_scan_for_devices() -> bool {
-    tk_ffi!(scan_for_devices,)
+    access_mutex(|tk| tk.scan_for_devices()).is_some()
 }
 
 #[instrument]
 pub fn tk_vibrate(speed: i64, secs: u64) -> bool {
-    tk_vibrate_evts(speed, secs, vec![])
+    access_mutex(|tk| tk.vibrate(Speed::new(speed), Duration::from_secs(secs), vec![])).is_some()
 }
 
 #[instrument]
 pub fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>) -> bool {
-    tk_vibrate_evts(speed, secs, as_string_list(&events))
-}
-
-pub fn tk_vibrate_evts(speed: i64, secs: u64, events: Vec<String>) -> bool {
-    let speed = Speed::new(speed);
-    let duration = Duration::from_secs(secs as u64);
-    tk_ffi!(vibrate, speed, duration, events)
+    access_mutex(|tk| {
+        tk.vibrate(
+            Speed::new(speed),
+            Duration::from_secs(secs),
+            as_string_list(&events),
+        )
+    })
+    .is_some()
 }
 
 // deprecated
 #[instrument]
 pub fn tk_vibrate_all(speed: i64) -> bool {
-    let speed = Speed::new(speed);
-    let duration = Duration::from_secs(30);
-    tk_ffi!(vibrate_all, speed, duration)
+    access_mutex(|tk| tk.vibrate_all(Speed::new(speed), Duration::from_secs(30))).is_some()
 }
 
 #[instrument]
 pub fn tk_vibrate_all_for(speed: i64, secs: u64) -> bool {
-    let speed = Speed::new(speed);
-    let duration = Duration::from_secs(secs as u64);
-    tk_ffi!(vibrate_all, speed, duration)
+    access_mutex(|tk| tk.vibrate_all(Speed::new(speed), Duration::from_secs(secs))).is_some()
 }
 
 #[instrument]
 pub fn tk_get_device_names() -> Vec<String> {
-    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
-        return tk.get_device_names()
+    if let Some(value) = access_mutex(|tk| tk.get_device_names()) {
+        return value;
     }
     vec![]
 }
 
 #[instrument]
 pub fn tk_get_device_connected(name: &str) -> bool {
-    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
-        return tk.get_device_connected(name);
+    if let Some(value) = access_mutex(|tk| tk.get_device_connected(name)) {
+        return value;
     }
     false
 }
 
 #[instrument]
 pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
-    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
-        return tk.get_device_capabilities(name);
+    if let Some(value) = access_mutex(|tk| tk.get_device_capabilities(name)) {
+        return value;
     }
     vec![]
 }
 
 #[instrument]
 pub fn tk_stop_all() -> bool {
-    tk_ffi!(stop_all,)
-}
-
-#[instrument]
-pub fn tk_close() -> bool {
-    info!("Closing connection");
-    let tk = TK.write().unwrap().take();
-    if let None = tk {
-        return false;
-    }
-    tk.unwrap().disconnect();
-    return true;
-}
-
-// PollEvents
-#[instrument]
-pub fn tk_poll_event() -> Option<String> {
-    info!("Polling event");
-    let mut evt = None;
-    let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap();
-    if let Some(mut tk) = guard.take() {
-        if let Some(ok) = tk.get_next_event() {
-            evt = Some(ok.to_string());
-        }
-        guard.replace(tk);
-    }
-    evt
+    access_mutex(|tk| tk.stop_all()).is_some()
 }
 
 #[instrument]
 pub fn tk_poll_events() -> Vec<String> {
     info!("Polling all events");
-    let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap();
-    if let Some(mut tk) = guard.take() {
+    match access_mutex(|tk| {
         let events = tk
             .get_next_events()
             .iter()
             .map(|evt| evt.to_string())
             .collect::<Vec<String>>();
-        guard.replace(tk);
         return events;
+    }) {
+        Some(events) => events,
+        None => vec![],
     }
-    vec![]
 }
 
 #[instrument]
 pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
     info!("Setting '{}' enabled={}", device_name, enabled);
-    let mut guard: RwLockWriteGuard<'_, Option<Telekinesis>> = TK.write().unwrap(); // TODO: Don't crash on mutex block
-    if let Some(mut tk) = guard.take() {
-        tk.settings_set_enabled(device_name, enabled);
-        guard.replace(tk);
-    }
+    access_mutex(|tk| tk.settings_set_enabled(device_name, enabled));
 }
 
 #[instrument]
 pub fn tk_settings_get_enabled(device_name: &str) -> bool {
-    if let Some(tk) = TK.write().unwrap().as_ref() { // TODO: Don't crash on mutex block
-        let enabled = tk.settings_get_enabled(device_name);
-        debug!("Getting setting '{}' enabled={}", device_name, enabled);
+    match access_mutex(|tk| return tk.settings_get_enabled(device_name)) {
+        Some(enabled) => enabled,
+        None => false,
     }
-    false
 }
