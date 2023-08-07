@@ -1,6 +1,6 @@
 #include <stddef.h>
 
-#include "../plug/include/telekinesis_plug.h"
+#include "../plug/include/api.h"
 #include "../plug/target/cxxbridge/plug/src/logging.rs.h"
 
 using namespace RE;
@@ -27,6 +27,7 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*))PollEvents);
     vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(StaticFunctionTag*, std::string))GetEnabled);
     vm->RegisterFunction("SetEnabled", PapyrusClass, (void (*)(StaticFunctionTag*, std::string, bool))SetEnabled);
+    vm->RegisterFunction("SettingsStore", PapyrusClass, (bool (*)(StaticFunctionTag*)) SettingsStore);
     return true;
 }
 

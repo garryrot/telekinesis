@@ -10,3 +10,4 @@ bool StopAll(void*);
 std::vector<std::string> PollEvents(void*);
 bool GetEnabled(void*, std::string name);
 void SetEnabled(void*, std::string name, bool enabled);
+bool SettingsStore(void*);

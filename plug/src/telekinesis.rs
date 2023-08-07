@@ -126,6 +126,7 @@ impl Tk for Telekinesis {
     }
 
     fn get_device_names(&self) -> Vec<String> {
+        debug!("Getting devices names");
         self.get_devices()
             .iter()
             .map(|d| d.name().clone())
@@ -133,6 +134,7 @@ impl Tk for Telekinesis {
     }
 
     fn get_device_capabilities(&self, name: &str) -> Vec<String> {
+        debug!("Getting '{}' capabilities", name);
         // maybe just return all actuator + types + linear + rotate
         if self
             .get_devices()
@@ -207,6 +209,7 @@ impl Tk for Telekinesis {
     }
 
     fn get_next_events(&mut self) -> Vec<TkEvent> {
+        debug!("Polling all events");
         let mut events = vec![];
         while let Some(event) = self.get_next_event() {
             events.push(event);
@@ -218,17 +221,21 @@ impl Tk for Telekinesis {
     }
 
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
+        info!("Setting '{}'.enabled={}", device_name, enabled);
         let mut settings = self.settings.clone();
         settings.set_enabled(device_name, enabled);
         self.settings = settings;
     }
 
     fn get_device_connected(&self, device_name: &str) -> bool {
+        debug!("Getting setting '{}' connected", device_name);
         self.get_devices().iter().any(|d| d.name() == device_name)
     }
 
     fn settings_get_enabled(&self, device_name: &str) -> bool {
-        self.settings.is_enabled(device_name)
+        let enabled = self.settings.is_enabled(device_name);
+        debug!("Getting setting '{}'.enabled={}", device_name, enabled);
+        enabled
     }
 }
 
@@ -406,7 +413,6 @@ mod tests {
     #[test]
     fn get_device_connected() {
         let (tk, _) = wait_for_connection(vec![scalar(1, "existing", ActuatorType::Vibrate)]);
-
         assert!(
             tk.get_device_connected("existing"),
             "Existing device returns true"

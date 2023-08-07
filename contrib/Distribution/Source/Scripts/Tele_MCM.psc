@@ -64,6 +64,8 @@ Event OnOptionSelect(int aOption)
         EndIf
         i += 1
     EndWhile
+
+    Tele.SettingsStore()
 EndEvent
 
 Event OnOptionMenuOpen(Int aOption)
@@ -105,7 +107,7 @@ Event OnPageReset(String page)
 
     If page == "Devices"
 		SetCursorFillMode(TOP_TO_BOTTOM)
-        String[] names = TeleDevices.GetDevices() ; TODO: Use stored devices from settings
+        String[] names = TeleDevices.GetDevices()
         Int i = 0
         Int deviceCount = 0
         While (i < names.Length) 

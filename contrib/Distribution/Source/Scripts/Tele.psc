@@ -64,3 +64,6 @@ Bool function GetEnabled(String device_name) global native
 ; Enable device by `name` in settings
 ; This setting is permanently stored
 function SetEnabled(String device_name, Bool enabled) global native
+
+; Persists settings in Telekinesis.json
+Bool function SettingsStore() global native

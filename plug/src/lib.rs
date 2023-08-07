@@ -1,11 +1,12 @@
 use buttplug::client::ButtplugClientDevice;
 use event::TkEvent;
 use lazy_static::lazy_static;
+use tracing_subscriber::field::debug;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, debug};
 
 use cxx::{CxxString, CxxVector};
 use telekinesis::{in_process_connector, Telekinesis};
@@ -208,7 +209,6 @@ pub fn tk_stop_all() -> bool {
 
 #[instrument]
 pub fn tk_poll_events() -> Vec<String> {
-    info!("Polling all events");
     match access_mutex(|tk| {
         let events = tk
             .get_next_events()
@@ -224,14 +224,15 @@ pub fn tk_poll_events() -> Vec<String> {
 
 #[instrument]
 pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
-    info!("Setting '{}' enabled={}", device_name, enabled);
     access_mutex(|tk| tk.settings_set_enabled(device_name, enabled));
 }
 
 #[instrument]
 pub fn tk_settings_get_enabled(device_name: &str) -> bool {
     match access_mutex(|tk| tk.settings_get_enabled(device_name)) {
-        Some(enabled) => enabled,
+        Some(enabled) => {
+            enabled
+        },
         None => false,
     }
 }

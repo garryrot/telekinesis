@@ -125,7 +125,7 @@ impl TkSettings {
             .iter()
             .filter(|d| d.name == device_name && d.enabled)
             .count()
-            > 1
+            >= 1
     }
 }
 
@@ -225,11 +225,18 @@ mod tests {
     }
 
     #[test]
-    fn is_enabled() {
+    fn is_enabled_false() {
         let mut settings = TkSettings::default();
         settings.add("a");
-        settings.add("b");
         assert!(settings.is_enabled("a") == false);
+    }
+
+    #[test]
+    fn is_enabled_true() {
+        let mut settings = TkSettings::default();
+        settings.add("a");
+        settings.set_enabled("a", true);
+        assert!(settings.is_enabled("a") == true);
     }
 
     #[test]

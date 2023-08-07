@@ -27,7 +27,8 @@ DllExport std::vector<std::string> GetDeviceCapabilities(void*, std::string devi
 DllExport bool GetDeviceConnected(void*, std::string device_name) {
     return tk_get_device_connected(device_name);
 }
-DllExport bool Vibrate(void*, int speed, float time_sec, std::vector<std::string> events  /* TODO: Add extra call that uses events */) {
+// TODO: Add extra call that uses events
+DllExport bool Vibrate(void*, int speed, float time_sec, std::vector<std::string> events) {
     return tk_vibrate(speed, time_sec);
 }
 DllExport bool VibrateAll(void*, int speed) { 
@@ -49,6 +50,6 @@ DllExport bool GetEnabled(void*, std::string device_name) {
 DllExport void SetEnabled(void*, std::string device_name, bool enabled) {
     tk_settings_set_enabled(device_name, enabled);
 }
-DllExport void SettingsStore(void*) {
-    tk_settings_store();
+DllExport bool SettingsStore(void*) {
+    return tk_settings_store();
 }
