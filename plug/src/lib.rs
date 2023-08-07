@@ -37,16 +37,14 @@ mod util;
 mod ffi {
     extern "Rust" {
         fn tk_connect() -> bool;
-        fn tk_connect_and_scan() -> bool;
         fn tk_scan_for_devices() -> bool;
+        fn tk_stop_scan() -> bool;
         fn tk_get_device_names() -> Vec<String>;
         fn tk_get_device_connected(name: &str) -> bool;
         fn tk_get_device_capabilities(name: &str) -> Vec<String>;
         fn tk_vibrate(speed: i64, duration_sec: u64) -> bool;
         fn tk_vibrate_events(speed: i64, duration_sec: u64, devices: &CxxVector<CxxString>)
             -> bool;
-        fn tk_vibrate_all(speed: i64) -> bool;
-        fn tk_vibrate_all_for(speed: i64, duration_sec: u64) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
@@ -59,6 +57,7 @@ mod ffi {
 /// access to Telekinesis struct from within foreign rust modules and tests
 pub trait Tk {
     fn scan_for_devices(&self) -> bool;
+    fn stop_scan(&self) -> bool;
     fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>>;
     fn get_device_names(&self) -> Vec<String>;
     fn get_device_connected(&self, name: &str) -> bool;
@@ -141,13 +140,13 @@ pub fn tk_close() -> bool {
 }
 
 #[instrument]
-pub fn tk_connect_and_scan() -> bool {
-    tk_connect() && tk_scan_for_devices()
+pub fn tk_scan_for_devices() -> bool {
+    access_mutex(|tk| tk.scan_for_devices()).is_some()
 }
 
 #[instrument]
-pub fn tk_scan_for_devices() -> bool {
-    access_mutex(|tk| tk.scan_for_devices()).is_some()
+pub fn tk_stop_scan() -> bool {
+    access_mutex(|tk| tk.stop_scan()).is_some()
 }
 
 #[instrument]
@@ -165,17 +164,6 @@ pub fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>) -
         )
     })
     .is_some()
-}
-
-// deprecated
-#[instrument]
-pub fn tk_vibrate_all(speed: i64) -> bool {
-    access_mutex(|tk| tk.vibrate_all(Speed::new(speed), Duration::from_secs(30))).is_some()
-}
-
-#[instrument]
-pub fn tk_vibrate_all_for(speed: i64, secs: u64) -> bool {
-    access_mutex(|tk| tk.vibrate_all(Speed::new(speed), Duration::from_secs(secs))).is_some()
 }
 
 #[instrument]

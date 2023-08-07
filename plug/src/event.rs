@@ -5,6 +5,8 @@ use crate::Speed;
 
 #[derive(Debug)]
 pub enum TkEvent {
+    ScanStarted,
+    ScanStopped,
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
     DeviceVibrated(i32, Speed),
@@ -22,6 +24,8 @@ impl Display for TkEvent {
             TkEvent::DeviceStopped() => write!(f, "Stopping all devices."),
             TkEvent::TkError(err) => write!(f, "Error '{:?}'", err),
             TkEvent::Other(other) => write!(f, "{:?}", other),
+            TkEvent::ScanStarted => write!(f, "Started scanning for devices"),
+            TkEvent::ScanStopped => write!(f, "Stopped scanning for devices"),
         };
         Ok(())
     }

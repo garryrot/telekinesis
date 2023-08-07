@@ -108,13 +108,20 @@ impl fmt::Debug for Telekinesis {
 impl Tk for Telekinesis {
     fn scan_for_devices(&self) -> bool {
         info!("Sending Command: Scan for devices");
-        if let Err(_) = self.command_sender.blocking_send(TkAction::Scan) {
+        if let Err(_) = self.command_sender.try_send(TkAction::Scan) {
             error!("Failed to start scan");
             return false;
         }
         true
     }
-
+    fn stop_scan(&self) -> bool {
+        info!("Sending Command: Stop scan");
+        if let Err(_) = self.command_sender.try_send(TkAction::StopScan) {
+            error!("Failed to stop scan");
+            return false;
+        }
+        true
+    }
     fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>> {
         self.devices
             .as_ref()

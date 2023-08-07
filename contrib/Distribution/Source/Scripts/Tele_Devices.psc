@@ -1,5 +1,6 @@
 ScriptName Tele_Devices extends Quest
 
+Float property Version = 0.4 auto
 Int property DevicesLength = 0 auto
 Int property ScanTime = 30 auto
 Bool property Reconnect = false auto
@@ -7,10 +8,12 @@ Bool property Reconnect = false auto
 String[] Devices
 
 Event OnInit()
-    InitDevices()
-	ScanForDevices()
+    Log("Init Telekinesis v." + Version)
+    Log("Enable devices in MCM to use them...")
+    Devices = new String[32]
+    Tele.Connect()
+	Tele.ScanForDevices()
 	RegisterForUpdate(5)
-    Log("Please enable connected devices in MCM to use them...")
 EndEvent
 
 Event OnUpdate()
@@ -33,15 +36,6 @@ Event OnUpdate()
         j += 1
     EndWhile
 EndEvent
-
-Function ScanForDevices()
-	Log("Start scanning for devices (" + ScanTime + "s...)")
-	Tele.ScanForDevices()
-EndFunction
-
-Function InitDevices()
-    Devices = new String[32]
-EndFunction
 
 Function DeviceNew(String id, String name)
     if (DevicesLength < 32) 

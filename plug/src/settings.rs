@@ -9,7 +9,7 @@ use tracing::{error, event, info, Level};
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
 pub static SETTINGS_FILE: &str = "Telekinesis.json";
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TkConnectionType {
     InProcess,
     WebSocket(i32, String),
@@ -92,6 +92,12 @@ impl TkSettings {
             .map(|d| d.clone())
             .collect()
     }
+    // pub fn get_known_devices(&self) -> Vec<TkDeviceSettings> {
+    //     self.devices
+    //         .iter()
+    //         .map(|d| d.clone())
+    //         .collect()
+    // }
     pub fn add(&mut self, device_name: &str) {
         if self.devices.iter().any(|d| d.name == device_name) {
             return;

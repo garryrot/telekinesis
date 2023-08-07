@@ -46,6 +46,7 @@ Event OnOptionSelect(int aOption)
 
         Tele.Close()
         Utility.Wait(5)
+        Tele.Connect()
         Tele.ScanForDevices()
         
         SetToggleOptionValue(aOption, false)

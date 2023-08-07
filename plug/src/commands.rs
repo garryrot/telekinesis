@@ -11,6 +11,7 @@ type DeviceNameList = Box<Vec<String>>;
 #[derive(Clone, Debug)]
 pub enum TkAction {
     Scan,
+    StopScan,
     Control(TkControl),
     StopAll,
     Disconect,
@@ -50,6 +51,14 @@ pub enum TkDeviceAction {
 pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
     if let Err(err) = client.start_scanning().await {
         error!(error = err.to_string(), "Failed scanning for devices.");
+        return false;
+    }
+    true
+}
+
+pub async fn cmd_stop_scan(client: &ButtplugClient) -> bool {
+    if let Err(err) = client.stop_scanning().await {
+        error!(error = err.to_string(), "Failed to stop scanning for devices.");
         return false;
     }
     true
@@ -131,6 +140,9 @@ pub fn create_cmd_thread(
                     TkAction::Scan => {
                         cmd_scan_for_devices(&client).await;
                     }
+                    TkAction::StopScan => {
+                        cmd_stop_scan(&client).await;
+                    },
                     TkAction::StopAll => {
                         client.stop_all_devices().await.unwrap_or_else(|_| error!("Failed to stop all devices."));
                         event_sender

@@ -11,23 +11,26 @@ using namespace SKSE;
 using namespace REL;
 
 #define DllExport __declspec(dllexport)
+#define SFT StaticFunctionTag*
+#define TkNativeCall 
 
 constexpr std::string_view PapyrusClass = "Tele";
 
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
-    vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(StaticFunctionTag*))ConnectAndScanForDevices);
-    vm->RegisterFunction("Close", PapyrusClass, (bool (*)(StaticFunctionTag*))Close);
-    vm->RegisterFunction("GetDeviceNames", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*)) GetDeviceNames);
-    vm->RegisterFunction("GetDeviceCapabilities", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*, std::string)) GetDeviceCapabilities);
-    vm->RegisterFunction("GetDeviceConnected", PapyrusClass, (bool (*)(StaticFunctionTag*, std::string)) GetDeviceConnected);
-    vm->RegisterFunction("Vibrate", PapyrusClass, (bool (*)(StaticFunctionTag*, int, float, std::vector<std::string>))Vibrate);
-    vm->RegisterFunction("VibrateAll", PapyrusClass, (bool (*)(StaticFunctionTag*, int)) VibrateAll);
-    vm->RegisterFunction("VibrateAllFor", PapyrusClass, (bool (*)(StaticFunctionTag*, int, float)) VibrateAllFor);
-    vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(StaticFunctionTag*)) StopAll);
-    vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(StaticFunctionTag*))PollEvents);
-    vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(StaticFunctionTag*, std::string))GetEnabled);
-    vm->RegisterFunction("SetEnabled", PapyrusClass, (void (*)(StaticFunctionTag*, std::string, bool))SetEnabled);
-    vm->RegisterFunction("SettingsStore", PapyrusClass, (bool (*)(StaticFunctionTag*)) SettingsStore);
+    vm->RegisterFunction("Connect", PapyrusClass, (bool (*)(SFT)) Tk::Connect);
+    vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(SFT))Tk::ScanForDevices);
+    vm->RegisterFunction("StopScan", PapyrusClass, (bool (*)(SFT))Tk::StopScan);
+    vm->RegisterFunction("Close", PapyrusClass, (bool (*)(SFT))Tk::Close);
+    vm->RegisterFunction("GetDeviceNames", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::GetDeviceNames);
+    vm->RegisterFunction("GetDeviceCapabilities", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetDeviceCapabilities);
+    vm->RegisterFunction("GetDeviceConnected", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetDeviceConnected);
+    vm->RegisterFunction("Vibrate", PapyrusClass, (bool (*)(SFT, int, float))Tk::Vibrate);
+    vm->RegisterFunction("VibrateEvents", PapyrusClass, (bool (*)(SFT, int, float, std::vector<std::string>))Tk::VibrateEvents);
+    vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(SFT))Tk::StopAll);
+    vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::PollEvents);
+    vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetEnabled);
+    vm->RegisterFunction("SetEnabled", PapyrusClass, (void (*)(SFT, std::string, bool))Tk::SetEnabled);
+    vm->RegisterFunction("SettingsStore", PapyrusClass, (bool (*)(SFT))Tk::SettingsStore);
     return true;
 }
 
