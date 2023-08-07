@@ -3,7 +3,6 @@ use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes};
 use buttplug::server::device::configuration::{
     ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes,
 };
-use lazy_static::__Deref;
 use serde::Serialize;
 use tokio::sync::mpsc::channel;
 use tokio::{
@@ -25,8 +24,9 @@ use buttplug::core::{
        ButtplugSpecV3ServerMessage, DeviceAdded,
     },
 };
-use futures::{future::BoxFuture, lock::Mutex, FutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use std::ops::{DerefMut, RangeInclusive};
+use std::sync::Mutex;
 use std::time::Duration;
 use std::{vec, thread};
 use std::{collections::HashMap, sync::Arc};
@@ -102,7 +102,7 @@ impl FakeConnectorCallRegistry {
     }
 
     pub fn get_device(&self, device_id: u32) -> Vec<FakeMessage> {
-        match self.actions.try_lock().unwrap().deref().get(&device_id) {
+        match self.actions.lock().unwrap().get(&device_id) {
             Some(some) => * some.clone(),
             None => vec![],
         }
