@@ -1,12 +1,11 @@
 use buttplug::client::ButtplugClientDevice;
 use event::TkEvent;
 use lazy_static::lazy_static;
-use tracing_subscriber::field::debug;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{error, info, instrument, debug};
+use tracing::{error, info, instrument};
 
 use cxx::{CxxString, CxxVector};
 use telekinesis::{in_process_connector, Telekinesis};
@@ -42,9 +41,8 @@ mod ffi {
         fn tk_get_device_names() -> Vec<String>;
         fn tk_get_device_connected(name: &str) -> bool;
         fn tk_get_device_capabilities(name: &str) -> Vec<String>;
-        fn tk_vibrate(speed: i64, duration_sec: u64) -> bool;
-        fn tk_vibrate_events(speed: i64, duration_sec: u64, devices: &CxxVector<CxxString>)
-            -> bool;
+        fn tk_vibrate(speed: i64, secs: u64) -> bool;
+        fn tk_vibrate_events(speed: i64, secs: u64, devices: &CxxVector<CxxString>) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
@@ -58,6 +56,7 @@ mod ffi {
 pub trait Tk {
     fn scan_for_devices(&self) -> bool;
     fn stop_scan(&self) -> bool;
+    fn disconnect(&mut self);
     fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>>;
     fn get_device_names(&self) -> Vec<String>;
     fn get_device_connected(&self, name: &str) -> bool;
@@ -65,7 +64,6 @@ pub trait Tk {
     fn vibrate(&self, speed: Speed, duration: Duration, device_names: Vec<String>) -> bool;
     fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool;
     fn stop_all(&self) -> bool;
-    fn disconnect(&mut self);
     fn get_next_event(&mut self) -> Option<TkEvent>;
     fn get_next_events(&mut self) -> Vec<TkEvent>;
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
@@ -218,9 +216,7 @@ pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
 #[instrument]
 pub fn tk_settings_get_enabled(device_name: &str) -> bool {
     match access_mutex(|tk| tk.settings_get_enabled(device_name)) {
-        Some(enabled) => {
-            enabled
-        },
+        Some(enabled) => enabled,
         None => false,
     }
 }

@@ -1,15 +1,15 @@
 ScriptName Tele_Devices extends Quest
 
-Float property Version = 0.4 auto
-Int property DevicesLength = 0 auto
+Int property MajorVersion = 0 auto
+Int property MinorVersion = 4 auto
 Int property ScanTime = 30 auto
 Bool property Reconnect = false auto
-
+Int property DevicesLength = 0 auto
 String[] Devices
 
 Event OnInit()
-    Log("Init Telekinesis v." + Version)
-    Log("Enable devices in MCM to use them...")
+    Log("Init Telekinesis v." + MajorVersion + "." + MinorVersion)
+    Log("Connect devices via BlueTooth and enable them in MCM for usage...")
     Devices = new String[32]
     Tele.Connect()
 	Tele.ScanForDevices()

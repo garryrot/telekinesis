@@ -23,8 +23,6 @@ Event OnVersionUpdate(int aVersion)
 EndEvent
 
 Event OnConfigInit()
-    TeleDevices.Log("Tele_MCM OnConfigInit")
-
     ModName = "Telekinesis"
 
     Pages = new String[2]
@@ -53,7 +51,7 @@ Event OnOptionSelect(int aOption)
     EndIf
     
     String[] names = TeleDevices.GetDevices()
-    Int i = 0;
+    Int i = 0
     While (i < 32)
         If (aOption == UseDeviceOids[i])
             If (i < names.Length)
@@ -96,7 +94,7 @@ Event OnPageReset(String page)
 
         ; AddHeaderOption("In-Process")
         ; AddEmptyOption()
-        
+
         ; AddHeaderOption("Connectors")
         ; AddToggleOption("Bluetooth LE", true)
         ; AddToggleOption("Lovesense Connect", false, OPTION_FLAG_DISABLED)
@@ -119,14 +117,18 @@ Event OnPageReset(String page)
                 Bool connected = Tele.GetDeviceConnected(name)
 
                 AddHeaderOption(name)
-                AddTextOption(Key(i, "Connected"), connected, OPTION_FLAG_DISABLED)
+                String status = "Disconnected"
+                If connected
+                    status = "Connected"
+                EndIf
+                AddTextOption(Key(i, "Status"), status, OPTION_FLAG_DISABLED)
                 AddTextOption(Key(i, "Actions"), Tele.GetDeviceCapabilities(name), OPTION_FLAG_DISABLED)
 
                 Int flags = OPTION_FLAG_DISABLED
                 If connected
                     flags = OPTION_FLAG_NONE
                 EndIf
-                UseDeviceOids[i] = AddToggleOption(Key(i, "Use"), Tele.GetEnabled(name), flags)
+                UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), Tele.GetEnabled(name), flags)
             EndIf
 
             i += 1

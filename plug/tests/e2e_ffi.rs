@@ -45,7 +45,7 @@ fn test_vibration_e2e() {
 
     // assert
     let events = tk_poll_events();
-    assert!(events[0].starts_with("Vibrating"));
+    assert!(events[0].starts_with("Vibrated"));
     assert!(events[1].starts_with("Stopping"));
     tk_close();
 }

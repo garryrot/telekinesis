@@ -54,7 +54,7 @@ mod tests {
         tk.stop_all();
         _sleep();
         let events = tk.get_next_events();
-        assert!(events[0].to_string().starts_with("Vibrating"));
+        assert!(events[0].to_string().starts_with("Vibrated"));
         assert!(events[1].to_string().starts_with("Stopping"));
     }
 

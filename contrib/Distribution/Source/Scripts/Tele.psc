@@ -48,7 +48,7 @@ Bool function StopAll() global native
 ; Examples messages:
 ;  * "Device XY connected" (This device is connected and will be controlled)
 ;  * "Device XY disconnected" (This device is no longer connected and will be ignored)
-;  * "Vibrating X devices..." (A vibrate command was successful and vibrated X devices)
+;  * "Vibrated X devices..." (A vibrate command was successful and vibrated X devices)
 ; When multiple Mods consume this, they will steal each others events
 String[] function PollEvents() global native
 
