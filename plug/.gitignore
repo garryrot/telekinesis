@@ -4,3 +4,4 @@
 *.dll.lib
 *.pdb
 **/*.exe
+**/Telekinesis.json

@@ -33,7 +33,7 @@ fn ffi_test_reconnect() {
 #[instrument]
 fn test_vibration_e2e() {
     // arrange
-    tk_connect();
+    tk_connect_with_settings(None);
     tk_scan_for_devices();
     wait_for_device_connect(Duration::from_secs(5));
 

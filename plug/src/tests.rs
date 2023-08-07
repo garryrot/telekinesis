@@ -9,13 +9,13 @@ mod tests {
 
     #[test]
     fn connect_and_scan() {
-        assert_eq!(tk_connect(), true);
+        assert_eq!(tk_connect_with_settings(None), true);
         tk_scan_for_devices();
     }
 
     #[test]
     fn vibrate_delayer_applied_after_timeout() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         tk.vibrate_all(Speed::new(0), Duration::from_millis(50));
         _assert_one_event(&mut tk);
         _assert_no_event(&mut tk);
@@ -25,21 +25,21 @@ mod tests {
 
     #[test]
     fn vibrate_delayed_command_is_overwritten() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         tk.vibrate_all(Speed::new(33), Duration::from_millis(50));
         _assert_one_event(&mut tk)
     }
 
     #[test]
     fn get_next_events_empty_when_nothing_happens() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
         assert_eq!(tk.get_next_events().len(), 0);
     }
 
     #[test]
     fn get_next_events_after_action_returns_1() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
         tk.vibrate_all(Speed::new(22), Duration::from_secs(10));
         _sleep();
@@ -48,7 +48,7 @@ mod tests {
 
     #[test]
     fn get_next_events_multiple_actions_are_returned_in_correct_order() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
         tk.vibrate_all(Speed::new(20), Duration::from_secs(10));
         tk.stop_all();
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn get_next_events_over_128_actions_respects_papyrus_limits_and_does_not_return_more_than_128_events(
     ) {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
         for _ in 1..200 {
             tk.stop_all();

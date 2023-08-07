@@ -49,3 +49,6 @@ DllExport bool GetEnabled(void*, std::string device_name) {
 DllExport void SetEnabled(void*, std::string device_name, bool enabled) {
     tk_settings_set_enabled(device_name, enabled);
 }
+DllExport void SettingsStore(void*) {
+    tk_settings_store();
+}

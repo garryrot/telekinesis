@@ -12,7 +12,7 @@ use telekinesis::{in_process_connector, Telekinesis};
 
 use crate::{
     inputs::{as_string_list, Speed},
-    settings::{SETTINGS_FILE, SETTINGS_PATH},
+    settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
 
 mod commands;
@@ -51,6 +51,7 @@ mod ffi {
         fn tk_poll_events() -> Vec<String>;
         fn tk_settings_set_enabled(name: &str, enabled: bool);
         fn tk_settings_get_enabled(name: &str) -> bool;
+        fn tk_settings_store() -> bool;
     }
 }
 
@@ -72,7 +73,7 @@ pub trait Tk {
 }
 
 pub fn new_with_default_settings() -> impl Tk {
-    Telekinesis::connect_with(|| async move { in_process_connector() }).unwrap()
+    Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap()
 }
 
 lazy_static! {
@@ -98,8 +99,15 @@ where
 
 #[instrument]
 pub fn tk_connect() -> bool {
+    tk_connect_with_settings(Some(TkSettings::try_read_or_default(
+        SETTINGS_PATH,
+        SETTINGS_FILE,
+    )))
+}
+
+pub fn tk_connect_with_settings(settings: Option<TkSettings>) -> bool {
     info!("Creating new connection");
-    match Telekinesis::connect_with(|| async move { in_process_connector() }) {
+    match Telekinesis::connect_with(|| async move { in_process_connector() }, settings) {
         Ok(tk) => {
             match TK.try_lock() {
                 Ok(mut guard) => {
@@ -222,8 +230,13 @@ pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
 
 #[instrument]
 pub fn tk_settings_get_enabled(device_name: &str) -> bool {
-    match access_mutex(|tk| return tk.settings_get_enabled(device_name)) {
+    match access_mutex(|tk| tk.settings_get_enabled(device_name)) {
         Some(enabled) => enabled,
         None => false,
     }
+}
+
+#[instrument]
+pub fn tk_settings_store() -> bool {
+    access_mutex(|tk| tk.settings.try_write(SETTINGS_PATH, SETTINGS_FILE)).is_some()
 }

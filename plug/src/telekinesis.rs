@@ -16,8 +16,6 @@ use buttplug::{
 };
 use futures::{Future, StreamExt};
 
-use std::{fmt::Display, time::Instant};
-
 use std::{
     fmt::{self},
     sync::{Arc, Mutex},
@@ -52,7 +50,7 @@ pub fn in_process_connector() -> ButtplugInProcessClientConnector {
 }
 
 impl Telekinesis {
-    pub fn connect_with<T, Fn, Fut>(connector_factory: Fn) -> Result<Telekinesis, anyhow::Error>
+    pub fn connect_with<T, Fn, Fut>(connector_factory: Fn, settings: Option<TkSettings>) -> Result<Telekinesis, anyhow::Error>
     where
         Fn: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = T> + Send,
@@ -93,7 +91,10 @@ impl Telekinesis {
             event_receiver: event_receiver,
             devices: devices,
             thread: runtime,
-            settings: TkSettings::default(), // TODO Parse settings
+            settings: match settings {
+                Some(settings) => settings,
+                None => TkSettings::default()
+            }
         })
     }
 }
@@ -253,6 +254,9 @@ where
 mod tests {
     use std::{thread, time::Duration, vec};
 
+    use std::fmt::Display;
+    use std::time::Instant;
+
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,
@@ -301,7 +305,7 @@ mod tests {
         let count = connector.devices.len();
 
         // act
-        let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
+        let tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
         tk.await_connect(count);
         tk.vibrate_all(Speed::new(100), Duration::from_millis(1));
 
@@ -419,7 +423,7 @@ mod tests {
         let count = connector.devices.len();
 
         // act
-        let tk = Telekinesis::connect_with(|| async move { connector }).unwrap();
+        let tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
         tk.await_connect(count);
         (tk, call_registry)
     }

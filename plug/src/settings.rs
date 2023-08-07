@@ -1,9 +1,13 @@
-use std::fs::{self};
+use std::{
+    fs::{self},
+    path::{PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
+use tracing::{error, event, info, Level};
 
-pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis.json";
+pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
+pub static SETTINGS_FILE: &str = "Telekinesis.json";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TkConnectionType {
@@ -47,7 +51,7 @@ impl TkDeviceSettings {
 }
 
 impl TkSettings {
-    pub fn default() -> TkSettings {
+    pub fn default() -> Self {
         TkSettings {
             version: 1,
             log_level: TkLogLevel::Debug,
@@ -55,8 +59,9 @@ impl TkSettings {
             devices: vec![],
         }
     }
-    pub fn try_read_or_default(settings_path: &str) -> TkSettings {
-        match fs::read_to_string(settings_path) {
+    pub fn try_read_or_default(settings_path: &str, settings_file: &str) -> Self {
+        let path = [settings_path, settings_file].iter().collect::<PathBuf>();
+        match fs::read_to_string(path) {
             Ok(settings_json) => match serde_json::from_str(&settings_json) {
                 Ok(settings) => settings,
                 Err(err) => {
@@ -70,13 +75,14 @@ impl TkSettings {
             }
         }
     }
-    pub fn try_write(&self, settings_path: &str) {
+    pub fn try_write(&self, settings_path: &str, settings_file: &str) {
         let json = serde_json::to_string_pretty(self).expect("Always serializable");
-        if let Err(err) = fs::write(settings_path, json) {
-            error!(
-                "Writing settings to path '{}' failed. Error: {}.",
-                settings_path, err
-            )
+        let _ = fs::create_dir_all(settings_path);
+        let filename = [settings_path, settings_file].iter().collect::<PathBuf>();
+
+        event!(Level::INFO, filename=?filename, settings=?self, "Storing settings");
+        if let Err(err) = fs::write(filename, json) {
+            error!("Writing to file failed. Error: {}.", err)
         }
     }
     pub fn get_enabled_devices(&self) -> Vec<TkDeviceSettings> {
@@ -93,10 +99,12 @@ impl TkSettings {
         self.devices.push(TkDeviceSettings::from_name(device_name))
     }
     pub fn set_enabled(&mut self, device_name: &str, enabled: bool) {
-        if self.devices
+        if self
+            .devices
             .iter()
             .filter(|d| d.name == device_name)
-            .count() == 0
+            .count()
+            == 0
         {
             self.add(device_name);
         }
@@ -149,30 +157,29 @@ mod tests {
         setting.devices.push(TkDeviceSettings::from_name("b"));
         setting.devices.push(TkDeviceSettings::from_name("c"));
 
-        let (path, _tmp_dir) = create_temp_file(
-            "test_config.json",
-            &serde_json::to_string(&setting).unwrap(),
-        );
+        let file = "test_config.json";
+        let (path, _tmp_dir) = create_temp_file(file, &serde_json::to_string(&setting).unwrap());
 
         // Act
         println!("{}", path);
-        let settings = TkSettings::try_read_or_default(&path);
+        let settings = TkSettings::try_read_or_default(_tmp_dir.path().to_str().unwrap(), &file);
         assert_eq!(settings.devices.len(), 3);
     }
 
     #[test]
     fn file_not_existing_returns_default() {
-        let settings = TkSettings::try_read_or_default("Path that does not exist");
+        let settings = TkSettings::try_read_or_default("Path that does not exist", "some.json");
         assert_eq!(settings.devices.len(), settings.devices.len());
     }
 
     #[test]
     fn file_unreadable_returns_default() {
         // File
-        let (path, _tmp_dir) = create_temp_file("bogus.json", "Some stuff that is not valid json");
+        let (_, tmp_dir) = create_temp_file("bogus.json", "Some stuff that is not valid json");
 
         // Act
-        let settings = TkSettings::try_read_or_default(&path);
+        let settings =
+            TkSettings::try_read_or_default(tmp_dir.path().to_str().unwrap(), "bogus.json");
 
         // Assert
         assert_eq!(settings.devices.len(), settings.devices.len());
@@ -231,11 +238,13 @@ mod tests {
         settings.add("foobar");
 
         // act
-        let (path, tmpdir) = create_temp_file("some_target_file.json", "");
-        settings.try_write(&path);
+        let target_file = "some_target_file.json";
+        let (_, tmpdir) = create_temp_file(target_file, "");
+        settings.try_write(tmpdir.path().to_str().unwrap(), target_file);
 
         // assert
-        let settings2 = TkSettings::try_read_or_default(&path);
+        let settings2 =
+            TkSettings::try_read_or_default(tmpdir.path().to_str().unwrap(), target_file);
         assert_eq!(settings2.devices[0].name, "foobar");
 
         assert_ok!(tmpdir.close());
