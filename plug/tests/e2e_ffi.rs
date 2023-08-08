@@ -52,10 +52,14 @@ fn test_vibration_e2e() {
 
 fn wait_for_device_connect(duration: Duration) {
     thread::sleep(duration);
+
     let events = tk_poll_events();
-    let mut split = events[0].split("'");
+    assert!(events[0].starts_with("Started scanning"));
+
+    let mut split = events[1].split("'");
     assert!( split.next().unwrap().starts_with("Device") );
     let device = split.next().unwrap();
     info!("Enabling device '{}'", device);
+    
     tk_settings_set_enabled(device, true);
 }

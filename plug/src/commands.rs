@@ -135,29 +135,33 @@ pub fn create_cmd_thread(
             delayed_cmd = None; // always overwrite delayed with new command
 
             if let Some(cmd) = cmd {
+                let queue_full_err = "Event sender full";
                 info!("Executing command {:?}", cmd);
                 match cmd {
                     TkAction::Scan => {
                         cmd_scan_for_devices(&client).await;
+                        event_sender.send(TkEvent::ScanStarted).unwrap_or_else( |_| error!(queue_full_err));
                     }
                     TkAction::StopScan => {
                         cmd_stop_scan(&client).await;
+                        event_sender.send(TkEvent::ScanStopped).unwrap_or_else( |_| error!(queue_full_err));
                     },
                     TkAction::StopAll => {
                         client.stop_all_devices().await.unwrap_or_else(|_| error!("Failed to stop all devices."));
                         event_sender
                             .send(TkEvent::DeviceStopped())
-                            .expect("Open");
+                            .unwrap_or_else( |_| error!(queue_full_err));
                     }
                     TkAction::Disconect => {
                         client
                             .disconnect()
                             .await
                             .unwrap_or_else(|_| error!("Failed to disconnect."));
+                        break;
                     }
                     TkAction::Control(control) => {
                         let vibrated =  control.execute(&client).await;
-                        event_sender.send(vibrated).unwrap_or_else(|_| error!("Failed sending event."));
+                        event_sender.send(vibrated).unwrap_or_else(|_| error!(queue_full_err));
                         if !control.duration.is_zero() {
                             delayed_timer = control.duration;
                             delayed_cmd = Some(control.get_stop_action());
