@@ -18,8 +18,8 @@ Bool function Close() global native
 
 ; Return a list of all connected device names
 ; - These names can be used to call specific devices
-; - The list will include devices that have been previously and are now disconnected
-String[] function GetDeviceNames() global native
+; - The list includes devices that have been connected in previous sessions
+String[] function GetDevices() global native
 
 ; Return a list of all device capabilities
 ; Only the capability "Vibrate" is avaiable right now

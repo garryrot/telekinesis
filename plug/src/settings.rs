@@ -92,12 +92,6 @@ impl TkSettings {
             .map(|d| d.clone())
             .collect()
     }
-    // pub fn get_known_devices(&self) -> Vec<TkDeviceSettings> {
-    //     self.devices
-    //         .iter()
-    //         .map(|d| d.clone())
-    //         .collect()
-    // }
     pub fn add(&mut self, device_name: &str) {
         if self.devices.iter().any(|d| d.name == device_name) {
             return;

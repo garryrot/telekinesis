@@ -2,12 +2,12 @@ ScriptName Tele_MCM extends SKI_ConfigBase
 
 Tele_Devices Property TeleDevices Auto
 
-; Connection type
 Int currenctConnection = 0
 String[] ConnectionList
 Int connectionOid
 
 Int[] UseDeviceOids
+String[] DeviceNames
 
 Int Function GetVersion()
 	return 1
@@ -37,17 +37,19 @@ Function InitAll()
 	ConnectionList[0] = "In-Process (Default)"
 	ConnectionList[1] = "Intiface (WebSocket)" ; Not supported right now
 	ConnectionList[2] = "Test Devices"         ; Not supported right now
+ 
+    ; Reserve mcm space for 5 fields per device
+    UseDeviceOids = new Int[20]
 
-    UseDeviceOids = new Int[32]
+    DeviceNames = new String[1]
 EndFunction
 
 Event OnOptionSelect(int aOption)
-    String[] names = TeleDevices.Devices
     Int i = 0
-    While (i < 32)
+    While (i < 31)
         If (aOption == UseDeviceOids[i])
-            If (i < names.Length)
-                String device = names[i]
+            If (i < DeviceNames.Length)
+                String device = DeviceNames[i]
                 Bool isUsed = ! Tele.GetEnabled(device)
                 SetToggleOptionValue(aOption, isUsed)
                 Tele.SetEnabled(device, isUsed)
@@ -98,14 +100,19 @@ Event OnPageReset(String page)
 
     If page == "Devices"
 		SetCursorFillMode(TOP_TO_BOTTOM)
-        String[] names = TeleDevices.Devices
+        DeviceNames = Tele.GetDevices()
         Int i = 0
-        Int deviceCount = 0
-        While (i < names.Length) 
-            String name = names[i]
+
+        Int len = DeviceNames.Length
+        If len > 20
+            TeleDevices.LogError("Too many devices, ignoring some in MCM")
+            len = 20
+        EndIf
+
+        While (i < len) 
+            String name = DeviceNames[i]
             
             If name != ""
-                deviceCount += 1
                 Bool connected = Tele.GetDeviceConnected(name)
 
                 AddHeaderOption(name)
@@ -126,8 +133,8 @@ Event OnPageReset(String page)
             i += 1
         EndWhile
 
-        If deviceCount == 0
-            AddHeaderOption("No Devices Connected...")
+        If DeviceNames.Length == 0
+            AddHeaderOption("No devices discovered yet...")
         EndIf
     EndIf
 
@@ -162,27 +169,6 @@ State ACTION_RECONNECT
 
     Event OnHighlightST()
         SetInfoText("Disconnect and re-connect all device connections")
-    EndEvent
-EndState
-
-State ACTION_SCAN_FOR_DEVICES
-    Event OnSelectST()
-        If TeleDevices.ScanningForDevices
-            Tele.StopScan()
-        Else
-            Tele.ScanForDevices()
-        EndIf
-        TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
-        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
-    EndEvent
-    
-    Event OnDefaultST()
-        TeleDevices.ScanningForDevices = true
-        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
-    EndEvent
-
-    Event OnHighlightST()
-        SetInfoText("Automatically scan for new devices (resets to 'true' on each restart)")
     EndEvent
 EndState
 
@@ -231,6 +217,27 @@ State OPTION_LOG_DEBUG
 
     Event OnHighlightST()
         SetInfoText("Show internal debug notifications")
+    EndEvent
+EndState
+
+State ACTION_SCAN_FOR_DEVICES
+    Event OnSelectST()
+        If TeleDevices.ScanningForDevices
+            Tele.StopScan()
+        Else
+            Tele.ScanForDevices()
+        EndIf
+        TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
+        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleDevices.ScanningForDevices = true
+        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Automatically scan for new devices (resets to 'true' on each restart)")
     EndEvent
 EndState
 

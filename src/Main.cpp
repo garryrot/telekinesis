@@ -21,7 +21,7 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(SFT))Tk::ScanForDevices);
     vm->RegisterFunction("StopScan", PapyrusClass, (bool (*)(SFT))Tk::StopScan);
     vm->RegisterFunction("Close", PapyrusClass, (bool (*)(SFT))Tk::Close);
-    vm->RegisterFunction("GetDeviceNames", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::GetDeviceNames);
+    vm->RegisterFunction("GetDevices", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::GetDevices);
     vm->RegisterFunction("GetDeviceCapabilities", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetDeviceCapabilities);
     vm->RegisterFunction("GetDeviceConnected", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetDeviceConnected);
     vm->RegisterFunction("Vibrate", PapyrusClass, (bool (*)(SFT, int, float))Tk::Vibrate);

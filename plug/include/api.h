@@ -4,7 +4,7 @@ namespace Tk
     bool ScanForDevices(void*);
     bool StopScan(void*);
     bool Close(void*);
-    std::vector<std::string> GetDeviceNames(void*);
+    std::vector<std::string> GetDevices(void*);
     std::vector<std::string> GetDeviceCapabilities(void*, std::string name);
     bool GetDeviceConnected(void*, std::string name);
     bool Vibrate(void*, int speed, float time_sec);

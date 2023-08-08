@@ -22,8 +22,8 @@ namespace Tk
     DllExport bool Close(void*) {
         return tk_close();
     }
-    DllExport std::vector<std::string> GetDeviceNames(void*) {
-        auto names = tk_get_device_names();
+    DllExport std::vector<std::string> GetDevices(void*) {
+        auto names = tk_get_devices();
         return std::vector<std::string>(names.begin(), names.end());
     }
     DllExport std::vector<std::string> GetDeviceCapabilities(void*, std::string device_name) {

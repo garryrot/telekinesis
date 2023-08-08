@@ -24,6 +24,8 @@ use std::{
 use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info, warn};
 
+use itertools::Itertools;
+
 use crate::{
     commands::{create_cmd_thread, TkAction, TkControl, TkDeviceAction, TkDeviceSelector},
     settings::TkSettings,
@@ -50,7 +52,10 @@ pub fn in_process_connector() -> ButtplugInProcessClientConnector {
 }
 
 impl Telekinesis {
-    pub fn connect_with<T, Fn, Fut>(connector_factory: Fn, settings: Option<TkSettings>) -> Result<Telekinesis, anyhow::Error>
+    pub fn connect_with<T, Fn, Fut>(
+        connector_factory: Fn,
+        settings: Option<TkSettings>,
+    ) -> Result<Telekinesis, anyhow::Error>
     where
         Fn: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = T> + Send,
@@ -93,8 +98,8 @@ impl Telekinesis {
             thread: runtime,
             settings: match settings {
                 Some(settings) => settings,
-                None => TkSettings::default()
-            }
+                None => TkSettings::default(),
+            },
         })
     }
 }
@@ -137,7 +142,10 @@ impl Tk for Telekinesis {
         self.get_devices()
             .iter()
             .map(|d| d.name().clone())
-            .collect::<Vec<String>>()
+            .chain(self.settings.devices.iter().map(|d| d.name.clone()))
+            .into_iter()
+            .unique()
+            .collect()
     }
 
     fn get_device_capabilities(&self, name: &str) -> Vec<String> {
@@ -163,7 +171,7 @@ impl Tk for Telekinesis {
         }
         vec![]
     }
-    
+
     fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool {
         info!("Sending Command: Vibrate");
         info!("events: {:?}", events);
@@ -290,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn test_connection_assert_devices_connect() {
+    fn get_devices_contains_connected_devices() {
         // arrange
         let (tk, _) = wait_for_connection(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
@@ -309,6 +317,16 @@ mod tests {
         assert!(
             tk.get_device_names().contains(&String::from("vib2")),
             "Contains name vib2"
+        );
+    }
+
+    #[test]
+    fn get_devices_contains_devices_from_settings() {
+        let (mut tk, _) = wait_for_connection(vec![]);
+        tk.settings_set_enabled("foreign", true);
+        assert!(
+            tk.get_device_names().contains(&String::from("foreign")),
+            "Contains additional device from settings"
         );
     }
 
@@ -370,16 +388,12 @@ mod tests {
             scalar(2, "vib2", ActuatorType::Vibrate),
             scalar(3, "vib3", ActuatorType::Vibrate),
         ]);
-        
+
         tk.settings_set_enabled("vib1", true);
         tk.settings_set_enabled("vib3", true);
 
         // act
-        tk.vibrate(
-            Speed::max(),
-            Duration::from_millis(1),
-            vec![],
-        );
+        tk.vibrate(Speed::max(), Duration::from_millis(1), vec![]);
         thread::sleep(Duration::from_secs(1));
 
         // assert

@@ -38,11 +38,12 @@ mod ffi {
         fn tk_connect() -> bool;
         fn tk_scan_for_devices() -> bool;
         fn tk_stop_scan() -> bool;
-        fn tk_get_device_names() -> Vec<String>;
+        fn tk_get_devices() -> Vec<String>;
         fn tk_get_device_connected(name: &str) -> bool;
         fn tk_get_device_capabilities(name: &str) -> Vec<String>;
         fn tk_vibrate(speed: i64, secs: u64) -> bool;
-        fn tk_vibrate_events(speed: i64, secs: u64, devices: &CxxVector<CxxString>) -> bool;
+        fn tk_vibrate_events(speed: i64, secs: u64, devices: &CxxVector<CxxString>)
+            -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
@@ -165,7 +166,7 @@ pub fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>) -
 }
 
 #[instrument]
-pub fn tk_get_device_names() -> Vec<String> {
+pub fn tk_get_devices() -> Vec<String> {
     if let Some(value) = access_mutex(|tk| tk.get_device_names()) {
         return value;
     }
@@ -216,7 +217,9 @@ pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
 #[instrument]
 pub fn tk_settings_get_enabled(device_name: &str) -> bool {
     match access_mutex(|tk| tk.settings_get_enabled(device_name)) {
-        Some(enabled) => enabled,
+        Some(enabled) => {
+            enabled
+        },
         None => false,
     }
 }
