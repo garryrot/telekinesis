@@ -201,7 +201,7 @@ impl Tk for Telekinesis {
 
     fn stop_all(&self) -> bool {
         info!("Sending Command: Stop all");
-        if let Err(_) = self.command_sender.blocking_send(TkAction::StopAll) {
+        if let Err(_) = self.command_sender.try_send(TkAction::StopAll) {
             error!("Failed to send stop_all");
             return false;
         }
@@ -210,7 +210,7 @@ impl Tk for Telekinesis {
 
     fn disconnect(&mut self) {
         info!("Sending Command: Disconnecting client");
-        if let Err(_) = self.command_sender.blocking_send(TkAction::Disconect) {
+        if let Err(_) = self.command_sender.try_send(TkAction::Disconect) {
             error!("Failed to send disconnect");
         }
     }
