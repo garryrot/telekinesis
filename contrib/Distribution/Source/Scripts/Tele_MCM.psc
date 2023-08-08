@@ -2,15 +2,13 @@ ScriptName Tele_MCM extends SKI_ConfigBase
 
 Tele_Devices Property TeleDevices Auto
 
-Int currenctConnection = 0
-String[] ConnectionList
-Int connectionOid
-
+Int selectedConnection = 0
+String[] ConnectionMenuOptions
 Int[] UseDeviceOids
 String[] DeviceNames
 
 Int Function GetVersion()
-	return 1
+	return 2
 EndFunction
 
 Event OnVersionUpdate(int aVersion)
@@ -33,13 +31,12 @@ Function InitAll()
     Pages[1] = "Devices"
     Pages[2] = "Debug"
 
-    ConnectionList = new String[4]
-	ConnectionList[0] = "In-Process (Default)"
-	ConnectionList[1] = "Intiface (WebSocket)" ; Not supported right now
-	ConnectionList[2] = "Test Devices"         ; Not supported right now
- 
-    ; Reserve mcm space for 5 fields per device
-    UseDeviceOids = new Int[20]
+    ConnectionMenuOptions = new String[2]
+	ConnectionMenuOptions[0] = "In-Process (Default)"
+	ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
+    ConnectionMenuOptions[2] = "Disable"
+
+    UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
 
     DeviceNames = new String[1]
 EndFunction
@@ -61,41 +58,16 @@ Event OnOptionSelect(int aOption)
     Tele.SettingsStore()
 EndEvent
 
-Event OnOptionMenuOpen(Int aOption)
-	If (aOption == connectionOid)
-		SetMenuDialogStartIndex(currenctConnection)
-		SetMenuDialogDefaultIndex(0)
-		SetMenuDialogOptions(connectionList)
-    EndIf
-EndEvent
-
-Event OnOptionMenuAccept(Int aOption, Int aIndex)
-	if (aOption == connectionOid)
-		currenctConnection = aIndex
-		SetMenuOptionValue(aOption, connectionList[currenctConnection])
-        Debug.MessageBox("Reconnect now")
-	endIf
-EndEvent
-
 Event OnPageReset(String page)
     If page == "Connection"
 		SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddHeaderOption("General")
-        
-        connectionOid = AddMenuOption("Type", connectionList[currenctConnection])
-        AddToggleOptionST("ACTION_RECONNECT", "Reconnect...", false)
+        AddMenuOptionST("CONNECTION_MENU", "Connection", ConnectionMenuOptions[selectedConnection])
+        AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "")
 
-        ; AddHeaderOption("In-Process")
-        ; AddEmptyOption()
-
-        ; AddHeaderOption("Connectors")
-        ; AddToggleOption("Bluetooth LE", true)
-        ; AddToggleOption("Lovesense Connect", false, OPTION_FLAG_DISABLED)
-        ; AddToggleOption("WebSocket-Connect", false, OPTION_FLAG_DISABLED)
-        ; AddToggleOption("SerialPort", false, OPTION_FLAG_DISABLED)
-        ; AddToggleOption("X-Input", false, OPTION_FLAG_DISABLED)
-        ; AddEmptyOption()
+        AddHeaderOption("Emergency")
+        AddTextOptionST("EMERGENCY_STOP", "Stop all devices", "")
     EndIf
 
     If page == "Devices"
@@ -153,22 +125,51 @@ EndEvent
 
 Bool property stoppingDeviceScan = false auto
 
+State CONNECTION_MENU
+	event OnMenuOpenST()
+		SetMenuDialogStartIndex(selectedConnection)
+		SetMenuDialogDefaultIndex(0)
+		SetMenuDialogOptions(ConnectionMenuOptions)
+	endEvent
+
+	event OnMenuAcceptST(int index)
+		selectedConnection = index
+		SetMenuOptionValueST(ConnectionMenuOptions[selectedConnection])
+        Debug.MessageBox("Reconnect now!")
+	endEvent
+
+	event OnDefaultST()
+		selectedConnection = 0
+		SetMenuOptionValueST(ConnectionMenuOptions[selectedConnection])
+	endEvent
+
+	event OnHighlightST()
+		SetInfoText("Specifies how telekinesis connects to Buttplug.IO")
+	endEvent
+EndState
+
 State ACTION_RECONNECT
     Event OnSelectST()
-        SetToggleOptionValueST(true)
-        Debug.MessageBox("Reconnecting now...")
+        SetTextOptionValueST("Reconnecting now...")
         TeleDevices.Disconnect()
         Utility.Wait(5)
         TeleDevices.Connect()
-        SetToggleOptionValueST(false)
-    EndEvent
-  
-    Event OnDefaultST()
-        SetToggleOptionValueST(false)
+        SetTextOptionValueST("Done!")
     EndEvent
 
     Event OnHighlightST()
         SetInfoText("Disconnect and re-connect all device connections")
+    EndEvent
+EndState
+
+State EMERGENCY_STOP
+	Event OnSelectST()
+		SetTextOptionValueST("Stopping...")
+        Tele.StopAll()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Immediately stop all devices from moving")
     EndEvent
 EndState
 
@@ -179,7 +180,6 @@ State OPTION_LOG_CONNECTS
     EndEvent
     
     Event OnDefaultST()
-        TeleDevices.LogDeviceConnects = true
         SetToggleOptionValueST(TeleDevices.LogDeviceConnects)
     EndEvent
 
@@ -195,7 +195,6 @@ State OPTION_LOG_EVENTS
     EndEvent
     
     Event OnDefaultST()
-        TeleDevices.LogDeviceEvents = false
         SetToggleOptionValueST(TeleDevices.LogDeviceEvents)
     EndEvent
 
@@ -240,6 +239,7 @@ State ACTION_SCAN_FOR_DEVICES
         SetInfoText("Automatically scan for new devices (resets to 'true' on each restart)")
     EndEvent
 EndState
+
 
 String Function Key( String index, String name )
     return "[" + index + "] " + name

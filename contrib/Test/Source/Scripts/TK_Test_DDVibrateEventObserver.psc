@@ -43,10 +43,10 @@ Event OnUpdate()
 		If SexSceneControl 
 			Log("Controlled Scene. Arousal: " + SexSceneArousal + "/ 100")
 			Int speed = SexSceneArousal
-			Tele.VibrateAll(speed)
+			Tele.Vibrate(speed, 60)
 		Else
 			Int speed = Utility.RandomInt(1, 100)
-			Tele.VibrateAll(speed)
+			Tele.Vibrate(speed, 60)
 			Log("Unctontrolled Scene. Random: " + speed)
 		EndIf
 	EndIf
@@ -58,14 +58,14 @@ Function StartSexScene(Bool controlled)
 	SexSceneControl = controlled
 	InSexScene = True
 	SexSceneArousal = 1
-	Tele.VibrateAll(Utility.RandomInt(1, 100))
+	Tele.Vibrate(Utility.RandomInt(1, 100), 120)
 EndFunction
 
 Function StopSexScene()
 	Log("StopSexScene")
 	InSexScene = False
 	SexSceneArousal = 1
-	Tele.VibrateAll(0)
+	Tele.Vibrate(0, 0.1)
 EndFunction
 
 Event OnSexlabAnimationStart(int _, bool HasPlayer)
@@ -87,43 +87,43 @@ EndEvent
 ; Devious Devices
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
     Log("OnDeviceActorOrgasm")
-	Tele.VibrateAllFor( Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0) )
+	Tele.Vibrate( Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0) )
 EndEvent
 
 Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
     Log("OnDeviceEdgedActor")
-	Tele.VibrateAllFor( Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0) )
+	Tele.Vibrate( Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0) )
 EndEvent
 
 Event OnVibrateEffectStart(string eventName, string argString, float argNum, form sender)
 	Log("VibrateStart " + eventName + "|" + argString + "|" + sender)
-	Tele.VibrateAll(100)
+	Tele.Vibrate(100, 30)
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string argString, float argNum, form sender)
 	Log("VibrateStop")
-	Tele.VibrateAll(0)
+	Tele.Vibrate(0, 0.1)
 EndEvent
 
 ; Toys & Love
 Event OnToysPulsate(string eventName, string argString, float argNum, form sender)
 	Log("ToysPulsate")
-	Tele.VibrateAllFor( Utility.RandomInt(1, 100), 5 )
+	Tele.Vibrate( Utility.RandomInt(1, 100), 5 )
 EndEvent
 
 Event OnToysFondleStart(string eventName, string argString, float argNum, form sender) 
 	Log("ToysFondleStart")
-	Tele.VibrateAll( 10 )
+	Tele.Vibrate( 10, 30 )
 EndEvent
 
 Event OnToysFondleEnd(string eventName, string argString, float argNum, form sender)
 	Log("ToysFondleEnd")
-	Tele.VibrateAll( 0 )
+	Tele.Vibrate( 0, 0.1 )
 EndEvent
 
 Event OnToysSquirt(string eventName, string argString, float argNum, form sender)
 	Log("ToysSquirt")
-	Tele.VibrateAllFor( 100, 12.0 )
+	Tele.Vibrate( 100, 12.0 )
 EndEvent
 
 Event OnToysSceneStart(string eventName, string argString, float argNum, form sender)
@@ -138,12 +138,12 @@ EndEvent
 
 Event OnToysClimax(string eventName, string argString, float argNum, form sender)
 	Log("OnToysClimax")
-	Tele.VibrateAllFor( 80, 5)
+	Tele.Vibrate(80, 5)
 EndEvent
 
 Event OnToysClimaxSimultaneous(string eventName, string argString, float argNum, form sender)
 	Log("OnToysClimaxSimultaneous")
-	Tele.VibrateAllFor( 100, 8)
+	Tele.Vibrate(100, 8)
 EndEvent
 
 Event OnToysVaginalPenetration(string eventName, string argString, float argNum, form sender)
@@ -159,7 +159,7 @@ Event OnToysOralPenetration(string eventName, string argString, float argNum, fo
 EndEvent
 
 Event OnToysCaressed(string eventName, string argString, float argNum, form sender)
-	; This doesn't work intended
+	; This doesn't work as intended
 	SexSceneArousal += 3
 	If SexSceneArousal > 100
 		SexSceneArousal = 100
@@ -169,7 +169,7 @@ EndEvent
 
 Event OnToysDenied(string eventName, string argString, float argNum, form sender)
 	; This doesn't work as intended
-	Tele.VibrateAll(0)
+	Tele.Vibrate(0, 0.1)
 	Log("OnToysDenied " + SexSceneArousal)
 EndEvent
 
