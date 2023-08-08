@@ -2,32 +2,36 @@ ScriptName Tele_MCM extends SKI_ConfigBase
 
 Tele_Devices Property TeleDevices Auto
 
+; Connection type
 Int currenctConnection = 0
 String[] ConnectionList
-
 Int connectionOid
-Int reconnectOid
+
 Int[] UseDeviceOids
 
-Int function GetVersion()
+Int Function GetVersion()
 	return 1
-endFunction
+EndFunction
 
 Event OnVersionUpdate(int aVersion)
     If CurrentVersion < aVersion
 		Debug.Trace(self + " Updating MCM " + CurrentVersion + " to " + aVersion)
     EndIf
     If CurrentVersion < 1
-        UseDeviceOids = new Int[32]
+        InitAll()
     EndIf
 EndEvent
 
 Event OnConfigInit()
     ModName = "Telekinesis"
+    InitAll()
+EndEvent
 
-    Pages = new String[2]
+Function InitAll()
+    Pages = new String[3]
     Pages[0] = "Connection"
     Pages[1] = "Devices"
+    Pages[2] = "Debug"
 
     ConnectionList = new String[4]
 	ConnectionList[0] = "In-Process (Default)"
@@ -35,22 +39,10 @@ Event OnConfigInit()
 	ConnectionList[2] = "Test Devices"         ; Not supported right now
 
     UseDeviceOids = new Int[32]
-EndEvent
+EndFunction
 
 Event OnOptionSelect(int aOption)
-    If (aOption == reconnectOid)
-        Debug.MessageBox("Reconnecting, close MCM now...")
-        SetToggleOptionValue(aOption, true)
-
-        Tele.Close()
-        Utility.Wait(5)
-        Tele.Connect()
-        Tele.ScanForDevices()
-        
-        SetToggleOptionValue(aOption, false)
-    EndIf
-    
-    String[] names = TeleDevices.GetDevices()
+    String[] names = TeleDevices.Devices
     Int i = 0
     While (i < 32)
         If (aOption == UseDeviceOids[i])
@@ -79,7 +71,7 @@ Event OnOptionMenuAccept(Int aOption, Int aIndex)
 	if (aOption == connectionOid)
 		currenctConnection = aIndex
 		SetMenuOptionValue(aOption, connectionList[currenctConnection])
-        Debug.MessageBox("Please reconnect now...")
+        Debug.MessageBox("Reconnect now")
 	endIf
 EndEvent
 
@@ -88,9 +80,9 @@ Event OnPageReset(String page)
 		SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddHeaderOption("General")
-
+        
         connectionOid = AddMenuOption("Type", connectionList[currenctConnection])
-        reconnectOid = AddToggleOption("Reconnect...", false)
+        AddToggleOptionST("ACTION_RECONNECT", "Reconnect...", false)
 
         ; AddHeaderOption("In-Process")
         ; AddEmptyOption()
@@ -106,7 +98,7 @@ Event OnPageReset(String page)
 
     If page == "Devices"
 		SetCursorFillMode(TOP_TO_BOTTOM)
-        String[] names = TeleDevices.GetDevices()
+        String[] names = TeleDevices.Devices
         Int i = 0
         Int deviceCount = 0
         While (i < names.Length) 
@@ -138,7 +130,109 @@ Event OnPageReset(String page)
             AddHeaderOption("No Devices Connected...")
         EndIf
     EndIf
+
+    If page == "Debug"
+		SetCursorFillMode(TOP_TO_BOTTOM)
+
+        AddHeaderOption("Logging")
+        AddToggleOptionST("OPTION_LOG_CONNECTS", "Device Connects/Disconnects", TeleDevices.LogDeviceConnects)
+        AddToggleOptionST("OPTION_LOG_EVENTS", "Device Events (Vibrations, etc.)", TeleDevices.LogDeviceEvents)
+        AddToggleOptionST("OPTION_LOG_DEBUG", "Other messages", TeleDevices.LogDebugEvents)
+
+        AddHeaderOption("Actions")
+        AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TeleDevices.ScanningForDevices)
+    EndIf
 EndEvent
+
+Bool property stoppingDeviceScan = false auto
+
+State ACTION_RECONNECT
+    Event OnSelectST()
+        SetToggleOptionValueST(true)
+        Debug.MessageBox("Reconnecting now...")
+        TeleDevices.Disconnect()
+        Utility.Wait(5)
+        TeleDevices.Connect()
+        SetToggleOptionValueST(false)
+    EndEvent
+  
+    Event OnDefaultST()
+        SetToggleOptionValueST(false)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Disconnect and re-connect all device connections")
+    EndEvent
+EndState
+
+State ACTION_SCAN_FOR_DEVICES
+    Event OnSelectST()
+        If TeleDevices.ScanningForDevices
+            Tele.StopScan()
+        Else
+            Tele.ScanForDevices()
+        EndIf
+        TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
+        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleDevices.ScanningForDevices = true
+        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Automatically scan for new devices (resets to 'true' on each restart)")
+    EndEvent
+EndState
+
+State OPTION_LOG_CONNECTS
+    Event OnSelectST()
+        TeleDevices.LogDeviceConnects = !TeleDevices.LogDeviceConnects
+        SetToggleOptionValueST(TeleDevices.LogDeviceConnects)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleDevices.LogDeviceConnects = true
+        SetToggleOptionValueST(TeleDevices.LogDeviceConnects)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Show notification when a device connects/disconnects")
+    EndEvent
+EndState
+
+State OPTION_LOG_EVENTS
+    Event OnSelectST()
+        TeleDevices.LogDeviceEvents = !TeleDevices.LogDeviceEvents
+        SetToggleOptionValueST(TeleDevices.LogDeviceEvents)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleDevices.LogDeviceEvents = false
+        SetToggleOptionValueST(TeleDevices.LogDeviceEvents)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Show notification when a device event (Vibration etc.) occurs")
+    EndEvent
+EndState
+
+State OPTION_LOG_DEBUG
+    Event OnSelectST()
+        TeleDevices.LogDebugEvents = !TeleDevices.LogDebugEvents
+        SetToggleOptionValueST(TeleDevices.LogDebugEvents)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleDevices.LogDebugEvents = false
+        SetToggleOptionValueST(TeleDevices.LogDebugEvents)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Show internal debug notifications")
+    EndEvent
+EndState
 
 String Function Key( String index, String name )
     return "[" + index + "] " + name

@@ -3,7 +3,6 @@ ScriptName Tele_OnGameLoadObserver extends ReferenceAlias
 Tele_Devices Property TeleDevices Auto
 
 Event OnPlayerLoadGame()
-	TeleDevices.Log("Tele_OnGameLoadObserver")
-	Tele.Connect()
-	Tele.ScanForDevices()
+	TeleDevices.LogDebug("OnPlayerLoadGame")
+	TeleDevices.Connect()
 EndEvent
