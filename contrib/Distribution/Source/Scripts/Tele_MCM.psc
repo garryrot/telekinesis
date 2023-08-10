@@ -8,14 +8,14 @@ Int[] UseDeviceOids
 String[] DeviceNames
 
 Int Function GetVersion()
-	return 2
+	return 3
 EndFunction
 
 Event OnVersionUpdate(int aVersion)
     If CurrentVersion < aVersion
-		Debug.Trace(self + " Updating MCM " + CurrentVersion + " to " + aVersion)
+        TeleDevices.LogDebug("Updating MCM from v" + CurrentVersion + " to v" + aVersion)
     EndIf
-    If CurrentVersion < 1
+    If CurrentVersion < 3
         InitAll()
     EndIf
 EndEvent
@@ -27,11 +27,11 @@ EndEvent
 
 Function InitAll()
     Pages = new String[3]
-    Pages[0] = "Connection"
+    Pages[0] = "General"
     Pages[1] = "Devices"
     Pages[2] = "Debug"
 
-    ConnectionMenuOptions = new String[2]
+    ConnectionMenuOptions = new String[3]
 	ConnectionMenuOptions[0] = "In-Process (Default)"
 	ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
     ConnectionMenuOptions[2] = "Disable"
@@ -47,22 +47,24 @@ Event OnOptionSelect(int aOption)
         If (aOption == UseDeviceOids[i])
             If (i < DeviceNames.Length)
                 String device = DeviceNames[i]
-                Bool isUsed = ! Tele.GetEnabled(device)
+                Bool isUsed = ! Tele_Api.GetEnabled(device)
                 SetToggleOptionValue(aOption, isUsed)
-                Tele.SetEnabled(device, isUsed)
+                Tele_Api.SetEnabled(device, isUsed)
             EndIf
         EndIf
         i += 1
     EndWhile
 
-    Tele.SettingsStore()
+    Tele_Api.SettingsStore()
 EndEvent
 
 Event OnPageReset(String page)
-    If page == "Connection"
+    If page == "General"
 		SetCursorFillMode(TOP_TO_BOTTOM)
 
-        AddHeaderOption("General")
+        AddTextOption("Version", TeleDevices.MajorVersion + "." + TeleDevices.MinorVersion, OPTION_FLAG_DISABLED)
+
+        AddHeaderOption("Connection")
         AddMenuOptionST("CONNECTION_MENU", "Connection", ConnectionMenuOptions[selectedConnection])
         AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "")
 
@@ -72,7 +74,7 @@ Event OnPageReset(String page)
 
     If page == "Devices"
 		SetCursorFillMode(TOP_TO_BOTTOM)
-        DeviceNames = Tele.GetDevices()
+        DeviceNames = Tele_Api.GetDevices()
         Int i = 0
 
         Int len = DeviceNames.Length
@@ -85,7 +87,7 @@ Event OnPageReset(String page)
             String name = DeviceNames[i]
             
             If name != ""
-                Bool connected = Tele.GetDeviceConnected(name)
+                Bool connected = Tele_Api.GetDeviceConnected(name)
 
                 AddHeaderOption(name)
                 String status = "Disconnected"
@@ -93,13 +95,13 @@ Event OnPageReset(String page)
                     status = "Connected"
                 EndIf
                 AddTextOption(Key(i, "Status"), status, OPTION_FLAG_DISABLED)
-                AddTextOption(Key(i, "Actions"), Tele.GetDeviceCapabilities(name), OPTION_FLAG_DISABLED)
+                AddTextOption(Key(i, "Actions"), Tele_Api.GetDeviceCapabilities(name), OPTION_FLAG_DISABLED)
 
                 Int flags = OPTION_FLAG_DISABLED
                 If connected
                     flags = OPTION_FLAG_NONE
                 EndIf
-                UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), Tele.GetEnabled(name), flags)
+                UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), Tele_Api.GetEnabled(name), flags)
             EndIf
 
             i += 1
@@ -126,26 +128,26 @@ EndEvent
 Bool property stoppingDeviceScan = false auto
 
 State CONNECTION_MENU
-	event OnMenuOpenST()
+	Event OnMenuOpenST()
 		SetMenuDialogStartIndex(selectedConnection)
 		SetMenuDialogDefaultIndex(0)
 		SetMenuDialogOptions(ConnectionMenuOptions)
-	endEvent
+    EndEvent
 
 	event OnMenuAcceptST(int index)
 		selectedConnection = index
 		SetMenuOptionValueST(ConnectionMenuOptions[selectedConnection])
         Debug.MessageBox("Reconnect now!")
-	endEvent
+	EndEvent
 
-	event OnDefaultST()
+	Event OnDefaultST()
 		selectedConnection = 0
 		SetMenuOptionValueST(ConnectionMenuOptions[selectedConnection])
-	endEvent
+	EndEvent
 
-	event OnHighlightST()
+	Event OnHighlightST()
 		SetInfoText("Specifies how telekinesis connects to Buttplug.IO")
-	endEvent
+	EndEvent
 EndState
 
 State ACTION_RECONNECT
@@ -165,7 +167,7 @@ EndState
 State EMERGENCY_STOP
 	Event OnSelectST()
 		SetTextOptionValueST("Stopping...")
-        Tele.StopAll()
+        Tele_Api.StopAll()
     EndEvent
 
     Event OnHighlightST()
@@ -222,9 +224,9 @@ EndState
 State ACTION_SCAN_FOR_DEVICES
     Event OnSelectST()
         If TeleDevices.ScanningForDevices
-            Tele.StopScan()
+            Tele_Api.StopScan()
         Else
-            Tele.ScanForDevices()
+            Tele_Api.ScanForDevices()
         EndIf
         TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
         SetToggleOptionValueST(TeleDevices.ScanningForDevices)

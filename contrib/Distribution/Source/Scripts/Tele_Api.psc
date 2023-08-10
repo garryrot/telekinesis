@@ -1,4 +1,7 @@
-ScriptName Tele hidden
+ScriptName Tele_Api hidden
+
+; Communication API with Telekinesis.DLL
+; DO NOT USE DIRECTLY, use Tele_Devices instead to respect user settings
 
 ; Sets up a new connection
 Bool function Connect() global native
@@ -29,13 +32,10 @@ String[] function GetDeviceCapabilities(String name) global native
 ; Will also return false when the device does not exist
 bool function GetDeviceConnected(String name) global native
 
-; Vibrate all specified devices for the given duration
-; - speed (Percentage from 0=off to 100=full power)
-; - duration_sec (Duratation in seconds. You can specify split seconds)
-; To stop the vibration early, call this method with speed=0 and any duration
+; Vibrate all enabled devices
 Bool function Vibrate(Int speed, Float duration_sec) global native
 
-; Vibrates devices that are enabled and match the specified events
+; Vibrate all enabled devices by events
 Bool function VibrateEvents(Int speed, Float duration_sec, String[] events) global native
 
 ; Immediately stops all connected devices. This can be used for

@@ -14,7 +14,7 @@ using namespace REL;
 #define SFT StaticFunctionTag*
 #define TkNativeCall 
 
-constexpr std::string_view PapyrusClass = "Tele";
+constexpr std::string_view PapyrusClass = "Tele_Api";
 
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Connect", PapyrusClass, (bool (*)(SFT)) Tk::Connect);

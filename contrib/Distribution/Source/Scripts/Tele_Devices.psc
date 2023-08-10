@@ -18,8 +18,7 @@ Event OnInit()
 EndEvent
 
 Event OnUpdate()
-    String[] evts = Tele.PollEvents()
-    
+    String[] evts = Tele_Api.PollEvents()
 	Int i = 0
 	While (i < evts.Length)
         String evt = evts[i]
@@ -34,49 +33,79 @@ Event OnUpdate()
 	EndWhile
 EndEvent
 
+; Private
+
 Function Connect()
-    Tele.Connect()
-	Tele.ScanForDevices()
+    Tele_Api.Connect()
+	Tele_Api.ScanForDevices()
     ScanningForDevices = true
 EndFunction
 
 Function Disconnect() 
-    Tele.Close()
+    Tele_Api.Close()
     ScanningForDevices = false
+EndFunction
+
+; Public
+
+; Vibrate all specified devices for the given duration
+; - speed (Percentage from 0=off to 100=full power)
+; - duration_sec (Duratation in seconds. You can specify split seconds)
+; - events (Vibrate devices that match the specified events)
+Function Vibrate(Int speed, Float duration_sec, String[] events = None)
+    If events == None
+        Tele_Api.Vibrate(speed, duration_sec)
+        Trace("(Vibrate) speed='" + speed + "' duration='" + duration_sec + "' all")
+    Else
+        Tele_Api.VibrateEvents(speed, duration_sec, events)
+        Trace("(Vibrate) events speed='" + speed + " duration=" + duration_sec + " events=" + events)
+    EndIf
+EndFunction
+
+; Stop all vibrators.
+; - events (If events are specified, stop vibrators associated with the given event)
+Function StopVibrate(String[] events = None)
+    If events == None
+        Tele_Api.Vibrate(0, 0.1)
+        Trace("(Vibrate) stop all")
+    Else
+        Tele_Api.VibrateEvents(0, 0.1, events)
+        Trace("(Vibrate) stop events=" + events)
+    EndIf
 EndFunction
 
 ; Logging
 
-Function Notify(string textToPrint)
-	Debug.Notification("[Tele] " + textToPrint)
+Function Notify(string msg)
+	Debug.Notification("[Tele] " + msg)
 EndFunction
 
-Function Trace(string textToTrace, Int level = 0)
-	Debug.Trace("[Tele] " + textToTrace, level)
+Function Trace(string msg, Int level = 0)
+	Debug.Trace("[Tele] " + msg, level)
 EndFunction
 
-Function LogError(string text)
-    Notify(text)
-    Trace(text, 2)
+Function LogError(string msg)
+    Notify(msg)
+    Trace(msg, 2)
 EndFunction
 
-Function LogConnection(string textToPrint)
-    Trace(textToPrint)
+Function LogConnection(string msg)
+    Trace(msg)
     If LogDeviceConnects
-        Notify(textToPrint)
+        Notify(msg)
     EndIf
 EndFunction
 
-Function LogEvent(string textToPrint)
-    Trace(textToPrint + " LogDeviceEvents " + LogDeviceEvents)
+Function LogEvent(string msg)
+    Trace(msg + " LogDeviceEvents " + LogDeviceEvents)
     If LogDeviceEvents
-        Notify(textToPrint)
+        Notify(msg)
     EndIf
 EndFunction
 
-Function LogDebug(string textToPrint)
-    Trace(textToPrint)
+Function LogDebug(string msg)
+    Trace(msg)
     If LogDebugEvents
-        Notify(textToPrint)
+        Notify(msg)
     EndIf
 EndFunction
