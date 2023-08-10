@@ -13,6 +13,7 @@ pub enum TkAction {
     Scan,
     StopScan,
     Control(TkControl),
+    Stop(TkControl),
     StopAll,
     Disconect,
 }
@@ -66,7 +67,7 @@ pub async fn cmd_stop_scan(client: &ButtplugClient) -> bool {
 
 impl TkControl {
     pub fn get_stop_action(&self) -> TkAction {
-        TkAction::Control(TkControl {
+        TkAction::Stop(TkControl {
             duration: Duration::ZERO,
             devices: self.devices.clone(),
             action: TkDeviceAction::Vibrate(Speed::min()),
@@ -91,7 +92,11 @@ impl TkControl {
                 let mut top_speed = Speed::min();
                 for device in selected_devices.filter(|d| d.message_attributes().scalar_cmd().is_some())
                 {
-                    info!("Vibrating device {} with speed {}", device.name(), speed);
+                    if speed.value != 0 {
+                        info!("Vibrating device {} with speed {}", device.name(), speed);
+                    } else {
+                        info!("Stopping device {}", device.name())
+                    }
                     match device.vibrate(&ScalarValueCommand::ScalarValue(speed.as_float())).await {
                         Ok(_) => vibrated += 1,
                         Err(err) => error!(
@@ -119,22 +124,21 @@ pub fn create_cmd_thread(
     Handle::current().spawn(async move {
         info!("Comand handling thread started");
         let _ = span!(Level::INFO, "cmd_handling_thread").entered();
-        let mut delayed_cmd: Option<TkAction> = None;
-        let mut delayed_timer: Duration = Duration::ZERO;
+        let mut stop_cmd: Option<TkAction> = None;
+        let mut stop_timer: Duration = Duration::ZERO;
         loop {
             let recv_fut = command_receiver.recv();
-            let cmd = if let Some(TkAction::Control(control)) = delayed_cmd {
-                debug!("Select delayed command");
+            let next_cmd = if let Some(action) = stop_cmd {
                 select! {
-                    () = sleep(delayed_timer) => Some(TkAction::Control(control)),
+                    () = sleep(stop_timer) => Some(action),
                     cmd = recv_fut => cmd
                 }
             } else {
                 recv_fut.await
             };
-            delayed_cmd = None; // always overwrite delayed with new command
+            stop_cmd = None; // always overwrite delayed with new command
 
-            if let Some(cmd) = cmd {
+            if let Some(cmd) = next_cmd {
                 let queue_full_err = "Event sender full";
                 info!("Executing command {:?}", cmd);
                 match cmd {
@@ -162,10 +166,13 @@ pub fn create_cmd_thread(
                     TkAction::Control(control) => {
                         let vibrated =  control.execute(&client).await;
                         event_sender.send(vibrated).unwrap_or_else(|_| error!(queue_full_err));
-                        if !control.duration.is_zero() {
-                            delayed_timer = control.duration;
-                            delayed_cmd = Some(control.get_stop_action());
-                        }
+                        stop_timer = control.duration;
+                        stop_cmd = Some(control.get_stop_action());
+                        debug!("Queing delayed stop command {:?} {:?}", stop_cmd, stop_timer);
+                    }
+                    TkAction::Stop(control) => {   
+                        let vibrated = control.execute(&client).await;
+                        event_sender.send(vibrated).unwrap_or_else(|_| error!(queue_full_err));
                     }
                 }
             } else {

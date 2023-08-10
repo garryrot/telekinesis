@@ -173,8 +173,7 @@ impl Tk for Telekinesis {
     }
 
     fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool {
-        info!("Sending Command: Vibrate");
-        info!("events: {:?}", events);
+        info!("Sending Command: Vibrate {:?}", events);
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
             devices: (&self.settings).into(),
             duration: duration,
@@ -185,7 +184,7 @@ impl Tk for Telekinesis {
         }
         true
     }
-
+    
     fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool {
         info!("Sending Command: Vibrate");
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
@@ -279,6 +278,7 @@ mod tests {
     use std::fmt::Display;
     use std::time::Instant;
 
+    use crate::util::enable_log;
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,
@@ -429,6 +429,21 @@ mod tests {
             &String::from("Vibrate"),
             "vibrator returns vibrate"
         );
+    }
+
+    #[test]
+    fn duration_0_does_not_vibrate_infinitely() {
+        // arrange
+        let (tk, call_registry) = wait_for_connection(vec![
+            scalar(1, "vib1", ActuatorType::Vibrate)
+        ]);
+
+        // act
+        tk.vibrate_all(Speed::max(), Duration::ZERO);
+        thread::sleep(Duration::from_secs(1));
+
+        // assert
+        call_registry.assert_vibrated(1);
     }
 
     #[test]
