@@ -11,7 +11,8 @@ Event OnHit(ObjectReference aggressor, Form source, Projectile projectile, bool 
 	If (duration < 0.5)
 		duration = 0.5
 	EndIf
-	Tele.Vibrate(strength, duration)
+	Tele_Api.Vibrate(strength, duration)
+	Log("str=" + strength + " duration=" + duration)
 EndEvent
 
 Function Log(string textToPrint)
