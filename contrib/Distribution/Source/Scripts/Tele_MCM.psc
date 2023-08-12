@@ -6,16 +6,29 @@ Int selectedConnection = 0
 String[] ConnectionMenuOptions
 Int[] UseDeviceOids
 String[] DeviceNames
+Bool SpellsAdded = false
+int EmergencyHotkey = 211 ; Del 
+
+Bool Devious_VibrateEffect = true
+
+Bool Sexlab_Animation = false
+Bool Sexlab_ActorOrgasm = false
+Bool Sexlab_ActorEdge = false
+
+Bool Toys_VibrateEffect = true
+Bool Toys_Animation = false
+Bool Toys_OtherEvents = false
+Bool Toys_Denial
 
 Int Function GetVersion()
-	return 3
+    return 4
 EndFunction
 
 Event OnVersionUpdate(int aVersion)
     If CurrentVersion < aVersion
         TeleDevices.LogDebug("Updating MCM from v" + CurrentVersion + " to v" + aVersion)
     EndIf
-    If CurrentVersion < 3
+    If CurrentVersion < 4
         InitAll()
     EndIf
 EndEvent
@@ -23,32 +36,46 @@ EndEvent
 Event OnConfigInit()
     ModName = "Telekinesis"
     InitAll()
+    RegisterForKey(EmergencyHotkey)
+    TeleDevices.Devious_VibrateEffect = true
+    TeleDevices.Toys_VibrateEffect = true
 EndEvent
 
 Function InitAll()
-    Pages = new String[3]
+    Pages = new String[5]
     Pages[0] = "General"
     Pages[1] = "Devices"
-    Pages[2] = "Debug"
+    Pages[2] = "Integration"
+    Pages[3] = "Debug"
+    Pages[4] = "Help"
 
     ConnectionMenuOptions = new String[3]
-	ConnectionMenuOptions[0] = "In-Process (Default)"
-	ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
+    ConnectionMenuOptions[0] = "In-Process (Default)"
+    ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
     ConnectionMenuOptions[2] = "Disable"
 
     UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
-
     DeviceNames = new String[1]
+    SpellsAdded = false
 EndFunction
 
-Event OnOptionSelect(int aOption)
+Event OnKeyUp(Int KeyCode, Float HoldTime)
+    If KeyCode == EmergencyHotkey
+        Tele_Api.StopAll()
+        TeleDevices.LogError("Emergency stop")
+    Else
+        TeleDevices.LogDebug("Unregistered keypress code: " + KeyCode)
+    EndIf
+EndEvent
+
+Event OnOptionSelect(int oid)
     Int i = 0
     While (i < 31)
-        If (aOption == UseDeviceOids[i])
+        If (oid == UseDeviceOids[i])
             If (i < DeviceNames.Length)
                 String device = DeviceNames[i]
                 Bool isUsed = ! Tele_Api.GetEnabled(device)
-                SetToggleOptionValue(aOption, isUsed)
+                SetToggleOptionValue(oid, isUsed)
                 Tele_Api.SetEnabled(device, isUsed)
             EndIf
         EndIf
@@ -59,8 +86,9 @@ Event OnOptionSelect(int aOption)
 EndEvent
 
 Event OnPageReset(String page)
-    If page == "General"
-		SetCursorFillMode(TOP_TO_BOTTOM)
+
+    If page == "General" || page == ""
+        SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddTextOption("Version", TeleDevices.MajorVersion + "." + TeleDevices.MinorVersion, OPTION_FLAG_DISABLED)
 
@@ -69,20 +97,23 @@ Event OnPageReset(String page)
         AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "")
 
         AddHeaderOption("Emergency")
-        AddTextOptionST("EMERGENCY_STOP", "Stop all devices", "")
+        AddTextOptionST("EMERGENCY_STOP", "Stop all devices", "Click me")
+        AddKeyMapOptionST("EMERGENCY_HOTKEY", "'Stop all' hotkey", EmergencyHotkey)
     EndIf
 
     If page == "Devices"
-		SetCursorFillMode(TOP_TO_BOTTOM)
+        SetCursorFillMode(TOP_TO_BOTTOM)
+  
+        AddHeaderOption("Discovery")
+        AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TeleDevices.ScanningForDevices)
         DeviceNames = Tele_Api.GetDevices()
-        Int i = 0
-
         Int len = DeviceNames.Length
         If len > 20
             TeleDevices.LogError("Too many devices, ignoring some in MCM")
             len = 20
         EndIf
 
+        Int i = 0
         While (i < len) 
             String name = DeviceNames[i]
             
@@ -112,50 +143,49 @@ Event OnPageReset(String page)
         EndIf
     EndIf
 
+    If page == "Integration"
+        SetCursorFillMode(TOP_TO_BOTTOM)
+
+        AddHeaderOption("Devious Devices")
+        AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", Devious_VibrateEffect)
+
+        AddHeaderOption("Sexlab")
+        AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", Sexlab_Animation)
+        AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", Sexlab_ActorOrgasm)
+        AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", Sexlab_ActorEdge)
+
+        AddHeaderOption("Toys & Love")
+        AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Toys", Toys_VibrateEffect)
+        AddToggleOptionST("OPTION_TOYS_ANIMATION", "Love Animation", Toys_Animation)
+        AddToggleOptionST("OPTION_TOYS_DENIAL", "Actor denial", Toys_Denial)
+        AddToggleOptionST("OPTION_TOYS_OTHER", "Actor tease or orgasm", Toys_OtherEvents)
+    EndIf
+
     If page == "Debug"
-		SetCursorFillMode(TOP_TO_BOTTOM)
+        SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddHeaderOption("Logging")
-        AddToggleOptionST("OPTION_LOG_CONNECTS", "Device Connects/Disconnects", TeleDevices.LogDeviceConnects)
-        AddToggleOptionST("OPTION_LOG_EVENTS", "Device Events (Vibrations, etc.)", TeleDevices.LogDeviceEvents)
+        AddToggleOptionST("OPTION_LOG_CONNECTS", "Device connects/disconnects", TeleDevices.LogDeviceConnects)
+        AddToggleOptionST("OPTION_LOG_EVENTS", "Device events (Vibrations, etc.)", TeleDevices.LogDeviceEvents)
         AddToggleOptionST("OPTION_LOG_DEBUG", "Other messages", TeleDevices.LogDebugEvents)
 
-        AddHeaderOption("Actions")
-        AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TeleDevices.ScanningForDevices)
+        AddHeaderOption("Spells")
+        AddToggleOptionST("ACTION_ADD_SPELLS_TO_PLAYER", "Learn debug spells", SpellsAdded)
+    EndIf
+
+    If page == "Help"
+        SetCursorFillMode(TOP_TO_BOTTOM)
+
+        AddTextOptionST("HELP_DEVICE_NOT_CONNECTING", "Why does my device not connect?", "Read below")
     EndIf
 EndEvent
-
-Bool property stoppingDeviceScan = false auto
-
-State CONNECTION_MENU
-	Event OnMenuOpenST()
-		SetMenuDialogStartIndex(selectedConnection)
-		SetMenuDialogDefaultIndex(0)
-		SetMenuDialogOptions(ConnectionMenuOptions)
-    EndEvent
-
-	event OnMenuAcceptST(int index)
-		selectedConnection = index
-		SetMenuOptionValueST(ConnectionMenuOptions[selectedConnection])
-        Debug.MessageBox("Reconnect now!")
-	EndEvent
-
-	Event OnDefaultST()
-		selectedConnection = 0
-		SetMenuOptionValueST(ConnectionMenuOptions[selectedConnection])
-	EndEvent
-
-	Event OnHighlightST()
-		SetInfoText("Specifies how telekinesis connects to Buttplug.IO")
-	EndEvent
-EndState
 
 State ACTION_RECONNECT
     Event OnSelectST()
         SetTextOptionValueST("Reconnecting now...")
         TeleDevices.Disconnect()
         Utility.Wait(5)
-        TeleDevices.Connect()
+        TeleDevices.ConnectAndScanForDevices()
         SetTextOptionValueST("Done!")
     EndEvent
 
@@ -165,13 +195,200 @@ State ACTION_RECONNECT
 EndState
 
 State EMERGENCY_STOP
-	Event OnSelectST()
-		SetTextOptionValueST("Stopping...")
+    Event OnSelectST()
+        SetTextOptionValueST("Stopping...")
         Tele_Api.StopAll()
     EndEvent
 
     Event OnHighlightST()
         SetInfoText("Immediately stop all devices from moving")
+    EndEvent
+EndState
+
+state EMERGENCY_HOTKEY
+    event OnKeyMapChangeST(int newKeyCode, string conflictControl, string conflictName) ; conflict control?
+        UnregisterForKey(EmergencyHotkey)
+        EmergencyHotkey = newKeyCode
+        SetKeyMapOptionValueST(EmergencyHotkey)
+        RegisterForKey(EmergencyHotkey)
+    endEvent
+
+    event OnDefaultST()
+        UnregisterForKey(EmergencyHotkey)
+        EmergencyHotkey = 55
+        SetKeyMapOptionValueST(EmergencyHotkey)
+        RegisterForKey(EmergencyHotkey)
+    endEvent
+
+    event OnHighlightST()
+        SetInfoText("A hotkey for immediately stopping all devices from moving (Default: DEL)")
+    endEvent
+endState
+
+State OPTION_DEVIOUS_VIBRATE
+    Event OnSelectST()
+        Devious_VibrateEffect = !Devious_VibrateEffect
+        SetToggleOptionValueST(Devious_VibrateEffect)
+        TeleDevices.Devious_VibrateEffect = Devious_VibrateEffect
+    EndEvent
+    
+    Event OnDefaultST()
+        Devious_VibrateEffect = true
+        SetToggleOptionValueST(Devious_VibrateEffect)
+        TeleDevices.Devious_VibrateEffect = Devious_VibrateEffect
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Sync with in-game vibrators (vibrate effect start/stop)")
+    EndEvent
+EndState
+
+State OPTION_SEXLAB_ANIMATION
+    Event OnSelectST()
+        Sexlab_Animation = !Sexlab_Animation
+        SetToggleOptionValueST(Sexlab_Animation)
+        TeleDevices.Sexlab_Animation = Sexlab_Animation
+    EndEvent
+    
+    Event OnDefaultST()
+        Sexlab_Animation = false
+        SetToggleOptionValueST(Sexlab_Animation)
+        TeleDevices.Sexlab_Animation = Sexlab_Animation
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices on sexlab player animation")
+    EndEvent
+EndState
+
+State OPTION_SEXLAB_ACTOR_ORGASM
+    Event OnSelectST()
+        Sexlab_ActorOrgasm = !Sexlab_ActorOrgasm
+        SetToggleOptionValueST(Sexlab_ActorOrgasm)
+        TeleDevices.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
+    EndEvent
+    
+    Event OnDefaultST()
+        Sexlab_ActorOrgasm = false
+        SetToggleOptionValueST(Sexlab_ActorOrgasm)
+        TeleDevices.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices on player orgasm")
+    EndEvent
+EndState
+
+State OPTION_SEXLAB_ACTOR_EDGE
+    Event OnSelectST()
+        Sexlab_ActorEdge = !Sexlab_ActorEdge
+        SetToggleOptionValueST(Sexlab_ActorEdge)
+        TeleDevices.Sexlab_ActorEdge = Sexlab_ActorEdge
+    EndEvent
+    
+    Event OnDefaultST()
+        Sexlab_ActorEdge = false
+        SetToggleOptionValueST(Sexlab_ActorEdge)
+        TeleDevices.Sexlab_ActorEdge = Sexlab_ActorEdge
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices on player edge")
+    EndEvent
+EndState
+
+State OPTION_TOYS_VIBRATE
+    Event OnSelectST()
+        Toys_VibrateEffect = !Toys_VibrateEffect
+        SetToggleOptionValueST(Toys_VibrateEffect)
+        TeleDevices.Toys_VibrateEffect = Toys_VibrateEffect
+    EndEvent
+    
+    Event OnDefaultST()
+        Toys_VibrateEffect = false
+        SetToggleOptionValueST(Toys_VibrateEffect)
+        TeleDevices.Toys_VibrateEffect = Toys_VibrateEffect
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Sync with in-game vibrators (toys pulsate start/stop)")
+    EndEvent
+EndState
+
+State OPTION_TOYS_ANIMATION
+    Event OnSelectST()
+        Toys_Animation = !Toys_Animation
+        SetToggleOptionValueST(Toys_Animation)
+        TeleDevices.Toys_Animation = Toys_Animation
+    EndEvent
+    
+    Event OnDefaultST()
+        Toys_Animation = false
+        SetToggleOptionValueST(Toys_Animation)
+        TeleDevices.Toys_Animation = Toys_Animation
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices during 'Toys & Love' player sex animation")
+    EndEvent
+EndState
+
+State OPTION_TOYS_DENIAL
+    Event OnSelectST()
+        Toys_Denial = !Toys_Denial
+        SetToggleOptionValueST(Toys_Denial)
+        TeleDevices.Toys_Denial = Toys_Denial
+    EndEvent
+    
+    Event OnDefaultST()
+        Toys_Denial = false
+        SetToggleOptionValueST(Toys_Denial)
+        TeleDevices.Toys_Denial = Toys_Denial
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Stop device movement on denial (toys denial event)")
+    EndEvent
+EndState
+
+State OPTION_TOYS_OTHER
+    Event OnSelectST()
+        Toys_OtherEvents = !Toys_OtherEvents
+        SetToggleOptionValueST(Toys_OtherEvents)
+        TeleDevices.Toys_OtherEvents = Toys_OtherEvents
+    EndEvent
+    
+    Event OnDefaultST()
+        Toys_OtherEvents = false
+        SetToggleOptionValueST(Toys_OtherEvents)
+        TeleDevices.Toys_OtherEvents = Toys_OtherEvents
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices during other 'Toys & Love' events: Fondled, Fondle, Squirt, Climax, ClimaxSimultaneous, Caressed, Denied")
+    EndEvent
+EndState
+
+State CONNECTION_MENU
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(selectedConnection)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(ConnectionMenuOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleDevices.ConnectionType = index ; selectedConnection = index
+        SetMenuOptionValueST(ConnectionMenuOptions[index])
+        Debug.MessageBox("Reconnect now!")
+    EndEvent
+
+    Event OnDefaultST()
+        TeleDevices.ConnectionType = 0
+        SetMenuOptionValueST(ConnectionMenuOptions[TeleDevices.ConnectionType])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Specify how Telekinesis connects to Buttplug.io")
     EndEvent
 EndState
 
@@ -242,6 +459,60 @@ State ACTION_SCAN_FOR_DEVICES
     EndEvent
 EndState
 
+State ACTION_ADD_SPELLS_TO_PLAYER
+    Event OnSelectST()
+        Actor player = Game.GetPlayer()
+        If ! SpellsAdded
+            If ! player.HasSpell(TeleDevices.Tele_VibrateSpellWeak)
+                player.AddSpell(TeleDevices.Tele_VibrateSpellWeak)
+            EndIf
+            If ! player.HasSpell(TeleDevices.Tele_VibrateSpellMedium)
+                player.AddSpell(TeleDevices.Tele_VibrateSpellMedium)
+            EndIf
+            If ! player.HasSpell(TeleDevices.Tele_VibrateSpellStrong)
+                player.AddSpell(TeleDevices.Tele_VibrateSpellStrong)
+            EndIf
+            If ! player.HasSpell(TeleDevices.Tele_Stop)
+                player.AddSpell(TeleDevices.Tele_Stop)
+            EndIf
+            SpellsAdded = true
+        Else
+            If player.HasSpell(TeleDevices.Tele_VibrateSpellWeak)
+                player.RemoveSpell(TeleDevices.Tele_VibrateSpellWeak)
+            EndIf
+            If player.HasSpell(TeleDevices.Tele_VibrateSpellMedium)
+                player.RemoveSpell(TeleDevices.Tele_VibrateSpellMedium)
+            EndIf
+            If player.HasSpell(TeleDevices.Tele_VibrateSpellStrong)
+                player.RemoveSpell(TeleDevices.Tele_VibrateSpellStrong)
+            EndIf
+            If player.HasSpell(TeleDevices.Tele_Stop)
+                player.RemoveSpell(TeleDevices.Tele_Stop)
+            EndIf
+            SpellsAdded = false
+        EndIf
+        SetToggleOptionValueST(SpellsAdded)
+    EndEvent
+    
+    Event OnDefaultST()
+        SetToggleOptionValueST(SpellsAdded)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Add spells for controlling device vibration")
+    EndEvent
+EndState
+
+State HELP_DEVICE_NOT_CONNECTING
+    Event OnHighlightST()
+        String a = "If your device does not connect, check if:\n"
+        String b = "1. Bluetooth is active\n"
+        String c = "2. The device is coupled in bluetooth settings\n\n"
+        String d = "3. The device has full battery\n"
+        String e = "4. The device is supported by buttplug.io (test with Intiface app)\n"
+        SetInfoText(a + b + c + d + e)
+    EndEvent
+EndState
 
 String Function Key( String index, String name )
     return "[" + index + "] " + name

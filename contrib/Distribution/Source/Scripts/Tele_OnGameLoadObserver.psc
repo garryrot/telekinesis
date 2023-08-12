@@ -4,5 +4,5 @@ Tele_Devices Property TeleDevices Auto
 
 Event OnPlayerLoadGame()
 	TeleDevices.LogDebug("OnPlayerLoadGame")
-	TeleDevices.Connect()
+	TeleDevices.ConnectAndScanForDevices()
 EndEvent
