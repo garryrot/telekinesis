@@ -15,18 +15,6 @@
 		},
 		{
 			"type": "pyro",
-			"projectFile": "Debug-Tests.ppj",
-			"gamePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Skyrim Special Edition\\",
-			"problemMatcher": [
-				"$PapyrusCompiler"
-			],
-			"label": "Compile Papyrus Test Scripts",
-			"group": {
-				"kind": "build"
-			}
-		},
-		{
-			"type": "pyro",
 			"projectFile": "Release.ppj",
 			"gamePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Skyrim Special Edition\\",
 			"problemMatcher": [
