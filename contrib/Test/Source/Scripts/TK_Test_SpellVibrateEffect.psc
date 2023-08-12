@@ -3,7 +3,7 @@ Scriptname TK_Test_SpellVibrateEffect extends ActiveMagicEffect
 Tele_Devices property TeleDevices Auto
 
 Event OnEffectStart(Actor target, Actor caster)
-	Bool vibrated = TeleDevices.Vibrate(100, 30)
+	Bool vibrated = TeleDevices.Vibrate(Math.Floor(GetMagnitude()), 120)
 EndEvent
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)

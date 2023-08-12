@@ -97,7 +97,7 @@ EndEvent
 
 Event OnVibrateEffectStart(string eventName, string argString, float argNum, form sender)
 	Log("VibrateStart " + eventName + "|" + argString + "|" + sender)
-	Tele_Api.Vibrate(100, 30)
+	Tele_Api.Vibrate(100, 120)
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string argString, float argNum, form sender)
@@ -113,7 +113,7 @@ EndEvent
 
 Event OnToysFondleStart(string eventName, string argString, float argNum, form sender) 
 	Log("ToysFondleStart")
-	Tele_Api.Vibrate( 10, 30 )
+	Tele_Api.Vibrate(10, 60)
 EndEvent
 
 Event OnToysFondleEnd(string eventName, string argString, float argNum, form sender)
