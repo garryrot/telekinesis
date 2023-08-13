@@ -1,6 +1,7 @@
 ScriptName Tele_MCM extends SKI_ConfigBase 
 
 Tele_Devices Property TeleDevices Auto
+Tele_Integration Property TeleIntegration Auto
 
 Int selectedConnection = 0
 String[] ConnectionMenuOptions
@@ -37,8 +38,8 @@ Event OnConfigInit()
     ModName = "Telekinesis"
     InitAll()
     RegisterForKey(EmergencyHotkey)
-    TeleDevices.Devious_VibrateEffect = true
-    TeleDevices.Toys_VibrateEffect = true
+    TeleIntegration.Devious_VibrateEffect = true
+    TeleIntegration.Toys_VibrateEffect = true
 EndEvent
 
 Function InitAll()
@@ -90,7 +91,7 @@ Event OnPageReset(String page)
     If page == "General" || page == ""
         SetCursorFillMode(TOP_TO_BOTTOM)
 
-        AddTextOption("Version", TeleDevices.MajorVersion + "." + TeleDevices.MinorVersion + "." + TeleDevices.PatchVersion + TeleDevices.Revsision, OPTION_FLAG_DISABLED)
+        AddTextOption("Version", TeleDevices.Version, OPTION_FLAG_DISABLED)
 
         AddHeaderOption("Connection")
         AddMenuOptionST("CONNECTION_MENU", "Connection", ConnectionMenuOptions[selectedConnection])
@@ -177,7 +178,7 @@ Event OnPageReset(String page)
         SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddTextOptionST("HELP_DEVICE_NOT_CONNECTING", "Device not connecting", "Read below")
-        AddTextOptionST("HELP_DEVICE_NOT_VIBRATING", "Device not moving", "Read below")
+        AddTextOptionST("HELP_DEVICE_NOT_VIBRATING", "Device not vibrating", "Read below")
     EndIf
 EndEvent
 
@@ -207,7 +208,7 @@ State EMERGENCY_STOP
 EndState
 
 state EMERGENCY_HOTKEY
-    event OnKeyMapChangeST(int newKeyCode, string conflictControl, string conflictName) ; conflict control?
+    event OnKeyMapChangeST(int newKeyCode, string conflictControl, string conflictName)
         UnregisterForKey(EmergencyHotkey)
         EmergencyHotkey = newKeyCode
         SetKeyMapOptionValueST(EmergencyHotkey)
@@ -230,13 +231,13 @@ State OPTION_DEVIOUS_VIBRATE
     Event OnSelectST()
         Devious_VibrateEffect = !Devious_VibrateEffect
         SetToggleOptionValueST(Devious_VibrateEffect)
-        TeleDevices.Devious_VibrateEffect = Devious_VibrateEffect
+        TeleIntegration.Devious_VibrateEffect = Devious_VibrateEffect
     EndEvent
     
     Event OnDefaultST()
         Devious_VibrateEffect = true
         SetToggleOptionValueST(Devious_VibrateEffect)
-        TeleDevices.Devious_VibrateEffect = Devious_VibrateEffect
+        TeleIntegration.Devious_VibrateEffect = Devious_VibrateEffect
     EndEvent
 
     Event OnHighlightST()
@@ -248,13 +249,13 @@ State OPTION_SEXLAB_ANIMATION
     Event OnSelectST()
         Sexlab_Animation = !Sexlab_Animation
         SetToggleOptionValueST(Sexlab_Animation)
-        TeleDevices.Sexlab_Animation = Sexlab_Animation
+        TeleIntegration.Sexlab_Animation = Sexlab_Animation
     EndEvent
     
     Event OnDefaultST()
         Sexlab_Animation = false
         SetToggleOptionValueST(Sexlab_Animation)
-        TeleDevices.Sexlab_Animation = Sexlab_Animation
+        TeleIntegration.Sexlab_Animation = Sexlab_Animation
     EndEvent
 
     Event OnHighlightST()
@@ -266,13 +267,13 @@ State OPTION_SEXLAB_ACTOR_ORGASM
     Event OnSelectST()
         Sexlab_ActorOrgasm = !Sexlab_ActorOrgasm
         SetToggleOptionValueST(Sexlab_ActorOrgasm)
-        TeleDevices.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
+        TeleIntegration.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
     EndEvent
     
     Event OnDefaultST()
         Sexlab_ActorOrgasm = false
         SetToggleOptionValueST(Sexlab_ActorOrgasm)
-        TeleDevices.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
+        TeleIntegration.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
     EndEvent
 
     Event OnHighlightST()
@@ -284,13 +285,13 @@ State OPTION_SEXLAB_ACTOR_EDGE
     Event OnSelectST()
         Sexlab_ActorEdge = !Sexlab_ActorEdge
         SetToggleOptionValueST(Sexlab_ActorEdge)
-        TeleDevices.Sexlab_ActorEdge = Sexlab_ActorEdge
+        TeleIntegration.Sexlab_ActorEdge = Sexlab_ActorEdge
     EndEvent
     
     Event OnDefaultST()
         Sexlab_ActorEdge = false
         SetToggleOptionValueST(Sexlab_ActorEdge)
-        TeleDevices.Sexlab_ActorEdge = Sexlab_ActorEdge
+        TeleIntegration.Sexlab_ActorEdge = Sexlab_ActorEdge
     EndEvent
 
     Event OnHighlightST()
@@ -302,13 +303,13 @@ State OPTION_TOYS_VIBRATE
     Event OnSelectST()
         Toys_VibrateEffect = !Toys_VibrateEffect
         SetToggleOptionValueST(Toys_VibrateEffect)
-        TeleDevices.Toys_VibrateEffect = Toys_VibrateEffect
+        TeleIntegration.Toys_VibrateEffect = Toys_VibrateEffect
     EndEvent
     
     Event OnDefaultST()
         Toys_VibrateEffect = false
         SetToggleOptionValueST(Toys_VibrateEffect)
-        TeleDevices.Toys_VibrateEffect = Toys_VibrateEffect
+        TeleIntegration.Toys_VibrateEffect = Toys_VibrateEffect
     EndEvent
 
     Event OnHighlightST()
@@ -320,13 +321,13 @@ State OPTION_TOYS_ANIMATION
     Event OnSelectST()
         Toys_Animation = !Toys_Animation
         SetToggleOptionValueST(Toys_Animation)
-        TeleDevices.Toys_Animation = Toys_Animation
+        TeleIntegration.Toys_Animation = Toys_Animation
     EndEvent
     
     Event OnDefaultST()
         Toys_Animation = false
         SetToggleOptionValueST(Toys_Animation)
-        TeleDevices.Toys_Animation = Toys_Animation
+        TeleIntegration.Toys_Animation = Toys_Animation
     EndEvent
 
     Event OnHighlightST()
@@ -338,13 +339,13 @@ State OPTION_TOYS_DENIAL
     Event OnSelectST()
         Toys_Denial = !Toys_Denial
         SetToggleOptionValueST(Toys_Denial)
-        TeleDevices.Toys_Denial = Toys_Denial
+        TeleIntegration.Toys_Denial = Toys_Denial
     EndEvent
     
     Event OnDefaultST()
         Toys_Denial = false
         SetToggleOptionValueST(Toys_Denial)
-        TeleDevices.Toys_Denial = Toys_Denial
+        TeleIntegration.Toys_Denial = Toys_Denial
     EndEvent
 
     Event OnHighlightST()
@@ -356,13 +357,13 @@ State OPTION_TOYS_OTHER
     Event OnSelectST()
         Toys_OtherEvents = !Toys_OtherEvents
         SetToggleOptionValueST(Toys_OtherEvents)
-        TeleDevices.Toys_OtherEvents = Toys_OtherEvents
+        TeleIntegration.Toys_OtherEvents = Toys_OtherEvents
     EndEvent
     
     Event OnDefaultST()
         Toys_OtherEvents = false
         SetToggleOptionValueST(Toys_OtherEvents)
-        TeleDevices.Toys_OtherEvents = Toys_OtherEvents
+        TeleIntegration.Toys_OtherEvents = Toys_OtherEvents
     EndEvent
 
     Event OnHighlightST()
@@ -509,11 +510,10 @@ State HELP_DEVICE_NOT_CONNECTING
     EndEvent
     Event OnHighlightST()
         String a = "If a device does not connect, check that:\n"
-        String b = "1. Bluetooth is active\n"
-        String c = "2. The device is coupled in bluetooth settings\n"
-        String d = "3. The device has full battery\n"
-        String e = "4. The device is supported by buttplug.io (test in Intiface app)\n"
-        SetInfoText(a + b + c + d + e)
+        String b = "1. Windows has bluetooth active and the device is connected\n"
+        String c = "2. Device has full battery\n"
+        String d = "3. Device is supported by buttplug.io (test in Intiface app)\n"
+        SetInfoText(a + b + c + d)
     EndEvent
 EndState
 
@@ -522,10 +522,10 @@ State HELP_DEVICE_NOT_VIBRATING
     EndEvent
     Event OnHighlightST()
         String a = "If a device connects but does not vibrate, check that:\n"
-        String b = "1. The devices is enabled (Devices Page)\n"
-        String c = "2. The device has full battery\n"
-        String d = "3. The device works in buttplug.io (test in Intiface app)\n"
-        SetInfoText(a + b + c)
+        String b = "1. Device is enabled (MCM: Devices Page)\n"
+        String c = "2. Device has full battery\n"
+        String d = "3. Device works in buttplug.io (test in Intiface app)\n"
+        SetInfoText(a + b + c + d)
     EndEvent
 EndState
 
