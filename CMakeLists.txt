@@ -6,7 +6,7 @@ message("Using toolchain file ${CMAKE_TOOLCHAIN_FILE}.")
 ########################################################################################################################
 project(
         Telekinesis
-        VERSION 0.4.0
+        VERSION 1.0.0
         DESCRIPTION "Papyrus remote control API for bluetooth toys."
         LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)

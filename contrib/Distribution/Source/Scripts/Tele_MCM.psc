@@ -47,7 +47,7 @@ Function InitAll()
     Pages[1] = "Devices"
     Pages[2] = "Integration"
     Pages[3] = "Debug"
-    Pages[4] = "Help"
+    Pages[4] = "Troubleshooting"
 
     ConnectionMenuOptions = new String[3]
     ConnectionMenuOptions[0] = "In-Process (Default)"
@@ -90,7 +90,7 @@ Event OnPageReset(String page)
     If page == "General" || page == ""
         SetCursorFillMode(TOP_TO_BOTTOM)
 
-        AddTextOption("Version", TeleDevices.MajorVersion + "." + TeleDevices.MinorVersion, OPTION_FLAG_DISABLED)
+        AddTextOption("Version", TeleDevices.MajorVersion + "." + TeleDevices.MinorVersion + "." + TeleDevices.PatchVersion + TeleDevices.Revsision, OPTION_FLAG_DISABLED)
 
         AddHeaderOption("Connection")
         AddMenuOptionST("CONNECTION_MENU", "Connection", ConnectionMenuOptions[selectedConnection])
@@ -173,10 +173,11 @@ Event OnPageReset(String page)
         AddToggleOptionST("ACTION_ADD_SPELLS_TO_PLAYER", "Learn debug spells", SpellsAdded)
     EndIf
 
-    If page == "Help"
+    If page == "Troubleshooting"
         SetCursorFillMode(TOP_TO_BOTTOM)
 
-        AddTextOptionST("HELP_DEVICE_NOT_CONNECTING", "Why does my device not connect?", "Read below")
+        AddTextOptionST("HELP_DEVICE_NOT_CONNECTING", "Device not connecting", "Read below")
+        AddTextOptionST("HELP_DEVICE_NOT_VIBRATING", "Device not moving", "Read below")
     EndIf
 EndEvent
 
@@ -504,13 +505,27 @@ State ACTION_ADD_SPELLS_TO_PLAYER
 EndState
 
 State HELP_DEVICE_NOT_CONNECTING
+    Event OnSelectST()
+    EndEvent
     Event OnHighlightST()
-        String a = "If your device does not connect, check if:\n"
+        String a = "If a device does not connect, check that:\n"
         String b = "1. Bluetooth is active\n"
-        String c = "2. The device is coupled in bluetooth settings\n\n"
+        String c = "2. The device is coupled in bluetooth settings\n"
         String d = "3. The device has full battery\n"
-        String e = "4. The device is supported by buttplug.io (test with Intiface app)\n"
+        String e = "4. The device is supported by buttplug.io (test in Intiface app)\n"
         SetInfoText(a + b + c + d + e)
+    EndEvent
+EndState
+
+State HELP_DEVICE_NOT_VIBRATING
+    Event OnSelectST()
+    EndEvent
+    Event OnHighlightST()
+        String a = "If a device connects but does not vibrate, check that:\n"
+        String b = "1. The devices is enabled (Devices Page)\n"
+        String c = "2. The device has full battery\n"
+        String d = "3. The device works in buttplug.io (test in Intiface app)\n"
+        SetInfoText(a + b + c)
     EndEvent
 EndState
 

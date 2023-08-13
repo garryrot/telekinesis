@@ -7,6 +7,7 @@ Spell Property Tele_Stop auto
 
 Int Property MajorVersion = 1 autoReadOnly
 Int Property MinorVersion = 0 autoReadOnly
+Int Property PatchVersion = 0 autoReadOnly
 String Property Revsision = "RC1" autoReadOnly
 
 Int Property ScanTime = 30 auto
@@ -19,7 +20,7 @@ Bool Property ScanningForDevices = false auto
 Int Property ConnectionType = 0 auto
 
 Event OnInit()
-    Notify("Telekinesis v" + MajorVersion + "." + MinorVersion + Revsision + ": Enable connected devices in MCM for usage...")
+    Notify("Telekinesis v" + MajorVersion + "." + MinorVersion + "." + PatchVersion + ": Enable connected devices in MCM for usage...")
     ConnectAndScanForDevices()
     RegisterForUpdate(5)
 EndEvent

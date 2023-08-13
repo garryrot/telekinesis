@@ -1,3 +1,0 @@
-debug:
-  logLevel: info
-  flushLevel: trace
