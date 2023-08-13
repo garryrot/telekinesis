@@ -1,120 +1,54 @@
-# Telekinesis (Bluetooth Toy Control for Papyrus) V0.4.0
+# Telekinesis (Bluetooth Toy Control for Skyrim) 1.0.0 Beta
 
-**In a Nutshell**
+## Installation
 
-This is my humble attempt at creating Papyrus bindings for the famous buttplug.io toy control library. This SKSE64 plugin allows modders to control bluetooth toys (Vibrators, etc.) from within Papyrus scripts. It provides several new Papyrus functions that let you Scan for local devices and then control/vibrate them. This does not provide any playable content on its own, (unless you run the Sample ESP). This is pretty much a big experimental prototype and still work in progress. The API I expose right now can and will change.
+1. Install `Telekinesis.7z` with a mod manager
 
-## Features
- * Very fast and reactive native implementation
- * Toy control directly from within Papyrus
- * No dependency on external processes, just install the ESP
+**Depdendencies**: `SKSE64`, `Skyrim SE`, `SkyUI`, `Address Library for SKSE Plugins`
+**Incompatibilities**:  Other mods that control Intiface/Or Buttplug.io in one way or the other might cause undefined behavior. Note that there is a compatibility option for G.I.F.T. so you can run it.
+
+## Migration
+
+Migrating from the early alpha versions is not supported, start a new game, or try to fix on your own.
+
+- Uninstall `TelekinesisTest.esp` and delete it forever (it won't be needed again)
 
 ## Usage
 
->:warning: **EARLY TEST PROTOTYPE: THIS API WILL CHANGE** :warning:
-
-### 1. Install
-
-1. Install the Mod
-2. Move the Main .psc file `Tele.psc` into a path where your Papyrus Compiler can find it. For Creation Kit its probably something like `data/source/scripts` but I don't get its folder structure at all tbh.
-3. Connect your Toy via Bluetooth
-4. Open up Creation Kit and [Use the Papyrus Functions!](https://github.com/garryrot/telekinesis/blob/master/contrib/Distribution/Source/Scripts/Tele.psc)
-4. Alternatively: Install The Sample ESP (Telekinesis.Sample.7z), which demonstrates the use of those Papyrus Functions In-Game
-
-**Depdendencies**: `SKSE64`, `Skyrim SE`, `Address Library for SKSE Plugins`
-**Incompatibilities**:  Other mods that control Intiface/Or Buttplug.io in one way or the other might cause undefined behavior.
-
-### 2. Start
-
-Start Telekinesis and scan for devices. This must be done once on every game startup (actually
-once for every game process). You most likely want to do this `OnInit` and `OnPlayerLoadGame`.
-
-```cs
-Actor property Player auto
-Event OnInit()
-    Tele.ScanForDevices()
-    RegisterForUpdate(5) // for displaying updates (see section 3)
-EndEvent
-```
-
-If Telekinesis wasn't started, the other functions will not have any effect.
-
-### 3. Control Devices 
-
-Call `VibrateAll(speed)` to vibrate all devices.
-
-```cs
-int vibrated = Tele.VibrateAll(100) // speed can be any int from 0 to (100=full speed)
-Debug.Notification( "Vibrating" + vibrated + " device(s)..." )
-```
-
-Call `VibrateAll(0)` to stop all devices
-
-```cs
-Util.Wait(5);
-int stopped = Tele.VibrateAll(0) // 0 = stop vibrating
-Debug.Notification( "Stopping" + stopped + " device(s)..." )
-```
-
-If no devices are connected or Telekinesis was not started, this will simply do nothing.
-
-#### 4. Monitoring Connections
-
-You can poll `PollEvents` to see if any device connected or disconnected. This
-will return a message or the default string `""` (if nothing happened).
-
-```cs
-Event OnUpdate()
-    String evt = Tele.PollEvents()
-    If (evt != "")
-        Debug.Notification(evt) // If it says "Device XY connected" you are ready to go
-    EndIf
-EndEvent
-```
-
-### 5. Shutting Down
-
-At one point the user will close the game or load a different safe. If possible, you should call `StopAll`
-to stop all devices. In the worst case (i.e. if the user kills the game process while a vibration is running)
-the `Stop Event` will be lost and the vibrating toys might need to be turned off manually.
-
-I don't know if there is any reliable event or hook to do this. Please tell me if you do.
-
-```cs
-Tele.StopAll() // stop all devices
-```
-
-`Close` will free up the associated memory resources after everything else is done.
-
-```cs
-Tele.Close() // destroy the connection 
-```
-
-## Demo
-
-Showcase of the Sample/Test-Mod `Telekinesis.SampleProject.7z`
-
-- Triggers vibration based on DD `OnVibrateEffectStart` and `OnVibrateEffectStart` events
-- Gives the player a "Telekinesis Vibrate Toy" spell that causes a vibration effect
-
-*You can already run this if you want, but its just a proof of concept and lacks any settings (and fun)*
-
-[![Watch the Video](https://i.imgur.com/QiG6p2y.jpg)](https://www.youtube.com/watch?v=_EoiLqY_6_Q)
+1. Make sure that your bluetooth devices are coupled in your system control and connected
+2. The dll will constantly scan for Bluetooth LE devices and connect them when they are available. Connected devices will show up in your Notifications
+3. Open the MCM, go to Page `Devices` and enable the devices you want to use (you only need to do this once, this choice is persisted between different save games)
+4. Use spells in `Debug` to test device vibrations (Don't worry, deselecting the option will remove them from your character again)
+5. Remember the Emergency Stop hotkey (default `DEL`) in case anything goes wrong
 
 ## Caveats & Known Issues
 
  * Only BluetoothLE is activated right now: [List of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
- * Only tested Skyrim SE (v1.5.97.0)
-    * If it works on different versions, please tell me!
- * If you close or reload the game during a vibration event it may not stop until you turn off your device manually
+ * Tested on Skyrim SE (v1.5.97.0) and AE (1.6.640.0)
 
-(*) More connection-managers be activated in later versions 
+## Screenshots
+
+<img src="doc/scr1.png" width="500"/>
+<img src="doc/scr2.png" width="500"/>
+<img src="doc/scr3.png" width="500"/>
+<img src="doc/scr4.png" width="500"/>
+<img src="doc/scr5.png" width="500"/>
 
 ## Troubleshooting
 
 ### Devices don't connect
 
-First, make sure that your device is couple correctly and works with Buttplug.io. You can use the [Intiface Central Desktop App](https://intiface.com/central) to test your device and verify that it actually works with Buttplug before proceeding.
+Please check that:
+
+1. First, make sure that your device is couple correctly
+2. Your device has enough battery
+3. Your device is supported by buttplug.io, see [List of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
+4. Test it with [Intiface Central Desktop App](https://intiface.com/central), if a vibrator works in that app, and not in this plugin, its an issue with the mod.
+
+### Devices connects but doesn't vibrate
+
+1. Make sure that your device is enabled in Page `Devices`
+2. Make sure it has full battery (with low battery it might still be able to connect but not move)
 
 ### Bug Reports
 
@@ -122,43 +56,20 @@ If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyp
 
 * You will find them in `%USERPROFILE%/My Games/Sykrim Special Edition/SKSE/...`
 * If you can reproduce the issue, adapt the debug level by changing `Telekinesis.yaml` (in `Data/SKSE/Plugins` next to your `Telekinesis.dll`) and set everything to `trace`.
-
-
 ## Why yet another bluetooth control?
 
-First of all, because I can :3
-
-Right now, this is more of a proof of concept, and far from a stable production state.
-
-There several other toy control projects you can use. The most complete and feature-rich approach
-is [GIFT](https://github.com/MinLL/GameInterfaceForToys), which processes events from the Papyrus Logs and controls
-external, and also supports a bigger variety of outputs (not only buttplug.io but also E-Stim, Chaster, etc.) and
-different Games.
-
-Right now, if you are not a mod developer with very specific speed and integration requirements, you most likely 
-want to use GIFT.
-
-### When Telekinesis?
-
-Telekinesis tries a completely different approach, trying to fit a different niche by providing native Papyrus functions.
-
-**Upsides**:
-
-- Fast reaction time, because everything happens in-process
-- Gives device control directly to Papyrus, which should make the creation of interactive interactions really easy
-- Will only add one mod dependency (this mod)
-
-**Downsides**:
-
-- With tighter integration and without an external supervisor process, there is one less failsafe. For example, if the User kill Skyrim with alt+f4, and then you have to turn off your device manually
-- Mods might not expose Papyrus events for all the things that show up the logs
-- External GUI applications might be easier to use than MCM Menus
 
 ## License
 
-This if free software. If you want to change this, redistribute it, or integrate it into your mod, you are free to whatever you like, as long as it is permitted by the  [Apache License](LICENSE)
+This if free software. If you want to change this, redistribute it, or integrate it into your mod, you are free to whatever you like, as long as it is permitted by the [Apache License](LICENSE)
+
 
 ## Changelog
+
+### 1.0.0
+
+- Complete rework of everything
+- Mod now comes with an MCM and lots of mod integration
 
 ### 0.3.0
 
