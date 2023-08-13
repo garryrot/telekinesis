@@ -28,11 +28,11 @@ Migrating from the early alpha versions is not supported, start a new game, or t
 
 ## Screenshots
 
-<img src="doc/scr1.png" width="500"/>
-<img src="doc/scr2.png" width="500"/>
-<img src="doc/scr3.png" width="500"/>
-<img src="doc/scr4.png" width="500"/>
-<img src="doc/scr5.png" width="500"/>
+<img src="doc/scr1.png" width="800"/>
+<img src="doc/scr2.png" width="800"/>
+<img src="doc/scr3.png" width="800"/>
+<img src="doc/scr4.png" width="800"/>
+<img src="doc/scr5.png" width="800"/>
 
 ## Troubleshooting
 
