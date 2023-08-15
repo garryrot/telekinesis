@@ -35,7 +35,7 @@ Watch the video:
 
 **Video guide**
 
-<a href="https://youtu.be/XrXUIUjuSRQ?t=127" title="Video Tutorial">
+<a href="https://youtu.be/XrXUIUjuSRQ" title="Video Tutorial">
   <img src="doc/prev1.png" width="400"/>
 </a>
 
