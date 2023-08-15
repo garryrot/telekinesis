@@ -2,14 +2,22 @@
 
 **~ Control Bluetooth toys directly from within Skyrim ~**
 
-I know that there was already an amazing solution with **G.I.F.T**, but sunk cost fallacy (and the prospect of TES 6 being released something like 2030) drove me to continue with my own little approach.
+I know that there was already an amazing solution with **G.I.F.T**, but sunk cost fallacy (and the prospect of TES 6 being released something like 2030) drove me to continue with my own little approach, and I think I managed to create a really fast and easy to use solution.
 
-**Features**
+Watch the video:
+
+<a href="https://youtu.be/XrXUIUjuSRQ?t=119" title="Video Tutorial">
+  <img src="doc/prev.png" width=350 />
+</a>
+
+## Features
 
 - Sync real toys with events from `Devious Devices` or `Toys & Love`
 - Control toys with `Sexlab` or `Toys & Love` scenes
 - Re-usable API for mod authors
-- Written as a native SKSE plugin for minimum Latency and to elimiate the need to setup any background processes
+- Written as a native SKSE plugin for
+  - Minimal latency
+  - Minimal setup effort (no background processes required)
 
 ## Installation
 
@@ -23,11 +31,13 @@ I know that there was already an amazing solution with **G.I.F.T**, but sunk cos
 1. Connect a bluetooth toy in your operating system
 2. Available toys will show up in your in-game notifications (and in MCM)
 3. Open the MCM Page `Devices` and **enable** it for usage
-
 4. There is an emergency stop hotkey (default `DEL`) in case anything goes wrong
 
+**Video guide**
 
-**NOTE**: In the MCM Page `Debug` you can learn debug spells for triggering vibrations
+<a href="https://youtu.be/XrXUIUjuSRQ?t=127" title="Video Tutorial">
+  <img src="doc/prev1.png" width="400"/>
+</a>
 
 ## Caveats & Known Issues
 
