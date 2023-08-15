@@ -1,6 +1,6 @@
 # Telekinesis (Bluetooth Toy Control for Skyrim) 1.0.0 Beta
 
-**~ Control Bluetooth toys directly from within Skyrim ~**
+**Control Bluetooth toys directly from within Skyrim**
 
 I know that there was already an amazing solution with **G.I.F.T**, but sunk cost fallacy (and the prospect of TES 6 being released something like 2030) drove me to continue with my own little approach, and I think I managed to create a really fast and easy to use solution.
 
