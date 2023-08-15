@@ -3,6 +3,9 @@ ScriptName Tele_Api hidden
 ; Communication API with Telekinesis.DLL
 ; DO NOT USE DIRECTLY, use Tele_Devices instead to respect user settings
 
+; Backend loaded
+Bool Function Loaded() global native
+
 ; Sets up a new connection
 Bool function Connect() global native
 

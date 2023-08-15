@@ -62,6 +62,7 @@ EndFunction
 
 Event OnKeyUp(Int KeyCode, Float HoldTime)
     If KeyCode == EmergencyHotkey
+        TeleDevices.StopVibrate()
         Tele_Api.StopAll()
         TeleDevices.LogError("Emergency stop")
     Else
@@ -92,9 +93,13 @@ Event OnPageReset(String page)
         SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddTextOption("Version", TeleDevices.Version, OPTION_FLAG_DISABLED)
+        If ! Tele_Api.Loaded()
+            AddTextOption("Connction", "SKSE plugin not loaded", OPTION_FLAG_DISABLED)
+            return
+        EndIf
 
         AddHeaderOption("Connection")
-        AddMenuOptionST("CONNECTION_MENU", "Connection", ConnectionMenuOptions[selectedConnection])
+        AddMenuOptionST("CONNECTION_MENU", "Connection", ConnectionMenuOptions[TeleDevices.ConnectionType])
         AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "")
 
         AddHeaderOption("Emergency")
@@ -104,6 +109,10 @@ Event OnPageReset(String page)
 
     If page == "Devices"
         SetCursorFillMode(TOP_TO_BOTTOM)
+        If ! TeleDevices.Connects()
+            AddHeaderOption("Connection Disabled...")
+            return
+        EndIf
   
         AddHeaderOption("Discovery")
         AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TeleDevices.ScanningForDevices)
@@ -133,7 +142,7 @@ Event OnPageReset(String page)
                 If connected
                     flags = OPTION_FLAG_NONE
                 EndIf
-                UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), Tele_Api.GetEnabled(name), flags)
+                UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), TeleDevices.Connects() && Tele_Api.GetEnabled(name), flags)
             EndIf
 
             i += 1
@@ -182,12 +191,34 @@ Event OnPageReset(String page)
     EndIf
 EndEvent
 
+State CONNECTION_MENU
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TeleDevices.ConnectionType)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(ConnectionMenuOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleDevices.ConnectionType = index
+        SetMenuOptionValueST(ConnectionMenuOptions[index])
+        Debug.MessageBox("Reconnecting now")
+        ActionReconnect()
+    EndEvent
+
+    Event OnDefaultST()
+        TeleDevices.ConnectionType = 0
+        SetMenuOptionValueST(ConnectionMenuOptions[TeleDevices.ConnectionType])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Specify how Telekinesis connects to Buttplug.io")
+    EndEvent
+EndState
+
 State ACTION_RECONNECT
     Event OnSelectST()
         SetTextOptionValueST("Reconnecting now...")
-        TeleDevices.Disconnect()
-        Utility.Wait(5)
-        TeleDevices.ConnectAndScanForDevices()
+        ActionReconnect()
         SetTextOptionValueST("Done!")
     EndEvent
 
@@ -195,6 +226,12 @@ State ACTION_RECONNECT
         SetInfoText("Disconnect and re-connect all device connections")
     EndEvent
 EndState
+
+Function ActionReconnect()
+    TeleDevices.Disconnect()
+    Utility.Wait(3)
+    TeleDevices.ConnectAndScanForDevices()
+EndFunction
 
 State EMERGENCY_STOP
     Event OnSelectST()
@@ -368,29 +405,6 @@ State OPTION_TOYS_OTHER
 
     Event OnHighlightST()
         SetInfoText("Move devices during other 'Toys & Love' events: Fondled, Fondle, Squirt, Climax, ClimaxSimultaneous, Caressed, Denied")
-    EndEvent
-EndState
-
-State CONNECTION_MENU
-    Event OnMenuOpenST()
-        SetMenuDialogStartIndex(selectedConnection)
-        SetMenuDialogDefaultIndex(0)
-        SetMenuDialogOptions(ConnectionMenuOptions)
-    EndEvent
-
-    event OnMenuAcceptST(int index)
-        TeleDevices.ConnectionType = index ; selectedConnection = index
-        SetMenuOptionValueST(ConnectionMenuOptions[index])
-        Debug.MessageBox("Reconnect now!")
-    EndEvent
-
-    Event OnDefaultST()
-        TeleDevices.ConnectionType = 0
-        SetMenuOptionValueST(ConnectionMenuOptions[TeleDevices.ConnectionType])
-    EndEvent
-
-    Event OnHighlightST()
-        SetInfoText("Specify how Telekinesis connects to Buttplug.io")
     EndEvent
 EndState
 

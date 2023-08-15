@@ -16,7 +16,10 @@ using namespace REL;
 
 constexpr std::string_view PapyrusClass = "Tele_Api";
 
+bool ApiLoaded(SFT) { return true; }
+
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
+    vm->RegisterFunction("Loaded", PapyrusClass, ApiLoaded);
     vm->RegisterFunction("Connect", PapyrusClass, (bool (*)(SFT)) Tk::Connect);
     vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(SFT))Tk::ScanForDevices);
     vm->RegisterFunction("StopScan", PapyrusClass, (bool (*)(SFT))Tk::StopScan);

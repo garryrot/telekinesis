@@ -7,9 +7,4 @@ Event OnEffectStart(Actor target, Actor caster)
 EndEvent
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)
-endEvent
-
-Function Log(string textToPrint)
-	Debug.Trace("[Tele] " + textToPrint)
-	Debug.Notification("[Tele] " + textToPrint)
-EndFunction
+EndEvent
