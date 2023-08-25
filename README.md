@@ -138,12 +138,15 @@ This if free software. If you want to change this, redistribute it, or integrate
 
 # Changelog
 
+## 1.1.0
+
+- Integrate Skyrim Chainbeasts
+
 ## 1.0.0
 
 - Complete rework of everything
 - Devious Devices Integration
 - Toys & Love Integration
-
 - Sexlab integration
 - Add emergency stop hotkey
 

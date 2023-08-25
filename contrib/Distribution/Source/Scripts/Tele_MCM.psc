@@ -21,8 +21,10 @@ Bool Toys_Animation = false
 Bool Toys_OtherEvents = false
 Bool Toys_Denial
 
+Bool Chainbeasts_Vibrate = true
+
 Int Function GetVersion()
-    return 4
+    return 5
 EndFunction
 
 Event OnVersionUpdate(int aVersion)
@@ -31,6 +33,9 @@ Event OnVersionUpdate(int aVersion)
     EndIf
     If CurrentVersion < 4
         InitAll()
+    EndIf
+    If CurrentVersion < 5
+        TeleIntegration.Chainbeasts_Vibrate = true
     EndIf
 EndEvent
 
@@ -159,16 +164,21 @@ Event OnPageReset(String page)
         AddHeaderOption("Devious Devices")
         AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", Devious_VibrateEffect)
 
-        AddHeaderOption("Sexlab")
-        AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", Sexlab_Animation)
-        AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", Sexlab_ActorOrgasm)
-        AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", Sexlab_ActorEdge)
-
         AddHeaderOption("Toys & Love")
         AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Toys", Toys_VibrateEffect)
         AddToggleOptionST("OPTION_TOYS_ANIMATION", "Love Animation", Toys_Animation)
         AddToggleOptionST("OPTION_TOYS_DENIAL", "Actor denial", Toys_Denial)
         AddToggleOptionST("OPTION_TOYS_OTHER", "Actor tease or orgasm", Toys_OtherEvents)
+
+        SetCursorPosition(1)
+        
+        AddHeaderOption("Skyrim Chainbeasts")
+        AddToggleOptionST("OPTION_CHAINBESTS_VIBRATE", "Gemmed Beasts", Chainbeasts_Vibrate)
+
+        AddHeaderOption("Sexlab")
+        AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", Sexlab_Animation)
+        AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", Sexlab_ActorOrgasm)
+        AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", Sexlab_ActorEdge)
     EndIf
 
     If page == "Debug"
@@ -244,25 +254,25 @@ State EMERGENCY_STOP
     EndEvent
 EndState
 
-state EMERGENCY_HOTKEY
-    event OnKeyMapChangeST(int newKeyCode, string conflictControl, string conflictName)
+State EMERGENCY_HOTKEY
+    Event OnKeyMapChangeST(int newKeyCode, string conflictControl, string conflictName)
         UnregisterForKey(EmergencyHotkey)
         EmergencyHotkey = newKeyCode
         SetKeyMapOptionValueST(EmergencyHotkey)
         RegisterForKey(EmergencyHotkey)
-    endEvent
+    EndEvent
 
-    event OnDefaultST()
+    Event OnDefaultST()
         UnregisterForKey(EmergencyHotkey)
         EmergencyHotkey = 55
         SetKeyMapOptionValueST(EmergencyHotkey)
         RegisterForKey(EmergencyHotkey)
-    endEvent
+    EndEvent
 
-    event OnHighlightST()
+    Event OnHighlightST()
         SetInfoText("A hotkey for immediately stopping all devices from moving (Default: DEL)")
-    endEvent
-endState
+    EndEvent
+EndState
 
 State OPTION_DEVIOUS_VIBRATE
     Event OnSelectST()
@@ -405,6 +415,24 @@ State OPTION_TOYS_OTHER
 
     Event OnHighlightST()
         SetInfoText("Move devices during other 'Toys & Love' events: Fondled, Fondle, Squirt, Climax, ClimaxSimultaneous, Caressed, Denied")
+    EndEvent
+EndState
+
+State OPTION_CHAINBESTS_VIBRATE
+    Event OnSelectST()
+        Chainbeasts_Vibrate = !Chainbeasts_Vibrate
+        SetToggleOptionValueST(Chainbeasts_Vibrate)
+        TeleIntegration.Chainbeasts_Vibrate = Chainbeasts_Vibrate
+    EndEvent
+    
+    Event OnDefaultST()
+        Chainbeasts_Vibrate = true
+        SetToggleOptionValueST(Chainbeasts_Vibrate)
+        TeleIntegration.Chainbeasts_Vibrate = Chainbeasts_Vibrate
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibrates devices during gemmed chainbeast capture (Requires Chainbeasts Version >= 0.7.0)")
     EndEvent
 EndState
 
