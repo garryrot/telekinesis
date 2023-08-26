@@ -3,51 +3,32 @@ ScriptName Tele_MCM extends SKI_ConfigBase
 Tele_Devices Property TeleDevices Auto
 Tele_Integration Property TeleIntegration Auto
 
-Int selectedConnection = 0
-String[] ConnectionMenuOptions
-Int[] UseDeviceOids
-String[] DeviceNames
-Bool SpellsAdded = false
-Int EmergencyHotkey = 211 ; Del 
-
-Bool Devious_VibrateEffect = true
-
-Bool Sexlab_Animation = false
-Bool Sexlab_ActorOrgasm = false
-Bool Sexlab_ActorEdge = false
-
-Bool Toys_VibrateEffect = true
-Bool Toys_Animation = false
-Bool Toys_OtherEvents = false
-Bool Toys_Denial = false
-
-Bool Chainbeasts_Vibrate = true
+String[] _ConnectionMenuOptions
+Int[] _UseDeviceOids
+String[] _DeviceNames
+Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 5
+    return 6
 EndFunction
-
-Event OnVersionUpdate(int aVersion)
-    If CurrentVersion < aVersion
-        TeleDevices.LogDebug("Updating MCM from v" + CurrentVersion + " to v" + aVersion)
-    EndIf
-    If CurrentVersion < 4
-        InitAll()
-    EndIf
-    If CurrentVersion < 5
-        TeleIntegration.Chainbeasts_Vibrate = true
-    EndIf
-EndEvent
 
 Event OnConfigInit()
     ModName = "Telekinesis"
-    InitAll()
-    RegisterForKey(EmergencyHotkey)
-    TeleIntegration.Devious_VibrateEffect = true
-    TeleIntegration.Toys_VibrateEffect = true
+    InitLocals()
 EndEvent
 
-Function InitAll()
+Event OnVersionUpdate(int aVersion)
+    If CurrentVersion < aVersion
+        TeleDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + aVersion)
+    EndIf
+
+    If CurrentVersion > 0 && CurrentVersion < 6 ; 1.0.0 Beta
+        InitLocals()
+        TeleIntegration.ResetIntegrationSettings()
+    EndIf
+EndEvent
+
+Function InitLocals()
     Pages = new String[5]
     Pages[0] = "General"
     Pages[1] = "Devices"
@@ -55,32 +36,23 @@ Function InitAll()
     Pages[3] = "Debug"
     Pages[4] = "Troubleshooting"
 
-    ConnectionMenuOptions = new String[3]
-    ConnectionMenuOptions[0] = "In-Process (Default)"
-    ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
-    ConnectionMenuOptions[2] = "Disable"
+    _ConnectionMenuOptions = new String[3]
+    _ConnectionMenuOptions[0] = "In-Process (Default)"
+    _ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
+    _ConnectionMenuOptions[2] = "Disable"
 
-    UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
-    DeviceNames = new String[1]
-    SpellsAdded = false
+    _UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
+    _DeviceNames = new String[1]
+
+    _DebugSpellsAdded = false
 EndFunction
-
-Event OnKeyUp(Int KeyCode, Float HoldTime)
-    If KeyCode == EmergencyHotkey
-        TeleDevices.StopVibrate()
-        Tele_Api.StopAll()
-        TeleDevices.LogError("Emergency stop")
-    Else
-        TeleDevices.LogDebug("Unregistered keypress code: " + KeyCode)
-    EndIf
-EndEvent
 
 Event OnOptionSelect(int oid)
     Int i = 0
     While (i < 31)
-        If (oid == UseDeviceOids[i])
-            If (i < DeviceNames.Length)
-                String device = DeviceNames[i]
+        If (oid == _UseDeviceOids[i])
+            If (i < _DeviceNames.Length)
+                String device = _DeviceNames[i]
                 Bool isUsed = ! Tele_Api.GetEnabled(device)
                 SetToggleOptionValue(oid, isUsed)
                 Tele_Api.SetEnabled(device, isUsed)
@@ -93,7 +65,6 @@ Event OnOptionSelect(int oid)
 EndEvent
 
 Event OnPageReset(String page)
-
     If page == "General" || page == ""
         SetCursorFillMode(TOP_TO_BOTTOM)
 
@@ -104,12 +75,12 @@ Event OnPageReset(String page)
         EndIf
 
         AddHeaderOption("Connection")
-        AddMenuOptionST("CONNECTION_MENU", "Connection", ConnectionMenuOptions[TeleDevices.ConnectionType])
+        AddMenuOptionST("CONNECTION_MENU", "Connection", _ConnectionMenuOptions[TeleDevices.ConnectionType])
         AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "")
 
         AddHeaderOption("Emergency")
         AddTextOptionST("EMERGENCY_STOP", "Stop all devices", "Click me")
-        AddKeyMapOptionST("EMERGENCY_HOTKEY", "'Stop all' hotkey", EmergencyHotkey)
+        AddKeyMapOptionST("EMERGENCY_HOTKEY", "'Stop all' hotkey",  TeleIntegration.EmergencyHotkey)
     EndIf
 
     If page == "Devices"
@@ -121,8 +92,8 @@ Event OnPageReset(String page)
   
         AddHeaderOption("Discovery")
         AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TeleDevices.ScanningForDevices)
-        DeviceNames = Tele_Api.GetDevices()
-        Int len = DeviceNames.Length
+        _DeviceNames = Tele_Api.GetDevices()
+        Int len = _DeviceNames.Length
         If len > 20
             TeleDevices.LogError("Too many devices, ignoring some in MCM")
             len = 20
@@ -130,7 +101,7 @@ Event OnPageReset(String page)
 
         Int i = 0
         While (i < len) 
-            String name = DeviceNames[i]
+            String name = _DeviceNames[i]
             
             If name != ""
                 Bool connected = Tele_Api.GetDeviceConnected(name)
@@ -147,13 +118,13 @@ Event OnPageReset(String page)
                 If connected
                     flags = OPTION_FLAG_NONE
                 EndIf
-                UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), TeleDevices.Connects() && Tele_Api.GetEnabled(name), flags)
+                _UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), TeleDevices.Connects() && Tele_Api.GetEnabled(name), flags)
             EndIf
 
             i += 1
         EndWhile
 
-        If DeviceNames.Length == 0
+        If _DeviceNames.Length == 0
             AddHeaderOption("No devices discovered yet...")
         EndIf
     EndIf
@@ -163,25 +134,25 @@ Event OnPageReset(String page)
 
         AddHeaderOption("Devious Devices")
         If TeleIntegration.ZadLib != None
-            AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", Devious_VibrateEffect)
+            AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", TeleIntegration.Devious_VibrateEffect)
         Else
             AddTextOption("In-Game Vibrators", "Not Installed", OPTION_FLAG_DISABLED)
         EndIf
 
         AddHeaderOption("Toys & Love")
-        AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Toys", Toys_VibrateEffect)
-        AddToggleOptionST("OPTION_TOYS_ANIMATION", "Love Animation", Toys_Animation)
-        AddToggleOptionST("OPTION_TOYS_DENIAL", "Actor denial", Toys_Denial)
-        AddToggleOptionST("OPTION_TOYS_OTHER", "Actor tease or orgasm", Toys_OtherEvents)
+        AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Toys", TeleIntegration.Toys_VibrateEffect)
+        AddToggleOptionST("OPTION_TOYS_ANIMATION", "Love Animation", TeleIntegration.Toys_Animation)
+        AddToggleOptionST("OPTION_TOYS_DENIAL", "Actor denial", TeleIntegration.Toys_Denial)
+        AddToggleOptionST("OPTION_TOYS_OTHER", "Actor tease or orgasm", TeleIntegration.Toys_OtherEvents)
 
         SetCursorPosition(1)
         AddHeaderOption("Sexlab")
-        AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", Sexlab_Animation)
-        AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", Sexlab_ActorOrgasm)
-        AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", Sexlab_ActorEdge)
+        AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", TeleIntegration.Sexlab_Animation)
+        AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
+        AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", TeleIntegration.Sexlab_ActorEdge)
 
         AddHeaderOption("Skyrim Chainbeasts")
-        AddToggleOptionST("OPTION_CHAINBESTS_VIBRATE", "Gemmed Beasts", Chainbeasts_Vibrate)
+        AddToggleOptionST("OPTION_CHAINBESTS_VIBRATE", "Gemmed Beasts", TeleIntegration.Chainbeasts_Vibrate)
 	    AddSliderOptionST("SLIDER_CHAINBEAST_MIN", "Min Strength", TeleIntegration.Chainbeasts_Min)
 	    AddSliderOptionST("SLIDER_CHAINBEAST_MAX", "Max Strength", TeleIntegration.Chainbeasts_Max)
     EndIf
@@ -195,7 +166,7 @@ Event OnPageReset(String page)
         AddToggleOptionST("OPTION_LOG_DEBUG", "Other messages", TeleDevices.LogDebugEvents)
 
         AddHeaderOption("Spells")
-        AddToggleOptionST("ACTION_ADD_SPELLS_TO_PLAYER", "Learn debug spells", SpellsAdded)
+        AddToggleOptionST("ACTION_ADD_SPELLS_TO_PLAYER", "Learn debug spells", _DebugSpellsAdded)
     EndIf
 
     If page == "Troubleshooting"
@@ -209,8 +180,8 @@ EndEvent
 State SLIDER_CHAINBEAST_MIN
 	Event OnSliderOpenST()
 		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Min)
-		SetSliderDialogDefaultValue(50)
-		SetSliderDialogRange(0, 100)
+		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Min_Default)
+		SetSliderDialogRange(0, TeleIntegration.Chainbeasts_Max)
 		SetSliderDialogInterval(1)
 	EndEvent
 
@@ -220,7 +191,7 @@ State SLIDER_CHAINBEAST_MIN
 	EndEvent
 
 	Event OnDefaultST()
-		TeleIntegration.Chainbeasts_Min = 80
+		TeleIntegration.Chainbeasts_Min = TeleIntegration.Chainbeasts_Min_Default
 		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Min)
 	EndEvent
 
@@ -232,8 +203,8 @@ EndState
 State SLIDER_CHAINBEAST_MAX
 	Event OnSliderOpenST()
 		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Max)
-		SetSliderDialogDefaultValue(50)
-		SetSliderDialogRange(0, 100)
+		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Max_Default)
+		SetSliderDialogRange(TeleIntegration.Chainbeasts_Min, 100)
 		SetSliderDialogInterval(1)
 	EndEvent
 
@@ -243,7 +214,7 @@ State SLIDER_CHAINBEAST_MAX
 	EndEvent
 
 	Event OnDefaultST()
-		TeleIntegration.Chainbeasts_Max = 100
+		TeleIntegration.Chainbeasts_Max = TeleIntegration.Chainbeasts_Max_Default
 		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Max)
 	EndEvent
 
@@ -252,24 +223,23 @@ State SLIDER_CHAINBEAST_MAX
 	EndEvent
 EndState
 
-
 State CONNECTION_MENU
     Event OnMenuOpenST()
         SetMenuDialogStartIndex(TeleDevices.ConnectionType)
         SetMenuDialogDefaultIndex(0)
-        SetMenuDialogOptions(ConnectionMenuOptions)
+        SetMenuDialogOptions(_ConnectionMenuOptions)
     EndEvent
 
     event OnMenuAcceptST(int index)
         TeleDevices.ConnectionType = index
-        SetMenuOptionValueST(ConnectionMenuOptions[index])
+        SetMenuOptionValueST(_ConnectionMenuOptions[index])
         Debug.MessageBox("Reconnecting now")
         ActionReconnect()
     EndEvent
 
     Event OnDefaultST()
         TeleDevices.ConnectionType = 0
-        SetMenuOptionValueST(ConnectionMenuOptions[TeleDevices.ConnectionType])
+        SetMenuOptionValueST(_ConnectionMenuOptions[TeleDevices.ConnectionType])
     EndEvent
 
     Event OnHighlightST()
@@ -308,17 +278,13 @@ EndState
 
 State EMERGENCY_HOTKEY
     Event OnKeyMapChangeST(int newKeyCode, string conflictControl, string conflictName)
-        UnregisterForKey(EmergencyHotkey)
-        EmergencyHotkey = newKeyCode
-        SetKeyMapOptionValueST(EmergencyHotkey)
-        RegisterForKey(EmergencyHotkey)
+        TeleIntegration.EmergencyHotkey = newKeyCode
+        SetKeyMapOptionValueST(TeleIntegration.EmergencyHotkey)
     EndEvent
 
     Event OnDefaultST()
-        UnregisterForKey(EmergencyHotkey)
-        EmergencyHotkey = 55
-        SetKeyMapOptionValueST(EmergencyHotkey)
-        RegisterForKey(EmergencyHotkey)
+        TeleIntegration.EmergencyHotkey = TeleIntegration.EmergencyHotkey_Default
+        SetKeyMapOptionValueST(TeleIntegration.EmergencyHotkey)
     EndEvent
 
     Event OnHighlightST()
@@ -328,15 +294,13 @@ EndState
 
 State OPTION_DEVIOUS_VIBRATE
     Event OnSelectST()
-        Devious_VibrateEffect = !Devious_VibrateEffect
-        SetToggleOptionValueST(Devious_VibrateEffect)
-        TeleIntegration.Devious_VibrateEffect = Devious_VibrateEffect
+        TeleIntegration.Devious_VibrateEffect = !TeleIntegration.Devious_VibrateEffect
+        SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffect)
     EndEvent
     
     Event OnDefaultST()
-        Devious_VibrateEffect = true
-        SetToggleOptionValueST(Devious_VibrateEffect)
-        TeleIntegration.Devious_VibrateEffect = Devious_VibrateEffect
+        TeleIntegration.Devious_VibrateEffect = TeleIntegration.Devious_VibrateEffect_Default
+        SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffect)
     EndEvent
 
     Event OnHighlightST()
@@ -346,15 +310,13 @@ EndState
 
 State OPTION_SEXLAB_ANIMATION
     Event OnSelectST()
-        Sexlab_Animation = !Sexlab_Animation
-        SetToggleOptionValueST(Sexlab_Animation)
-        TeleIntegration.Sexlab_Animation = Sexlab_Animation
+        TeleIntegration.Sexlab_Animation = !TeleIntegration.Sexlab_Animation
+        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation)
     EndEvent
     
     Event OnDefaultST()
-        Sexlab_Animation = false
-        SetToggleOptionValueST(Sexlab_Animation)
-        TeleIntegration.Sexlab_Animation = Sexlab_Animation
+        TeleIntegration.Sexlab_Animation = TeleIntegration.Sexlab_Animation_Default
+        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation)
     EndEvent
 
     Event OnHighlightST()
@@ -364,15 +326,13 @@ EndState
 
 State OPTION_SEXLAB_ACTOR_ORGASM
     Event OnSelectST()
-        Sexlab_ActorOrgasm = !Sexlab_ActorOrgasm
-        SetToggleOptionValueST(Sexlab_ActorOrgasm)
-        TeleIntegration.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
+        TeleIntegration.Sexlab_ActorOrgasm = !TeleIntegration.Sexlab_ActorOrgasm
+        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorOrgasm)
     EndEvent
     
     Event OnDefaultST()
-        Sexlab_ActorOrgasm = false
-        SetToggleOptionValueST(Sexlab_ActorOrgasm)
-        TeleIntegration.Sexlab_ActorOrgasm = Sexlab_ActorOrgasm
+        TeleIntegration.Sexlab_ActorOrgasm = TeleIntegration.Sexlab_ActorOrgasm_Default
+        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorOrgasm)
     EndEvent
 
     Event OnHighlightST()
@@ -382,15 +342,13 @@ EndState
 
 State OPTION_SEXLAB_ACTOR_EDGE
     Event OnSelectST()
-        Sexlab_ActorEdge = !Sexlab_ActorEdge
-        SetToggleOptionValueST(Sexlab_ActorEdge)
-        TeleIntegration.Sexlab_ActorEdge = Sexlab_ActorEdge
+        TeleIntegration.Sexlab_ActorEdge = !TeleIntegration.Sexlab_ActorEdge
+        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorEdge)
     EndEvent
     
     Event OnDefaultST()
-        Sexlab_ActorEdge = false
-        SetToggleOptionValueST(Sexlab_ActorEdge)
-        TeleIntegration.Sexlab_ActorEdge = Sexlab_ActorEdge
+        TeleIntegration.Sexlab_ActorEdge = TeleIntegration.Sexlab_ActorEdge_Default
+        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorEdge)
     EndEvent
 
     Event OnHighlightST()
@@ -400,15 +358,13 @@ EndState
 
 State OPTION_TOYS_VIBRATE
     Event OnSelectST()
-        Toys_VibrateEffect = !Toys_VibrateEffect
-        SetToggleOptionValueST(Toys_VibrateEffect)
-        TeleIntegration.Toys_VibrateEffect = Toys_VibrateEffect
+        TeleIntegration.Toys_VibrateEffect = !TeleIntegration.Toys_VibrateEffect
+        SetToggleOptionValueST(TeleIntegration.Toys_VibrateEffect)
     EndEvent
     
     Event OnDefaultST()
-        Toys_VibrateEffect = false
-        SetToggleOptionValueST(Toys_VibrateEffect)
-        TeleIntegration.Toys_VibrateEffect = Toys_VibrateEffect
+        TeleIntegration.Toys_VibrateEffect = TeleIntegration.Toys_VibrateEffect_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_VibrateEffect)
     EndEvent
 
     Event OnHighlightST()
@@ -418,15 +374,13 @@ EndState
 
 State OPTION_TOYS_ANIMATION
     Event OnSelectST()
-        Toys_Animation = !Toys_Animation
-        SetToggleOptionValueST(Toys_Animation)
-        TeleIntegration.Toys_Animation = Toys_Animation
+        TeleIntegration.Toys_Animation = !TeleIntegration.Toys_Animation
+        SetToggleOptionValueST(TeleIntegration.Toys_Animation)
     EndEvent
     
     Event OnDefaultST()
-        Toys_Animation = false
-        SetToggleOptionValueST(Toys_Animation)
-        TeleIntegration.Toys_Animation = Toys_Animation
+        TeleIntegration.Toys_Animation = TeleIntegration.Toys_Animation_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Animation)
     EndEvent
 
     Event OnHighlightST()
@@ -436,15 +390,13 @@ EndState
 
 State OPTION_TOYS_DENIAL
     Event OnSelectST()
-        Toys_Denial = !Toys_Denial
-        SetToggleOptionValueST(Toys_Denial)
-        TeleIntegration.Toys_Denial = Toys_Denial
+        TeleIntegration.Toys_Denial = !TeleIntegration.Toys_Denial
+        SetToggleOptionValueST(TeleIntegration.Toys_Denial)
     EndEvent
     
     Event OnDefaultST()
-        Toys_Denial = false
-        SetToggleOptionValueST(Toys_Denial)
-        TeleIntegration.Toys_Denial = Toys_Denial
+        TeleIntegration.Toys_Denial = TeleIntegration.Toys_Denial_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Denial)
     EndEvent
 
     Event OnHighlightST()
@@ -454,15 +406,13 @@ EndState
 
 State OPTION_TOYS_OTHER
     Event OnSelectST()
-        Toys_OtherEvents = !Toys_OtherEvents
-        SetToggleOptionValueST(Toys_OtherEvents)
-        TeleIntegration.Toys_OtherEvents = Toys_OtherEvents
+        TeleIntegration.Toys_OtherEvents = !TeleIntegration.Toys_OtherEvents
+        SetToggleOptionValueST(TeleIntegration.Toys_OtherEvents)
     EndEvent
     
     Event OnDefaultST()
-        Toys_OtherEvents = false
-        SetToggleOptionValueST(Toys_OtherEvents)
-        TeleIntegration.Toys_OtherEvents = Toys_OtherEvents
+        TeleIntegration.Toys_OtherEvents = TeleIntegration.Toys_OtherEvents_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_OtherEvents)
     EndEvent
 
     Event OnHighlightST()
@@ -472,15 +422,13 @@ EndState
 
 State OPTION_CHAINBESTS_VIBRATE
     Event OnSelectST()
-        Chainbeasts_Vibrate = !Chainbeasts_Vibrate
-        SetToggleOptionValueST(Chainbeasts_Vibrate)
-        TeleIntegration.Chainbeasts_Vibrate = Chainbeasts_Vibrate
+        TeleIntegration.Chainbeasts_Vibrate = !TeleIntegration.Chainbeasts_Vibrate
+        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
     EndEvent
     
     Event OnDefaultST()
-        Chainbeasts_Vibrate = true
-        SetToggleOptionValueST(Chainbeasts_Vibrate)
-        TeleIntegration.Chainbeasts_Vibrate = Chainbeasts_Vibrate
+        TeleIntegration.Chainbeasts_Vibrate = TeleIntegration.Chainbeasts_Vibrate_Default
+        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
     EndEvent
 
     Event OnHighlightST()
@@ -558,7 +506,7 @@ EndState
 State ACTION_ADD_SPELLS_TO_PLAYER
     Event OnSelectST()
         Actor player = Game.GetPlayer()
-        If ! SpellsAdded
+        If ! _DebugSpellsAdded
             If ! player.HasSpell(TeleDevices.Tele_VibrateSpellWeak)
                 player.AddSpell(TeleDevices.Tele_VibrateSpellWeak)
             EndIf
@@ -571,7 +519,7 @@ State ACTION_ADD_SPELLS_TO_PLAYER
             If ! player.HasSpell(TeleDevices.Tele_Stop)
                 player.AddSpell(TeleDevices.Tele_Stop)
             EndIf
-            SpellsAdded = true
+            _DebugSpellsAdded = true
         Else
             If player.HasSpell(TeleDevices.Tele_VibrateSpellWeak)
                 player.RemoveSpell(TeleDevices.Tele_VibrateSpellWeak)
@@ -585,13 +533,13 @@ State ACTION_ADD_SPELLS_TO_PLAYER
             If player.HasSpell(TeleDevices.Tele_Stop)
                 player.RemoveSpell(TeleDevices.Tele_Stop)
             EndIf
-            SpellsAdded = false
+            _DebugSpellsAdded = false
         EndIf
-        SetToggleOptionValueST(SpellsAdded)
+        SetToggleOptionValueST(_DebugSpellsAdded)
     EndEvent
     
     Event OnDefaultST()
-        SetToggleOptionValueST(SpellsAdded)
+        SetToggleOptionValueST(_DebugSpellsAdded)
     EndEvent
 
     Event OnHighlightST()

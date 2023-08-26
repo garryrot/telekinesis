@@ -10,17 +10,15 @@ Spell Property Tele_VibrateSpellWeak auto
 Spell Property Tele_Stop auto
 
 Int Property MajorVersion = 1 autoReadOnly
-Int Property MinorVersion = 0 autoReadOnly
+Int Property MinorVersion = 1 autoReadOnly
 Int Property PatchVersion = 0 autoReadOnly
-String Property Revision = "Beta" autoReadOnly
+String Property Revision = "" autoReadOnly
 
 String Property Version
     String Function Get()
         return MajorVersion + "." + MinorVersion + "." + PatchVersion + " " + Revision
     EndFunction
 EndProperty
-
-Int Property ScanTime = 30 auto
 
 Bool Property LogDeviceConnects = true auto
 Bool Property LogDeviceEvents = false auto
@@ -41,7 +39,7 @@ Event OnUpdate()
             String evt = evts[i]
             If StringUtil.Find(evt, "connected") != -1 || StringUtil.Find(evt, "removed") != -1
                 LogConnection(evt)
-            ElseIf StringUtil.Find( evt, "Vibrated") != -1
+            ElseIf StringUtil.Find( evt, "Vibrated") != -1 && StringUtil.Find( evt, "0%") >= 0
                 LogEvent(evt)
             Else
                 LogDebug(evt)
