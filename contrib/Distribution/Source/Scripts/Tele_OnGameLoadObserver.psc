@@ -5,10 +5,19 @@ Tele_Integration Property TeleIntegration Auto
 
 Event OnInit()
     TeleDevices.Notify("Telekinesis v" + TeleDevices.Version + ": Enable connected devices in MCM for usage...")
-    TeleDevices.ConnectAndScanForDevices()
+    LoadTelekinesis()
 EndEvent
 
 Event OnPlayerLoadGame()
-	TeleDevices.LogDebug("OnPlayerLoadGame")
-	TeleDevices.ConnectAndScanForDevices()
+    LoadTelekinesis()
 EndEvent
+
+Function LoadTelekinesis()
+	TeleDevices.LogDebug("Loading")
+    If Game.GetModByName("Devious Devices - Expansion.esm") != 255
+        TeleIntegration.ZadLib = (Quest.GetQuest("zadQuest") As ZadLibs)
+    Else
+        TeleIntegration.ZadLib = None
+    EndIf
+    TeleDevices.ConnectAndScanForDevices()
+EndFunction

@@ -162,7 +162,11 @@ Event OnPageReset(String page)
         SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddHeaderOption("Devious Devices")
-        AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", Devious_VibrateEffect)
+        If TeleIntegration.ZadLib != None
+            AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", Devious_VibrateEffect)
+        Else
+            AddTextOption("In-Game Vibrators", "Not Installed", OPTION_FLAG_DISABLED)
+        EndIf
 
         AddHeaderOption("Toys & Love")
         AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Toys", Toys_VibrateEffect)

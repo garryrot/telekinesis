@@ -2,7 +2,7 @@
 
 If you just intent to create mods with the papyrus functions, you can ignore this page and go straight to the [User Documentation](README.md)
 
-## Building
+## Building Dll
 
 The build outputs `Telekinesis.dll` (An SKSE64 plugin using CommonLibSSE NG), a Skyrim Plugin file `.esp` and the compiled pyparus files `.psx` required to use the Telekinesis API from within other mods.
 
@@ -20,4 +20,14 @@ I do not provide detailed build instructions (and won't promise that I ever will
  * CommonLibSSE NG and all of its dependencies
  * CMake/Visual Studio 2022/See Sample Plugin dock
 
+## Building Plugin Code
+
+You need to include all dependency psc scripts that are not fetched with ninja in contrib/Dependencies
+
+For example:
+   - SkyUI
+   - Devious Devices [SE][AE][VR] 5.2 5.2
+   - Sexlab Framework
+   - MfgFix
+   - And their respective dependencies (a lot)
 

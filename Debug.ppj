@@ -9,6 +9,7 @@
     Anonymize="true"
     Final="false">
     <Imports>
+        <Import>.\contrib\Dependencies</Import>
         <Import>.\build\debug-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skse</Import>
         <Import>.\build\debug-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skyrim</Import>
     </Imports>

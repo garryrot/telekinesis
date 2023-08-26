@@ -1,6 +1,12 @@
 ScriptName Tele_Integration extends Quest
+{
+    Controls (and executes) foreign mod integration
+}
 
 Tele_Devices Property TeleDevices Auto
+ZadLibs Property ZadLib Auto
+Int Property Chainbeasts_Min = 10 Auto
+Int Property Chainbeasts_Max = 100 Auto
 
 Event OnInit()
     RegisterForUpdate(5)
@@ -10,9 +16,14 @@ Event OnUpdate()
     UpdateSexScene()
 EndEvent
 
+; Devious Devices
+
 Bool Property Devious_VibrateEffect
     Function Set(Bool enable)
-        If enable
+        If ZadLib == None
+            return
+        EndIf
+        If enable 
             RegisterForModEvent("DeviceVibrateEffectStart", "OnVibrateEffectStart")
             RegisterForModEvent("DeviceVibrateEffectStop", "OnVibrateEffectStop")
         Else
@@ -22,34 +33,49 @@ Bool Property Devious_VibrateEffect
     EndFunction
 EndProperty
 
-Event OnVibrateEffectStart(string eventName, string actorName, float vibrationStrength, form sender)
-    If Game.GetPlayer().GetLeveledActorBase().GetName() != actorName
-        
+Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationStrength, Form sender)
+    Actor player = Game.GetPlayer()
+    If player.GetLeveledActorBase().GetName() != actorName
         return ; Not the player
     EndIf
+    If ZadLib == None
+        return ; Should not happen
+    EndIf
 
-    ; vibrationStrength = BaseStrength * VibratorMultiplicator
-    ; BaseStrength:
-    ;   1=very weak, 2=weak, 3=Standard, 4=Strong, 5=Very Strong)
-    ; VibratorMultiplicator:
-    ;   Vaginal Plug      += 0.7
-    ;   Anal Plug         += 0.3
-    ;   Nipple Piercings  += 0.25
-    ;   Vaginal Piercings += 0.5 
-    ;   Blindfold         *= 1.15
-    
-    ; For now as a heuristic a range of 0-5 is assumed
-    ; This would be a multiplicator of 1.0 which is basically 2 devices
-    ; Everything above will be rounded down to 100% by vibrate
-    int speed = Math.Floor(100 * (vibrationStrength / 5))
-	Tele_Api.Vibrate(speed, 30)
-	TeleDevices.LogDebug("DD OnVibrateEffectStart vibrationStrength: " + vibrationStrength)
+    ; Reverse DD multi device calculation to get the actual strength
+    ; and also extract events for later
+    String[] events = new String[3] ; unused for now
+    Float numVibratorsMult = 0
+    If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
+        numVibratorsMult += 0.7
+        events[0] = "Vaginal" 
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
+        numVibratorsMult += 0.3
+        events[1] = "Anal" 
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
+        numVibratorsMult += 0.25
+        events[2] = "Nipples"
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
+        numVibratorsMult += 0.5
+        events[0] = "Vaginal"
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
+        numVibratorsMult /= 1.15
+    EndIf
+
+    float strength = (vibrationStrength / numVibratorsMult)
+	Tele_Api.Vibrate(Math.Floor(strength * 20), 30)
+	TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string argString, float argNum, form sender)
 	Tele_Api.Vibrate(0, 0.1)
-    TeleDevices.LogDebug("DD OnVibrateEffectStop")
 EndEvent
+
+; Sexlab
 
 Bool Property Sexlab_Animation
     Function set(Bool enable)
@@ -91,7 +117,7 @@ EndProperty
 
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
 	Tele_Api.Vibrate( Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0) )
-    TeleDevices.LogDebug("DD OnDeviceActorOrgasm")
+    TeleDevices.LogDebug("OnDeviceActorOrgasm")
 EndEvent
 
 Bool Property Sexlab_ActorEdge
@@ -106,8 +132,10 @@ EndProperty
 
 Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
 	Tele_Api.Vibrate( Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0) )
-    TeleDevices.LogDebug("DD OnDeviceEdgedActor")
+    TeleDevices.LogDebug("OnDeviceEdgedActor")
 EndEvent
+
+; Toys & Love
 
 Bool Property Toys_VibrateEffect
     Function set(Bool enable)
@@ -229,7 +257,6 @@ EndEvent
 ; EndEvent
 
 Bool InSexScene = False
-
 Function UpdateSexScene()
     If InSexScene
 		Int speed = Utility.RandomInt(0, 100)
@@ -251,8 +278,7 @@ Function StopSexScene()
 	Tele_Api.Vibrate(0, 0.1)
 EndFunction
 
-Int Property Chainbeasts_Min = 10 Auto
-Int Property Chainbeasts_Max = 100 Auto
+; Skyrim Chain Beasts
 
 Bool Property Chainbeasts_Vibrate
     Function set(Bool enable)

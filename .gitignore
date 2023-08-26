@@ -539,3 +539,6 @@ contrib/**/*.pex
 
 ### Mod Package
 *.7z
+
+### Papyrus Sources for mod dependencies
+contrib/Dependencies/**.psc
