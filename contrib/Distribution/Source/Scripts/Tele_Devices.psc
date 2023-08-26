@@ -30,8 +30,6 @@ Bool Property ScanningForDevices = false auto
 Int Property ConnectionType = 0 auto ; In-Process
 
 Event OnInit()
-    Notify("Telekinesis v" + Version + ": Enable connected devices in MCM for usage...")
-    ConnectAndScanForDevices()
     RegisterForUpdate(5)
 EndEvent
 
