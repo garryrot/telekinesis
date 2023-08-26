@@ -75,7 +75,7 @@ Function Vibrate(Int speed, Float duration_sec)
         - speed (Percentage from 0=off to 100=full power)
         - duration_sec (Duratation in seconds. You can specify split seconds) }
     If Connects()
-        Tele_Api.Vibrate(speed, duration_sec)
+        Tele_Api.Vibrate(InRange(speed, 0, 100), duration_sec)
     EndIf
     Trace("(Vibrate) speed='" + speed + "' duration='" + duration_sec + "' all")
 EndFunction
@@ -84,7 +84,7 @@ Function VibrateEvents(Int speed, Float duration_sec, String[] events)
     { See vibrate(speed, duration_sec), but additionally filters for events
         - events (Vibrate devices that match the specified events) }
     If Connects()
-        Tele_Api.VibrateEvents(speed, duration_sec, events)
+        Tele_Api.VibrateEvents(InRange(speed, 0, 100), duration_sec, events)
     EndIf
     Trace("(Vibrate) events speed='" + speed + " duration=" + duration_sec + " events=" + events)
 EndFunction
@@ -100,6 +100,19 @@ EndFunction
 Bool Function Connects()
     { Returns if the module connects at all (Connection is not Disable and the DLL was loaded) }
     return Tele_Api.Loaded() && ConnectionType != 2
+EndFunction
+
+; Utility
+
+Int Function InRange(Int value, Int min, Int max)
+    { Assures that value is within the given boundaries }
+    If value > max
+        value = max
+    EndIf 
+    If value < min
+        value = min
+    EndIf
+    return value
 EndFunction
 
 ; Logging

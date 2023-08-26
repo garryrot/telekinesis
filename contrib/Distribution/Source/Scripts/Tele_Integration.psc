@@ -22,24 +22,33 @@ Bool Property Devious_VibrateEffect
     EndFunction
 EndProperty
 
-Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
-	Tele_Api.Vibrate( Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0) )
-    TeleDevices.LogDebug("DD OnDeviceActorOrgasm")
-EndEvent
+Event OnVibrateEffectStart(string eventName, string actorName, float vibrationStrength, form sender)
+    If Game.GetPlayer().GetLeveledActorBase().GetName() != actorName
+        
+        return ; Not the player
+    EndIf
 
-Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
-	Tele_Api.Vibrate( Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0) )
-    TeleDevices.LogDebug("DD OnDeviceEdgedActor")
-EndEvent
-
-Event OnVibrateEffectStart(string eventName, string argString, float argNum, form sender)
-	Tele_Api.Vibrate(100, 120)
-	TeleDevices.LogDebug("DD VibrateStart " + eventName)
+    ; vibrationStrength = BaseStrength * VibratorMultiplicator
+    ; BaseStrength:
+    ;   1=very weak, 2=weak, 3=Standard, 4=Strong, 5=Very Strong)
+    ; VibratorMultiplicator:
+    ;   Vaginal Plug      += 0.7
+    ;   Anal Plug         += 0.3
+    ;   Nipple Piercings  += 0.25
+    ;   Vaginal Piercings += 0.5 
+    ;   Blindfold         *= 1.15
+    
+    ; For now as a heuristic a range of 0-5 is assumed
+    ; This would be a multiplicator of 1.0 which is basically 2 devices
+    ; Everything above will be rounded down to 100% by vibrate
+    int speed = Math.Floor(100 * (vibrationStrength / 5))
+	Tele_Api.Vibrate(speed, 30)
+	TeleDevices.LogDebug("DD OnVibrateEffectStart vibrationStrength: " + vibrationStrength)
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string argString, float argNum, form sender)
 	Tele_Api.Vibrate(0, 0.1)
-    TeleDevices.LogDebug("DD VibrateStop")
+    TeleDevices.LogDebug("DD OnVibrateEffectStop")
 EndEvent
 
 Bool Property Sexlab_Animation
@@ -50,26 +59,6 @@ Bool Property Sexlab_Animation
         Else
             UnregisterForModEvent("HookAnimationStart")
             UnregisterForModEvent("HookAnimationEnd")
-        EndIf
-    EndFunction
-EndProperty
-
-Bool Property Sexlab_ActorOrgasm
-    Function set(Bool enable)
-        If enable
-            RegisterForModEvent("DeviceActorOrgasm", "OnDeviceActorOrgasm")
-        Else
-            UnregisterForModEvent("DeviceActorOrgasm")
-        EndIf
-    EndFunction
-EndProperty
-
-Bool Property Sexlab_ActorEdge
-    Function set(Bool enable)
-        If enable
-            RegisterForModEvent("DeviceEdgedActor", "OnDeviceEdgedActor")
-        Else
-            UnregisterForModEvent("DeviceEdgedActor")
         EndIf
     EndFunction
 EndProperty
@@ -88,6 +77,36 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
 		 return
 	EndIf
 	StopSexScene()
+EndEvent
+
+Bool Property Sexlab_ActorOrgasm
+    Function set(Bool enable)
+        If enable
+            RegisterForModEvent("DeviceActorOrgasm", "OnDeviceActorOrgasm")
+        Else
+            UnregisterForModEvent("DeviceActorOrgasm")
+        EndIf
+    EndFunction
+EndProperty
+
+Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
+	Tele_Api.Vibrate( Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0) )
+    TeleDevices.LogDebug("DD OnDeviceActorOrgasm")
+EndEvent
+
+Bool Property Sexlab_ActorEdge
+    Function set(Bool enable)
+        If enable
+            RegisterForModEvent("DeviceEdgedActor", "OnDeviceEdgedActor")
+        Else
+            UnregisterForModEvent("DeviceEdgedActor")
+        EndIf
+    EndFunction
+EndProperty
+
+Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
+	Tele_Api.Vibrate( Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0) )
+    TeleDevices.LogDebug("DD OnDeviceEdgedActor")
 EndEvent
 
 Bool Property Toys_VibrateEffect
@@ -193,23 +212,6 @@ Event OnToysDenied(string eventName, string argString, float argNum, form sender
 	TeleDevices.LogDebug("OnToysDenied")
 EndEvent
 
-Bool Property Chainbeasts_Vibrate
-    Function set(Bool enable)
-        If enable
-            TeleDevices.LogDebug("Enabled Chainbeasts Vibrate")
-            RegisterForModEvent("SCB_VibeEvent", "OnSCB_VibeEvent")
-        Else
-            TeleDevices.LogDebug("Disabled Chainbeasts Vibrate")
-            UnregisterForModEvent("SCB_VibeEvent")
-        EndIf
-    EndFunction
-EndProperty
-
-Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
-	Tele_Api.Vibrate(100, 3)
-	TeleDevices.LogDebug("OnSCB_VibeEvent")
-EndEvent
-
 ; Event OnToysVaginalPenetration(string eventName, string argString, float argNum, form sender)
 ; 	TeleDevices.LogDebug("OnToysVaginalPenetration")
 ; EndEvent
@@ -225,8 +227,6 @@ EndEvent
 ; Event OnToysCaressed(string eventName, string argString, float argNum, form sender)
 ; 	TeleDevices.LogDebug("OnToysCaressed")
 ; EndEvent
-
-; --------------- TODO DEPRACTE -------------
 
 Bool InSexScene = False
 
@@ -251,3 +251,22 @@ Function StopSexScene()
 	Tele_Api.Vibrate(0, 0.1)
 EndFunction
 
+Int Property Chainbeasts_Min = 10 Auto
+Int Property Chainbeasts_Max = 100 Auto
+
+Bool Property Chainbeasts_Vibrate
+    Function set(Bool enable)
+        If enable
+            TeleDevices.LogDebug("Enabled Chainbeasts Vibrate")
+            RegisterForModEvent("SCB_VibeEvent", "OnSCB_VibeEvent")
+        Else
+            TeleDevices.LogDebug("Disabled Chainbeasts Vibrate")
+            UnregisterForModEvent("SCB_VibeEvent")
+        EndIf
+    EndFunction
+EndProperty
+
+Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
+	Tele_Api.Vibrate(Utility.RandomInt(Chainbeasts_Min, Chainbeasts_Max), 3)
+	TeleDevices.LogDebug("OnSCB_VibeEvent")
+EndEvent

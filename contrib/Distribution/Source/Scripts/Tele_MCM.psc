@@ -8,7 +8,7 @@ String[] ConnectionMenuOptions
 Int[] UseDeviceOids
 String[] DeviceNames
 Bool SpellsAdded = false
-int EmergencyHotkey = 211 ; Del 
+Int EmergencyHotkey = 211 ; Del 
 
 Bool Devious_VibrateEffect = true
 
@@ -19,7 +19,7 @@ Bool Sexlab_ActorEdge = false
 Bool Toys_VibrateEffect = true
 Bool Toys_Animation = false
 Bool Toys_OtherEvents = false
-Bool Toys_Denial
+Bool Toys_Denial = false
 
 Bool Chainbeasts_Vibrate = true
 
@@ -171,14 +171,15 @@ Event OnPageReset(String page)
         AddToggleOptionST("OPTION_TOYS_OTHER", "Actor tease or orgasm", Toys_OtherEvents)
 
         SetCursorPosition(1)
-        
-        AddHeaderOption("Skyrim Chainbeasts")
-        AddToggleOptionST("OPTION_CHAINBESTS_VIBRATE", "Gemmed Beasts", Chainbeasts_Vibrate)
-
         AddHeaderOption("Sexlab")
         AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", Sexlab_Animation)
         AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", Sexlab_ActorOrgasm)
         AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", Sexlab_ActorEdge)
+
+        AddHeaderOption("Skyrim Chainbeasts")
+        AddToggleOptionST("OPTION_CHAINBESTS_VIBRATE", "Gemmed Beasts", Chainbeasts_Vibrate)
+	    AddSliderOptionST("SLIDER_CHAINBEAST_MIN", "Min Strength", TeleIntegration.Chainbeasts_Min)
+	    AddSliderOptionST("SLIDER_CHAINBEAST_MAX", "Max Strength", TeleIntegration.Chainbeasts_Max)
     EndIf
 
     If page == "Debug"
@@ -200,6 +201,53 @@ Event OnPageReset(String page)
         AddTextOptionST("HELP_DEVICE_NOT_VIBRATING", "Device not vibrating", "Read below")
     EndIf
 EndEvent
+
+State SLIDER_CHAINBEAST_MIN
+	Event OnSliderOpenST()
+		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Min)
+		SetSliderDialogDefaultValue(50)
+		SetSliderDialogRange(0, 100)
+		SetSliderDialogInterval(1)
+	EndEvent
+
+	Event OnSliderAcceptST(float value)
+		TeleIntegration.Chainbeasts_Min = value as int
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Min)
+	EndEvent
+
+	Event OnDefaultST()
+		TeleIntegration.Chainbeasts_Min = 80
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Min)
+	EndEvent
+
+	Event OnHighlightST()
+		SetInfoText("Min vibration strength for chainbeast events")
+	EndEvent
+EndState
+
+State SLIDER_CHAINBEAST_MAX
+	Event OnSliderOpenST()
+		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Max)
+		SetSliderDialogDefaultValue(50)
+		SetSliderDialogRange(0, 100)
+		SetSliderDialogInterval(1)
+	EndEvent
+
+	Event OnSliderAcceptST(float value)
+		TeleIntegration.Chainbeasts_Max = value as int
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Max)
+	EndEvent
+
+	Event OnDefaultST()
+		TeleIntegration.Chainbeasts_Max = 100
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Max)
+	EndEvent
+
+	Event OnHighlightST()
+		SetInfoText("Max vibration strength for chainbeast events")
+	EndEvent
+EndState
+
 
 State CONNECTION_MENU
     Event OnMenuOpenST()
