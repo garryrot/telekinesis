@@ -135,12 +135,13 @@ If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyp
 
 This if free software. If you want to change this, redistribute it, or integrate it into your mod, you are free to whatever you like, as long as it is permitted by the [Apache License](LICENSE)
 
-
 # Changelog
 
 ## 1.1.0
 
-- Integrate Skyrim Chainbeasts
+- Use vibration strength from vibration event for vibrator sync
+- Support for Skyrim Chain Beast vibrations (`SCB_VibeEvent`)
+- Reduce dll size by about 30%
 
 ## 1.0.0
 
@@ -153,6 +154,7 @@ This if free software. If you want to change this, redistribute it, or integrate
 ## 0.3.0
 
 **Features**:
+
 - Add `Tele.VibrateAllFor` to vibrate for a specific duration and then stop
 - Reworked/broke entire API
     - Vibration speed is now value between 0 and 100
