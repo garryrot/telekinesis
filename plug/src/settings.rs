@@ -1,6 +1,6 @@
 use std::{
     fs::{self},
-    path::{PathBuf},
+    path::PathBuf,
 };
 
 use serde::{Deserialize, Serialize};
@@ -98,16 +98,40 @@ impl TkSettings {
         }
         self.devices.push(TkDeviceSettings::from_name(device_name))
     }
-    pub fn set_enabled(&mut self, device_name: &str, enabled: bool) {
-        if self
+
+    pub fn set_events(mut self, device_name: &str, events: Vec<String>) -> Self {
+        self.assure_exists(device_name);
+
+        self.devices = self
+            .devices
+            .iter()
+            .map(|d| {
+                let mut device = d.clone();
+                if d.name == device_name {
+                    device.events = events.clone();
+                }
+                device
+            })
+            .collect();
+        self
+    }
+
+    pub fn get_events(&self, device_name: &str) -> Vec<String> {
+        match self
             .devices
             .iter()
             .filter(|d| d.name == device_name)
-            .count()
-            == 0
+            .map(|d| d.events.clone())
+            .next()
         {
-            self.add(device_name);
+            Some(evt) => evt,
+            None => vec![],
         }
+    }
+
+    pub fn set_enabled(&mut self, device_name: &str, enabled: bool) {
+        self.assure_exists(device_name);
+
         self.devices = self
             .devices
             .iter()
@@ -120,6 +144,19 @@ impl TkSettings {
             })
             .collect();
     }
+
+    pub fn assure_exists(&mut self, device_name: &str) {
+        if self
+            .devices
+            .iter()
+            .filter(|d| d.name == device_name)
+            .count()
+            == 0
+        {
+            self.add(device_name);
+        }
+    }
+
     pub fn is_enabled(&self, device_name: &str) -> bool {
         self.devices
             .iter()

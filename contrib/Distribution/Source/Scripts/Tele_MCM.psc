@@ -4,12 +4,15 @@ Tele_Devices Property TeleDevices Auto
 Tele_Integration Property TeleIntegration Auto
 
 String[] _ConnectionMenuOptions
+
 Int[] _UseDeviceOids
+Int[] _DeviceEventOids
+
 String[] _DeviceNames
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 6
+    return 7
 EndFunction
 
 Event OnConfigInit()
@@ -22,7 +25,7 @@ Event OnVersionUpdate(int aVersion)
         TeleDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + aVersion)
     EndIf
 
-    If CurrentVersion > 0 && CurrentVersion < 6 ; 1.0.0 Beta
+    If CurrentVersion > 0 && CurrentVersion < 7 ; 1.0.0 Beta
         InitLocals()
         TeleIntegration.ResetIntegrationSettings()
     EndIf
@@ -42,27 +45,11 @@ Function InitLocals()
     _ConnectionMenuOptions[2] = "Disable"
 
     _UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
+    _DeviceEventOids = new Int[20]
+    
     _DeviceNames = new String[1]
-
     _DebugSpellsAdded = false
 EndFunction
-
-Event OnOptionSelect(int oid)
-    Int i = 0
-    While (i < 31)
-        If (oid == _UseDeviceOids[i])
-            If (i < _DeviceNames.Length)
-                String device = _DeviceNames[i]
-                Bool isUsed = ! Tele_Api.GetEnabled(device)
-                SetToggleOptionValue(oid, isUsed)
-                Tele_Api.SetEnabled(device, isUsed)
-            EndIf
-        EndIf
-        i += 1
-    EndWhile
-
-    Tele_Api.SettingsStore()
-EndEvent
 
 Event OnPageReset(String page)
     If page == "General" || page == ""
@@ -113,6 +100,7 @@ Event OnPageReset(String page)
                 EndIf
                 AddTextOption(Key(i, "Status"), status, OPTION_FLAG_DISABLED)
                 AddTextOption(Key(i, "Actions"), Tele_Api.GetDeviceCapabilities(name), OPTION_FLAG_DISABLED)
+                _DeviceEventOids[i] = AddInputOption(Key(i, "Events"), Join(Tele_Api.GetEvents(name), ","))
 
                 Int flags = OPTION_FLAG_DISABLED
                 If connected
@@ -135,6 +123,15 @@ Event OnPageReset(String page)
         AddHeaderOption("Devious Devices")
         If TeleIntegration.ZadLib != None
             AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", TeleIntegration.Devious_VibrateEffect)
+
+            AddToggleOptionST("OPTION_DEVIOUS_MATCH_EVENTS", "Match worn devices", TeleIntegration.Devious_VibrateEffectMatchEvents)
+            Int flags = OPTION_FLAG_DISABLED
+            If TeleIntegration.Devious_VibrateEffectMatchEvents
+                flags = OPTION_FLAG_NONE
+            EndIf
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.Devious_VibrateEventAnal, flags)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.Devious_VibrateEventVaginal, flags)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.Devious_VibrateEventNipple, flags)
         Else
             AddTextOption("In-Game Vibrators", "Not Installed", OPTION_FLAG_DISABLED)
         EndIf
@@ -305,6 +302,70 @@ State OPTION_DEVIOUS_VIBRATE
 
     Event OnHighlightST()
         SetInfoText("Sync with in-game vibrators (vibrate effect start/stop)")
+    EndEvent
+EndState
+
+State OPTION_DEVIOUS_MATCH_EVENTS
+    Event OnSelectST()
+        TeleIntegration.Devious_VibrateEffectMatchEvents = !TeleIntegration.Devious_VibrateEffectMatchEvents
+        SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffectMatchEvents)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Devious_VibrateEffectMatchEvents = TeleIntegration.Devious_VibrateEffectMatchEvents_Default
+        SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffectMatchEvents)
+    EndEvent
+
+    Event OnHighlightST()
+        String text = "Vibrate only devices that have events correspond to a worn device\n"
+        text += "Supported events: ANAL, VAGINAL, NIPPLE\n"
+        SetInfoText(text)
+    EndEvent
+EndState
+
+State OPTION_DEVIOUS_EVENT_ANAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Devious_VibrateEventAnal)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Devious_VibrateEventAnal = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The event that is triggered for 'Anal' devices. Default: Anal")
+    EndEvent
+EndState
+
+State OPTION_DEVIOUS_EVENT_NIPPLE
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Devious_VibrateEventNipple)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Devious_VibrateEventNipple = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The event that is triggered for 'Nipple' devices. Default: Nipple")
+    EndEvent
+EndState
+
+State OPTION_DEVIOUS_EVENT_VAGINAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Devious_VibrateEventVaginal)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Devious_VibrateEventVaginal = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The event that is triggered for 'Vaginal' devices. Default: Vaginal")
     EndEvent
 EndState
 
@@ -571,6 +632,59 @@ State HELP_DEVICE_NOT_VIBRATING
     EndEvent
 EndState
 
+Event OnOptionSelect(int oid)
+    Int i = 0
+    While (i < 31 && i < _DeviceNames.Length)
+        If (oid == _UseDeviceOids[i])
+            String device = _DeviceNames[i]
+            Bool isUsed = ! Tele_Api.GetEnabled(device)
+            SetToggleOptionValue(oid, isUsed)
+            Tele_Api.SetEnabled(device, isUsed)
+        EndIf
+        i += 1
+    EndWhile
+    Tele_Api.SettingsStore()
+EndEvent
+
+Event OnOptionInputAccept(int oid, string value)
+    Int i = 0
+    While (i < 31 && i < _DeviceNames.Length)
+        If (oid == _DeviceEventOids[i])
+            String name = _DeviceNames[i]
+            Tele_Api.SetEvents(name, StringUtil.Split(value, ","))
+            SetInputOptionValue(oid, value)
+        EndIf
+        i += 1
+    EndWhile
+    Tele_Api.SettingsStore()
+EndEvent
+
+Event OnOptionHighlight(int oid)
+    Int i = 0
+    While (i < 31 && i < _DeviceNames.Length)
+        If (oid == _DeviceEventOids[i])  
+            String infoText = "A comma-separated list of events that are associated with this device\n"
+            infoText += "Example 1: Vaginal,Anal,Nipple\n"
+            infoText += "Example 2: Nipple"
+            SetInfoText(infoText)
+        EndIf
+        i += 1
+    EndWhile
+EndEvent
+
 String Function Key( String index, String name )
     return "[" + index + "] " + name
+EndFunction
+
+String Function Join(String[] segments, String separator)
+    String joined = ""
+    Int j = 0
+    While (j < segments.Length)
+        If j > 0
+            joined += separator
+        EndIf
+        joined += segments[j]
+        j += 1
+    EndWhile
+    return joined
 EndFunction

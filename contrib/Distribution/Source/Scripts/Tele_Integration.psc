@@ -32,6 +32,11 @@ Int Property EmergencyHotkey
     EndFunction
 EndProperty
 
+String Property Devious_VibrateEventAnal = "Anal" Auto
+String Property Devious_VibrateEventVaginal = "Vaginal" Auto
+String Property Devious_VibrateEventNipple = "Nipple" Auto
+Bool Property Devious_VibrateEffectMatchEvents = false Auto
+Bool Property Devious_VibrateEffectMatchEvents_Default = false AutoReadOnly
 Bool Property Devious_VibrateEffect_Default = true AutoReadOnly
 Bool Property Devious_VibrateEffect
     Function Set(Bool enable)
@@ -270,30 +275,34 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     EndIf
 
     ; Reverse DD multi device calculation to get the actual strength
-    String[] events = new String[3] ; unused for now
+    String[] events = new String[3]
     Float numVibratorsMult = 0
     If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
         numVibratorsMult += 0.7
-        events[0] = "Vaginal" 
+        events[0] = Devious_VibrateEventVaginal
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
         numVibratorsMult += 0.3
-        events[1] = "Anal" 
+        events[1] = Devious_VibrateEventAnal
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
         numVibratorsMult += 0.25
-        events[2] = "Nipples"
+        events[2] = Devious_VibrateEventNipple
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
         numVibratorsMult += 0.5
-        events[0] = "Vaginal"
+        events[0] = Devious_VibrateEventVaginal
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
         numVibratorsMult /= 1.15
     EndIf
 
-    float strength = (vibrationStrength / numVibratorsMult)
-	Tele_Api.Vibrate(Math.Floor(strength * 20), 30)
+    Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
+    If Devious_VibrateEffectMatchEvents
+        TeleDevices.VibrateEvents(strength, 30, events)
+    Else
+        TeleDevices.Vibrate(strength, 30)
+    EndIf
 	TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 

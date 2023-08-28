@@ -29,11 +29,11 @@ String[] function GetDevices() global native
 
 ; Return a list of all device capabilities
 ; Only the capability "Vibrate" is avaiable right now
-String[] function GetDeviceCapabilities(String name) global native
+String[] function GetDeviceCapabilities(String device_name) global native
 
 ; Returns whether the device with the given name is connected.
 ; Will also return false when the device does not exist
-bool function GetDeviceConnected(String name) global native
+bool function GetDeviceConnected(String device_name) global native
 
 ; Vibrate all enabled devices
 Bool function Vibrate(Int speed, Float duration_sec) global native
@@ -62,6 +62,12 @@ Bool function GetEnabled(String device_name) global native
 ; Enable device by `name` in settings
 ; This setting is permanently stored
 function SetEnabled(String device_name, Bool enabled) global native
+
+; Get the list of events associated with the given device
+String[] function GetEvents(String device_name) global native
+
+; Associated the list of events with the given device
+function SetEvents(String device_name, String[] events) global native
 
 ; Persists settings in Telekinesis.json
 Bool function SettingsStore() global native

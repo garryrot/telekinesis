@@ -11,7 +11,7 @@ use cxx::{CxxString, CxxVector};
 use telekinesis::{in_process_connector, Telekinesis};
 
 use crate::{
-    inputs::{as_string_list, Speed},
+    inputs::{read_input_string, Speed},
     settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
 
@@ -39,16 +39,18 @@ mod ffi {
         fn tk_scan_for_devices() -> bool;
         fn tk_stop_scan() -> bool;
         fn tk_get_devices() -> Vec<String>;
-        fn tk_get_device_connected(name: &str) -> bool;
-        fn tk_get_device_capabilities(name: &str) -> Vec<String>;
+        fn tk_get_device_connected(device_name: &str) -> bool;
+        fn tk_get_device_capabilities(device_name: &str) -> Vec<String>;
         fn tk_vibrate(speed: i64, secs: u64) -> bool;
-        fn tk_vibrate_events(speed: i64, secs: u64, devices: &CxxVector<CxxString>)
+        fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>)
             -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
-        fn tk_settings_set_enabled(name: &str, enabled: bool);
-        fn tk_settings_get_enabled(name: &str) -> bool;
+        fn tk_settings_set_enabled(device_name: &str, enabled: bool);
+        fn tk_settings_get_enabled(device_name: &str) -> bool;
+        fn tk_settings_get_events(device_name: &str) -> Vec<String>; 
+        fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>);
         fn tk_settings_store() -> bool;
     }
 }
@@ -60,14 +62,16 @@ pub trait Tk {
     fn disconnect(&mut self);
     fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>>;
     fn get_device_names(&self) -> Vec<String>;
-    fn get_device_connected(&self, name: &str) -> bool;
-    fn get_device_capabilities(&self, name: &str) -> Vec<String>;
-    fn vibrate(&self, speed: Speed, duration: Duration, device_names: Vec<String>) -> bool;
+    fn get_device_connected(&self, device_name: &str) -> bool;
+    fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
+    fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool;
     fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool;
     fn stop_all(&self) -> bool;
     fn get_next_event(&mut self) -> Option<TkEvent>;
     fn get_next_events(&mut self) -> Vec<TkEvent>;
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
+    fn settings_set_events(&mut self, device_name: &str, events: Vec<String>);
+    fn settings_get_events(&self, device_name: &str) -> Vec<String>;
     fn settings_get_enabled(&self, device_name: &str) -> bool;
 }
 
@@ -159,7 +163,7 @@ pub fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>) -
         tk.vibrate(
             Speed::new(speed),
             Duration::from_secs(secs),
-            as_string_list(&events),
+            read_input_string(&events),
         )
     })
     .is_some()
@@ -212,6 +216,19 @@ pub fn tk_poll_events() -> Vec<String> {
 #[instrument]
 pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
     access_mutex(|tk| tk.settings_set_enabled(device_name, enabled));
+}
+
+#[instrument]
+pub fn tk_settings_get_events(device_name: &str) -> Vec<String> {
+    match access_mutex(|tk| tk.settings_get_events(device_name)) {
+        Some(events) => events,
+        None => vec![],
+    } 
+}
+
+#[instrument]
+pub fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>) {
+    access_mutex(|tk| tk.settings_set_events(device_name, read_input_string(events)));
 }
 
 #[instrument]

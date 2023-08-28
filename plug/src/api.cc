@@ -52,6 +52,13 @@ namespace Tk
     DllExport void SetEnabled(void*, std::string device_name, bool enabled) {
         tk_settings_set_enabled(device_name, enabled);
     }
+    DllExport std::vector<std::string> GetEvents(void*, std::string device_name) {
+        auto events = tk_settings_get_events(device_name);
+        return std::vector<std::string>(events.begin(), events.end());
+    }
+    DllExport void SetEvents(void*, std::string device_name, std::vector<std::string> events) {
+        tk_settings_set_events(device_name, events);
+    }
     DllExport bool SettingsStore(void*) {
         return tk_settings_store();
     }

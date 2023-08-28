@@ -33,8 +33,11 @@ impl Display for Speed {
     }
 }
 
-pub fn as_string_list(list: &CxxVector<CxxString>) -> Vec<String> {
+pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {
+    // automatically discards any empty strings to account for papyrus
+    // inability to do dynamic array sizes
     list.iter()
+        .filter(|d| d.len() > 0)
         .map(|d| d.to_string_lossy().into_owned())
         .collect()
 }

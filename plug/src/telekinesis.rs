@@ -28,7 +28,7 @@ use itertools::Itertools;
 
 use crate::{
     commands::{create_cmd_thread, TkAction, TkControl, TkDeviceAction, TkDeviceSelector},
-    settings::TkSettings,
+    settings::{TkDeviceSettings, TkSettings},
     Speed, Tk, TkEvent,
 };
 
@@ -173,9 +173,21 @@ impl Tk for Telekinesis {
     }
 
     fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool {
-        info!("Sending Command: Vibrate {:?}", events);
+        info!("Sending Command: Vibrate Events");
+
+        let selected = TkDeviceSelector::ByNames(Box::new(
+            self.settings
+                .devices
+                .iter()
+                .filter(|d| {
+                    d.enabled && (events.len() == 0 || d.events.iter().any(|e| events.contains(e)))
+                })
+                .map(|d| d.name.clone())
+                .collect(),
+        ));
+
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
-            devices: (&self.settings).into(),
+            devices: selected,
             duration: duration,
             action: TkDeviceAction::Vibrate(speed),
         })) {
@@ -184,9 +196,9 @@ impl Tk for Telekinesis {
         }
         true
     }
-    
+
     fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool {
-        info!("Sending Command: Vibrate");
+        info!("Sending Command: Vibrate All");
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
             devices: TkDeviceSelector::All,
             duration: duration,
@@ -236,9 +248,21 @@ impl Tk for Telekinesis {
 
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
         info!("Setting '{}'.enabled={}", device_name, enabled);
+
         let mut settings = self.settings.clone();
         settings.set_enabled(device_name, enabled);
         self.settings = settings;
+    }
+
+    fn settings_set_events(&mut self, device_name: &str, events: Vec<String>) {
+        info!("Setting '{}'.events={:?}", device_name, events);
+
+        let settings = self.settings.clone();
+        self.settings = settings.set_events(device_name, events);
+    }
+
+    fn settings_get_events(&self, device_name: &str) -> Vec<String> {
+        self.settings.get_events(device_name)
     }
 
     fn get_device_connected(&self, device_name: &str) -> bool {
@@ -275,10 +299,10 @@ where
 mod tests {
     use std::{thread, time::Duration, vec};
 
-    use std::fmt::Display;
+    //use std::fmt::Display;
     use std::time::Instant;
 
-    use crate::util::enable_log;
+    // use crate::util::enable_log;
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,
@@ -363,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    fn vibrate_select_non_existing_devices() {
+    fn vibrate_non_existing_device() {
         // arrange
         let (tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
@@ -381,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn vibrate_only_enabled_devices() {
+    fn settings_only_vibrate_enabled_devices() {
         // arrange
         let (mut tk, call_registry) = wait_for_connection(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
@@ -399,6 +423,49 @@ mod tests {
         // assert
         call_registry.assert_vibrated(1);
         call_registry.assert_vibrated(3);
+        call_registry.assert_not_vibrated(2);
+    }
+
+    #[test]
+    fn events_get() {
+        let empty: Vec<String> = vec![];
+        let one_event: Vec<String> = vec![String::from("evt2")];
+        let two_events: Vec<String> = vec![String::from("evt2"), String::from("evt3")];
+
+        let (mut tk, _) = wait_for_connection(vec![
+            scalar(1, "vib1", ActuatorType::Vibrate),
+            scalar(2, "vib2", ActuatorType::Vibrate),
+            scalar(3, "vib3", ActuatorType::Vibrate),
+        ]);
+
+        tk.settings_set_events("vib2", one_event.clone());
+        tk.settings_set_events("vib3", two_events.clone());
+
+        assert_eq!(tk.settings_get_events("vib1"), empty);
+        assert_eq!(tk.settings_get_events("vib2"), one_event);
+        assert_eq!(tk.settings_get_events("vib3"), two_events);
+    }
+
+    #[test]
+    fn event_only_vibrate_selected_devices() {
+        let (mut tk, call_registry) = wait_for_connection(vec![
+            scalar(1, "vib1", ActuatorType::Vibrate),
+            scalar(2, "vib2", ActuatorType::Vibrate),
+        ]);
+        
+        tk.settings_set_enabled("vib1", true);
+        tk.settings_set_enabled("vib2", true);
+        tk.settings_set_events("vib1", vec![String::from("selected_event")]);
+        tk.settings_set_events("vib2", vec![String::from("bogus")]);
+
+        tk.vibrate(
+            Speed::max(),
+            Duration::from_millis(1),
+            vec![String::from("selected_event")],
+        );
+        thread::sleep(Duration::from_secs(1));
+
+        call_registry.assert_vibrated(1);
         call_registry.assert_not_vibrated(2);
     }
 
@@ -432,11 +499,10 @@ mod tests {
     }
 
     #[test]
-    fn duration_0_does_not_vibrate_infinitely() {
+    fn vibrate_duration_0_does_not_vibrate_infinitely() {
         // arrange
-        let (tk, call_registry) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate)
-        ]);
+        let (tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
         tk.vibrate_all(Speed::max(), Duration::ZERO);

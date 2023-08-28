@@ -20,7 +20,7 @@ bool ApiLoaded(SFT) { return true; }
 
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Loaded", PapyrusClass, ApiLoaded);
-    vm->RegisterFunction("Connect", PapyrusClass, (bool (*)(SFT)) Tk::Connect);
+    vm->RegisterFunction("Connect", PapyrusClass, (bool (*)(SFT))Tk::Connect);
     vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(SFT))Tk::ScanForDevices);
     vm->RegisterFunction("StopScan", PapyrusClass, (bool (*)(SFT))Tk::StopScan);
     vm->RegisterFunction("Close", PapyrusClass, (bool (*)(SFT))Tk::Close);
@@ -33,6 +33,8 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::PollEvents);
     vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetEnabled);
     vm->RegisterFunction("SetEnabled", PapyrusClass, (void (*)(SFT, std::string, bool))Tk::SetEnabled);
+    vm->RegisterFunction("GetEvents", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetEvents);
+    vm->RegisterFunction("SetEvents", PapyrusClass, (void (*)(SFT, std::string, std::vector<std::string>))Tk::SetEvents);
     vm->RegisterFunction("SettingsStore", PapyrusClass, (bool (*)(SFT))Tk::SettingsStore);
     return true;
 }

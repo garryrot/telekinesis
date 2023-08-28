@@ -13,5 +13,7 @@ namespace Tk
     std::vector<std::string> PollEvents(void*);
     bool GetEnabled(void*, std::string name);
     void SetEnabled(void*, std::string name, bool enabled);
+    std::vector<std::string> GetEvents(void*, std::string device_name);
+    void SetEvents(void*, std::string device_name, std::vector<std::string> events);
     bool SettingsStore(void*);
 }
