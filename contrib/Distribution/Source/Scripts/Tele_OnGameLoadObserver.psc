@@ -19,5 +19,10 @@ Function LoadTelekinesis()
     Else
         TeleIntegration.ZadLib = None
     EndIf
+    If Game.GetModByName("SexLab.esm") != 255
+        TeleIntegration.SexLab = (Quest.GetQuest("SexLabQuestFramework") As SexLabFramework)
+    Else
+        TeleIntegration.SexLab = None
+    EndIf
     TeleDevices.ConnectAndScanForDevices()
 EndFunction

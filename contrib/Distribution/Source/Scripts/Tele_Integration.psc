@@ -7,8 +7,12 @@ ScriptName Tele_Integration extends Quest
 Tele_Devices Property TeleDevices Auto
 
 ZadLibs Property ZadLib Auto
+SexLabFramework Property SexLab Auto
+
+String[] _SceneTags
 
 Bool _InSexScene = false
+Bool _InToysSexScene = false
 Bool _Devious_VibrateEffect = false
 Bool _Sexlab_Animation = false
 Bool _Sexlab_ActorOrgasm = false
@@ -35,8 +39,8 @@ EndProperty
 String Property Devious_VibrateEventAnal = "Anal" Auto
 String Property Devious_VibrateEventVaginal = "Vaginal" Auto
 String Property Devious_VibrateEventNipple = "Nipple" Auto
-Bool Property Devious_VibrateEffectMatchEvents = false Auto
-Bool Property Devious_VibrateEffectMatchEvents_Default = false AutoReadOnly
+Int Property Devious_VibrateEffectDeviceSelector = 0 Auto
+Int Property Devious_VibrateEffectDeviceSelector_Default = 0 AutoReadOnly
 Bool Property Devious_VibrateEffect_Default = true AutoReadOnly
 Bool Property Devious_VibrateEffect
     Function Set(Bool enable)
@@ -54,6 +58,8 @@ Bool Property Devious_VibrateEffect
     EndFunction
 EndProperty
 
+Int Property Sexlab_AnimationDeviceSelector = 0 Auto
+Int Property Sexlab_AnimationDeviceSelector_Default = 0 AutoReadOnly
 Bool Property Sexlab_Animation_Default = false AutoReadOnly
 Bool Property Sexlab_Animation
     Function Set(Bool enable)
@@ -216,7 +222,9 @@ Function ResetIntegrationSettings()
     TeleDevices.Notify("Resetting integration settings")
     EmergencyHotkey = EmergencyHotkey_Default
     Devious_VibrateEffect = Devious_VibrateEffect_Default
+    Devious_VibrateEffectDeviceSelector = Devious_VibrateEffectDeviceSelector_Default
     Sexlab_Animation = Sexlab_Animation_Default
+    Sexlab_AnimationDeviceSelector = Sexlab_AnimationDeviceSelector_Default
     Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
     Sexlab_ActorEdge = Sexlab_ActorEdge_Default
     Toys_VibrateEffect = Toys_VibrateEffect_Default
@@ -226,29 +234,6 @@ Function ResetIntegrationSettings()
     Chainbeasts_Vibrate = Chainbeasts_Vibrate_Default
     Chainbeasts_Min = Chainbeasts_Min_Default
     Chainbeasts_Max = Chainbeasts_Max_Default
-EndFunction
-
-; Sex animation handling
-
-Event OnUpdate()
-    UpdateSexScene()
-EndEvent
-
-Function UpdateSexScene()
-    If _InSexScene
-		Int speed = Utility.RandomInt(0, 100)
-		Tele_Api.Vibrate(speed, 10)
-	EndIf
-EndFunction
-
-Function StartSexScene()
-	_InSexScene = True
-	Tele_Api.Vibrate(Utility.RandomInt(1, 100), 120)
-EndFunction
-
-Function StopSexScene()
-	_InSexScene = False
-	Tele_Api.Vibrate(0, 0.1)
 EndFunction
 
 ; Key Events
@@ -262,6 +247,51 @@ Event OnKeyUp(Int keyCode, Float HoldTime)
         TeleDevices.LogDebug("Unregistered keypress code: " + KeyCode)
     EndIf
 EndEvent
+
+; Sex animation handling
+
+Event OnUpdate()
+    UpdateSexScene()
+EndEvent
+
+Function UpdateSexScene()
+    Int speed = Utility.RandomInt(0, 100)
+    If _InSexScene
+        If Sexlab_AnimationDeviceSelector == 1
+            TeleDevices.VibrateEvents(speed, 10, _SceneTags)
+        Else
+            TeleDevices.Vibrate(speed, 10)
+        EndIf
+	EndIf
+    If _InToysSexScene
+		TeleDevices.Vibrate(speed, 10)
+    EndIF
+EndFunction
+
+Function StartSexLabScene(String[] tags)
+	_InSexScene = True
+    _SceneTags = tags
+	UpdateSexScene()
+EndFunction
+
+Function StopSexLabScene()
+	_InSexScene = False
+    If Sexlab_AnimationDeviceSelector == 1
+        TeleDevices.VibrateEvents(0, 0.1, _SceneTags)
+    Else
+        TeleDevices.Vibrate(0, 0.1)
+    EndIF
+EndFunction
+
+Function StartToysScene()
+	_InToysSexScene = True
+	UpdateSexScene()
+EndFunction
+
+Function StopToysScene()
+	_InToysSexScene = False
+    TeleDevices.Vibrate(0, 0.1)
+EndFunction
 
 ; Devious Devices Events
 
@@ -298,7 +328,7 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     EndIf
 
     Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
-    If Devious_VibrateEffectMatchEvents
+    If Devious_VibrateEffectDeviceSelector == 1
         TeleDevices.VibrateEvents(strength, 30, events)
     Else
         TeleDevices.Vibrate(strength, 30)
@@ -312,12 +342,15 @@ EndEvent
 
 ; Sexlab Events
 
-Event OnSexlabAnimationStart(int _, bool hasPlayer)
+Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	If !hasPlayer
 		TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
-	StartSexScene()
+
+    sslThreadController Controller = Sexlab.GetController(threadID)
+    sslBaseAnimation animation = Controller.Animation
+	StartSexLabScene(animation.GetTags()) 
 EndEvent
 
 Event OnSexlabAnimationEnd(int _, bool hasPlayer)
@@ -325,7 +358,7 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
         TeleDevices.LogDebug("Animation on Non-Player")
 		 return
 	EndIf
-	StopSexScene()
+	StopSexLabScene()
 EndEvent
 
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
@@ -361,12 +394,12 @@ Event OnToysSquirt(string eventName, string argString, float argNum, form sender
 EndEvent
 
 Event OnToysSceneStart(string eventName, string argString, float argNum, form sender)
-	StartSexScene()
+	StartToysScene()
 	TeleDevices.LogDebug("ToysSceneStart")
 EndEvent
 
 Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
-	StopSexScene()
+	StopToysScene()
 	TeleDevices.LogDebug("OnToysSceneEnd")
 EndEvent
 

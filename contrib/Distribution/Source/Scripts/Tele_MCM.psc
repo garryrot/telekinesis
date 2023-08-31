@@ -4,6 +4,7 @@ Tele_Devices Property TeleDevices Auto
 Tele_Integration Property TeleIntegration Auto
 
 String[] _ConnectionMenuOptions
+String[] _DeviceSelectorOptions ; 0 = All, 1 = Match Tags
 
 Int[] _UseDeviceOids
 Int[] _DeviceEventOids
@@ -43,6 +44,10 @@ Function InitLocals()
     _ConnectionMenuOptions[0] = "In-Process (Default)"
     _ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
     _ConnectionMenuOptions[2] = "Disable"
+
+    _DeviceSelectorOptions = new String[2]
+    _DeviceSelectorOptions[0] = "All"
+    _DeviceSelectorOptions[1] = "Match Events"
 
     _UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
     _DeviceEventOids = new Int[20]
@@ -123,10 +128,13 @@ Event OnPageReset(String page)
         AddHeaderOption("Devious Devices")
         If TeleIntegration.ZadLib != None
             AddToggleOptionST("OPTION_DEVIOUS_VIBRATE", "In-Game Vibrators", TeleIntegration.Devious_VibrateEffect)
-
-            AddToggleOptionST("OPTION_DEVIOUS_MATCH_EVENTS", "Match worn devices", TeleIntegration.Devious_VibrateEffectMatchEvents)
+            int selector_flags = OPTION_FLAG_DISABLED
+            If TeleIntegration.Devious_VibrateEffect
+                selector_flags = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_DEVIOUS_DEVICE_SELECTOR", "Device Selector", _DeviceSelectorOptions[TeleIntegration.Devious_VibrateEffectDeviceSelector], selector_flags)
             Int flags = OPTION_FLAG_DISABLED
-            If TeleIntegration.Devious_VibrateEffectMatchEvents
+            If TeleIntegration.Devious_VibrateEffect && TeleIntegration.Devious_VibrateEffectDeviceSelector == 1
                 flags = OPTION_FLAG_NONE
             EndIf
             AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.Devious_VibrateEventAnal, flags)
@@ -144,9 +152,19 @@ Event OnPageReset(String page)
 
         SetCursorPosition(1)
         AddHeaderOption("Sexlab")
-        AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", TeleIntegration.Sexlab_Animation)
-        AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
-        AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", TeleIntegration.Sexlab_ActorEdge)
+        If TeleIntegration.SexLab != None
+            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", TeleIntegration.Sexlab_Animation)
+            int sl_selector_flags = OPTION_FLAG_DISABLED
+            If TeleIntegration.Sexlab_Animation
+                sl_selector_flags = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_SEXLAB_DEVICE_SELECTOR", "Device Selector", _DeviceSelectorOptions[TeleIntegration.Sexlab_AnimationDeviceSelector], sl_selector_flags)
+            AddEmptyOption()
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", TeleIntegration.Sexlab_ActorEdge)
+        Else
+            AddTextOption("Sexlab", "Not Installed", OPTION_FLAG_DISABLED)
+        EndIf
 
         AddHeaderOption("Skyrim Chainbeasts")
         AddToggleOptionST("OPTION_CHAINBESTS_VIBRATE", "Gemmed Beasts", TeleIntegration.Chainbeasts_Vibrate)
@@ -293,11 +311,13 @@ State OPTION_DEVIOUS_VIBRATE
     Event OnSelectST()
         TeleIntegration.Devious_VibrateEffect = !TeleIntegration.Devious_VibrateEffect
         SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffect)
+        ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
         TeleIntegration.Devious_VibrateEffect = TeleIntegration.Devious_VibrateEffect_Default
         SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffect)
+        ForcePageReset()
     EndEvent
 
     Event OnHighlightST()
@@ -305,21 +325,28 @@ State OPTION_DEVIOUS_VIBRATE
     EndEvent
 EndState
 
-State OPTION_DEVIOUS_MATCH_EVENTS
-    Event OnSelectST()
-        TeleIntegration.Devious_VibrateEffectMatchEvents = !TeleIntegration.Devious_VibrateEffectMatchEvents
-        SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffectMatchEvents)
+State MENU_DEVIOUS_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TeleIntegration.Devious_VibrateEffectDeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleIntegration.Devious_VibrateEffectDeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
-    
+
     Event OnDefaultST()
-        TeleIntegration.Devious_VibrateEffectMatchEvents = TeleIntegration.Devious_VibrateEffectMatchEvents_Default
-        SetToggleOptionValueST(TeleIntegration.Devious_VibrateEffectMatchEvents)
+        TeleIntegration.Devious_VibrateEffectDeviceSelector = TeleIntegration.Devious_VibrateEffectDeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Devious_VibrateEffectDeviceSelector])
+        ForcePageReset()
     EndEvent
 
     Event OnHighlightST()
-        String text = "Vibrate only devices that have events correspond to a worn device\n"
-        text += "Supported events: ANAL, VAGINAL, NIPPLE\n"
+        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        text += "Supported events: Anal (Buttplug), Vaginal (Vaginal Plug, Piercing), Nipple (Piercing)\n"
         SetInfoText(text)
     EndEvent
 EndState
@@ -373,15 +400,43 @@ State OPTION_SEXLAB_ANIMATION
     Event OnSelectST()
         TeleIntegration.Sexlab_Animation = !TeleIntegration.Sexlab_Animation
         SetToggleOptionValueST(TeleIntegration.Sexlab_Animation)
+        ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
         TeleIntegration.Sexlab_Animation = TeleIntegration.Sexlab_Animation_Default
         SetToggleOptionValueST(TeleIntegration.Sexlab_Animation)
+        ForcePageReset()
     EndEvent
 
     Event OnHighlightST()
         SetInfoText("Move devices on sexlab player animation")
+    EndEvent
+EndState
+
+State MENU_SEXLAB_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TeleIntegration.Sexlab_AnimationDeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+        ForcePageReset()
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleIntegration.Sexlab_AnimationDeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TeleIntegration.Sexlab_AnimationDeviceSelector = TeleIntegration.Sexlab_AnimationDeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Sexlab_AnimationDeviceSelector])
+    EndEvent
+
+    Event OnHighlightST()
+        String txt = "Set to 'Match Events' when you only want to vibrate devices that match any of the sexlab animation tags\n"
+        txt += "Note: Will match any tag, but Anal, Boobjob, Vaginal, Masturbation, Oral are probably the events you want to match."
+        SetInfoText(txt)
     EndEvent
 EndState
 
