@@ -29,7 +29,7 @@ use itertools::Itertools;
 use crate::{
     commands::{create_cmd_thread, TkAction, TkControl, TkDeviceAction, TkDeviceSelector},
     settings::{TkDeviceSettings, TkSettings},
-    Speed, Tk, TkEvent,
+    Speed, Tk, TkEvent, inputs::sanitize_input_string,
 };
 
 pub struct Telekinesis {
@@ -174,13 +174,13 @@ impl Tk for Telekinesis {
 
     fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool {
         info!("Sending Command: Vibrate Events");
-
+        let evts: Vec<String> = sanitize_input_string(events);
         let selected = TkDeviceSelector::ByNames(Box::new(
             self.settings
                 .devices
                 .iter()
                 .filter(|d| {
-                    d.enabled && (events.len() == 0 || d.events.iter().any(|e| events.contains(e)))
+                    d.enabled && (evts.len() == 0 || d.events.iter().any(|e| evts.contains(e)))
                 })
                 .map(|d| d.name.clone())
                 .collect(),
@@ -452,7 +452,7 @@ mod tests {
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
         ]);
-        
+
         tk.settings_set_enabled("vib1", true);
         tk.settings_set_enabled("vib2", true);
         tk.settings_set_events("vib1", vec![String::from("selected_event")]);
@@ -467,6 +467,36 @@ mod tests {
 
         call_registry.assert_vibrated(1);
         call_registry.assert_not_vibrated(2);
+    }
+
+    #[test]
+    fn event_is_trimmed_and_ignores_casing() {
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+        tk.settings_set_enabled("vib1", true);
+        tk.settings_set_events("vib1", vec![String::from("some event")]);
+        tk.vibrate(
+            Speed::max(),
+            Duration::from_millis(1),
+            vec![String::from(" SoMe EvEnT    ")],
+        );
+
+        call_registry.assert_vibrated(1);
+    }
+
+    #[test]
+    fn settings_are_trimmed_and_lowercased() {
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+        tk.settings_set_enabled("vib1", true);
+        tk.settings_set_events("vib1", vec![String::from(" SoMe EvEnT    ")]);
+        tk.vibrate(
+            Speed::max(),
+            Duration::from_millis(1),
+            vec![String::from("some event")],
+        );
+
+        call_registry.assert_vibrated(1);
     }
 
     #[test]

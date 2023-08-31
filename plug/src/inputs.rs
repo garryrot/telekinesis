@@ -1,9 +1,8 @@
-use std::fmt::{Display, self};
+use cxx::{CxxString, CxxVector};
+use std::fmt::{self, Display};
 use util::Narrow;
-use cxx::{CxxVector, CxxString};
 
 use crate::util;
-
 
 #[derive(Debug, Clone, Copy)]
 pub struct Speed {
@@ -31,6 +30,12 @@ impl Display for Speed {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
     }
+}
+
+pub fn sanitize_input_string(list: Vec<String>) -> Vec<String> {
+    list.iter()
+        .map(|e| String::from(e.to_lowercase().trim()))
+        .collect()
 }
 
 pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {

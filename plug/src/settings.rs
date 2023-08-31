@@ -6,6 +6,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tracing::{error, event, info, Level};
 
+use crate::inputs::sanitize_input_string;
+
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
 pub static SETTINGS_FILE: &str = "Telekinesis.json";
 
@@ -101,6 +103,7 @@ impl TkSettings {
 
     pub fn set_events(mut self, device_name: &str, events: Vec<String>) -> Self {
         self.assure_exists(device_name);
+        let evts: Vec<String> = sanitize_input_string(events);
 
         self.devices = self
             .devices
@@ -108,7 +111,7 @@ impl TkSettings {
             .map(|d| {
                 let mut device = d.clone();
                 if d.name == device_name {
-                    device.events = events.clone();
+                    device.events = evts.clone();
                 }
                 device
             })
