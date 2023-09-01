@@ -405,6 +405,25 @@ mod tests {
     }
 
     #[test]
+    fn vibrate_two_devices_both_are_started_and_stopped() {
+        let (mut tk, call_registry) = wait_for_connection(vec![
+            scalar(1, "vib1", ActuatorType::Vibrate),
+            scalar(2, "vib2", ActuatorType::Vibrate),
+        ]);
+        tk.settings_set_events("vib1", vec![String::from("device 1")]);
+        tk.settings_set_events("vib2", vec![String::from("device 2")]);
+
+        // act
+        tk.vibrate(Speed::new(99), Duration::from_millis(100), vec![String::from("device 1")]);
+        tk.vibrate(Speed::new(88), Duration::from_millis(100), vec![String::from("device 2")]);
+        thread::sleep(Duration::from_secs(1));
+
+        // assert
+        call_registry.assert_vibrated(1);
+        call_registry.assert_vibrated(2);
+    }
+    
+    #[test]
     fn settings_only_vibrate_enabled_devices() {
         // arrange
         let (mut tk, call_registry) = wait_for_connection(vec![
@@ -412,9 +431,7 @@ mod tests {
             scalar(2, "vib2", ActuatorType::Vibrate),
             scalar(3, "vib3", ActuatorType::Vibrate),
         ]);
-
-        tk.settings_set_enabled("vib1", true);
-        tk.settings_set_enabled("vib3", true);
+        tk.settings_set_enabled("vib2", false);
 
         // act
         tk.vibrate(Speed::max(), Duration::from_millis(1), vec![]);
@@ -452,9 +469,6 @@ mod tests {
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
         ]);
-
-        tk.settings_set_enabled("vib1", true);
-        tk.settings_set_enabled("vib2", true);
         tk.settings_set_events("vib1", vec![String::from("selected_event")]);
         tk.settings_set_events("vib2", vec![String::from("bogus")]);
 
@@ -557,12 +571,18 @@ mod tests {
     }
 
     fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {
+        let devices_names: Vec<String>  = devices.iter().map(|d| d.device_name().clone()).collect();
         let (connector, call_registry) = FakeDeviceConnector::new(devices);
         let count = connector.devices.len();
 
         // act
-        let tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
         tk.await_connect(count);
+
+        for name in devices_names {
+            tk.settings_set_enabled(&name, true);
+        }
+
         (tk, call_registry)
     }
 }
