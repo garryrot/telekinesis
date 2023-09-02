@@ -187,9 +187,9 @@ impl Tk for Telekinesis {
         ));
 
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
-            devices: selected,
+            selector: selected,
             duration: duration,
-            action: TkDeviceAction::Vibrate(speed),
+            speed: speed // TkDeviceAction::Vibrate(speed),
         })) {
             error!("Failed to send vibrate");
             return false;
@@ -200,9 +200,9 @@ impl Tk for Telekinesis {
     fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool {
         info!("Sending Command: Vibrate All");
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
-            devices: TkDeviceSelector::All,
+            selector: TkDeviceSelector::All,
             duration: duration,
-            action: TkDeviceAction::Vibrate(speed),
+            speed: speed // TkDeviceAction::Vibrate(speed),
         })) {
             error!("Failed to send vibrate");
             return false;
@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn vibrate_two_devices_both_are_started_and_stopped() {
+    fn vibrate_two_devices_simultaneously_both_are_started_and_stopped() {
         let (mut tk, call_registry) = wait_for_connection(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
@@ -414,13 +414,37 @@ mod tests {
         tk.settings_set_events("vib2", vec![String::from("device 2")]);
 
         // act
-        tk.vibrate(Speed::new(99), Duration::from_millis(100), vec![String::from("device 1")]);
-        tk.vibrate(Speed::new(88), Duration::from_millis(100), vec![String::from("device 2")]);
-        thread::sleep(Duration::from_secs(1));
+        tk.vibrate(Speed::new(99), Duration::from_millis(3000), vec![String::from("device 1")]);
+        tk.vibrate(Speed::new(88), Duration::from_millis(3000), vec![String::from("device 2")]);
+        thread::sleep(Duration::from_secs(5));
 
         // assert
         call_registry.assert_vibrated(1);
         call_registry.assert_vibrated(2);
+    }
+     
+    #[test]
+    fn vibrate_the_same_device_simultaneously() {
+        // call1  |111111111111111111111-->|
+        // call2         |2222->|
+        // result |111111122222222222222-->|    
+        
+        // arrange
+        let (tk, call_registry) = wait_for_connection(vec![
+            scalar(1, "vib1", ActuatorType::Vibrate)
+        ]);
+
+        // act
+        tk.vibrate_all(Speed::new(10), Duration::from_secs(1));
+        thread::sleep(Duration::from_millis(500));
+        tk.vibrate_all(Speed::new(20), Duration::from_millis(10));
+        thread::sleep(Duration::from_secs(1));
+
+        // assert
+        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.1));
+        assert!(call_registry.get_device(1)[1].vibration_started_strength(0.2));
+        assert!(call_registry.get_device(1)[2].vibration_stopped());
+        assert_eq!(call_registry.get_device(1).len(), 3)
     }
     
     #[test]
