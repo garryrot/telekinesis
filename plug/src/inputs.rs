@@ -1,4 +1,5 @@
 use cxx::{CxxString, CxxVector};
+use funscript::FSPoint;
 use std::fmt::{self, Display};
 use util::Narrow;
 
@@ -15,6 +16,9 @@ impl Speed {
             value: percentage.narrow(0, 100) as u16,
         }
     }
+    pub fn from_fs(point: &FSPoint) -> Speed {
+        Speed::new(point.pos.into())
+    } 
     pub fn min() -> Speed {
         Speed { value: 0 }
     }

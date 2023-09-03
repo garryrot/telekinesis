@@ -8,6 +8,7 @@ use tracing::{error, event, info, Level};
 
 use crate::inputs::sanitize_input_string;
 
+pub static PATTERN_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis\\Patterns";
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
 pub static SETTINGS_FILE: &str = "Telekinesis.json";
 

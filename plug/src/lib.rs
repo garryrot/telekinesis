@@ -20,6 +20,7 @@ mod event;
 mod fakes;
 mod inputs;
 mod logging;
+mod pattern;
 mod settings;
 mod telekinesis;
 mod tests;
@@ -65,6 +66,7 @@ pub trait Tk {
     fn get_device_connected(&self, device_name: &str) -> bool;
     fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
     fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool;
+    fn vibrate_pattern(&self, pattern: TkPattern, events: Vec<String>) -> bool;
     fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool;
     fn stop_all(&self) -> bool;
     fn get_next_event(&mut self) -> Option<TkEvent>;
@@ -73,6 +75,12 @@ pub trait Tk {
     fn settings_set_events(&mut self, device_name: &str, events: Vec<String>);
     fn settings_get_events(&self, device_name: &str) -> Vec<String>;
     fn settings_get_enabled(&self, device_name: &str) -> bool;
+}
+
+#[derive(Clone, Debug)]
+pub enum TkPattern {
+    Linear(Duration, Speed),
+    Funscript(Duration, String),
 }
 
 pub fn new_with_default_settings() -> impl Tk {

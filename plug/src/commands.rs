@@ -1,10 +1,10 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand};
-use tokio::{runtime::Handle, sync::mpsc::unbounded_channel, time::sleep};
-use tracing::{error, info, span, Level};
+use tokio::{runtime::Handle, sync::mpsc::unbounded_channel};
+use tracing::{error, info, span, Level, debug};
 
-use crate::{event::TkEvent, settings::TkSettings, Speed};
+use crate::{event::TkEvent, pattern::TkPatternPlayer, settings::TkSettings, Speed, TkPattern};
 
 type DeviceNameList = Box<Vec<String>>;
 
@@ -19,10 +19,8 @@ pub enum TkAction {
 
 #[derive(Clone, Debug)]
 pub struct TkControl {
-    pub duration: Duration,
     pub selector: TkDeviceSelector,
-    pub speed: Speed,
-    // Pattern(Speed)
+    pub pattern: TkPattern,
 }
 
 impl TkControl {
@@ -80,6 +78,7 @@ impl From<&TkSettings> for TkDeviceSelector {
 #[derive(Clone, Debug)]
 pub enum TkDeviceAction {
     Vibrate(Arc<ButtplugClientDevice>, Speed),
+    Update(Arc<ButtplugClientDevice>, Speed),
     Stop(Arc<ButtplugClientDevice>),
     StopAll, // global but required for resetting device state
 }
@@ -170,6 +169,14 @@ pub fn create_cmd_thread(
                                     error!("Failed to set device vibration speed.")
                                 });
                         }
+                        TkDeviceAction::Update(device, speed) => {
+                            debug!("Update action {} speed={}", device.name(), speed);
+                            device.vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
+                                .await
+                                .unwrap_or_else(|_| {
+                                    error!("Failed to set device vibration speed.")
+                                })
+                        },
                         TkDeviceAction::Stop(device) => {
                             device_access.release(&device);
                             info!(
@@ -235,39 +242,18 @@ pub fn create_cmd_thread(
                     }
 
                     TkAction::Control(control) => {
-                        // linear vibration 'patttern'
                         let devices = client.devices().clone();
-                        let action_sender = device_action_sender.clone();
-                        let speed = control.speed;
-
-                        let event_sender_clone: tokio::sync::mpsc::UnboundedSender<TkEvent> =
-                            event_sender.clone();
+                        let selection = control.filter_devices(devices);
+                        let event_sender_clone = event_sender.clone();
+                        let device_action_sender_clone = device_action_sender.clone();
                         Handle::current().spawn(async move {
-                            info!("Linear vibration control thread started");
-                            let selected = control.filter_devices(devices);
-                            let count = selected.len() as i32;
-
-                            // vibrate with speed
-                            for device in selected.iter() {
-                                action_sender
-                                    .send(TkDeviceAction::Vibrate(device.clone(), speed))
-                                    .unwrap_or_else(|_| error!(queue_full_err));
-                            }
-                            event_sender_clone
-                                .send(TkEvent::DeviceVibrated(count, speed))
-                                .unwrap_or_else(|_| error!(queue_full_err));
-                            sleep(control.duration).await;
-
-                            // stop
-                            for device in selected.iter() {
-                                action_sender
-                                    .send(TkDeviceAction::Stop(device.clone()))
-                                    .unwrap_or_else(|_| error!(queue_full_err));
-                            }
-                            event_sender_clone
-                                .send(TkEvent::DeviceStopped(count))
-                                .unwrap_or_else(|_| error!(queue_full_err));
-                            info!("Linear vibration thread done.");
+                            let player = TkPatternPlayer {
+                                devices: selection,
+                                action_sender: device_action_sender_clone,
+                                event_sender: event_sender_clone,
+                                resolution_ms: 100
+                            };
+                            player.play(control.pattern).await;
                         });
                     }
                 }

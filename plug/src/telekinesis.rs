@@ -27,9 +27,10 @@ use tracing::{debug, error, info, warn};
 use itertools::Itertools;
 
 use crate::{
-    commands::{create_cmd_thread, TkAction, TkControl, TkDeviceAction, TkDeviceSelector},
-    settings::{TkDeviceSettings, TkSettings},
-    Speed, Tk, TkEvent, inputs::sanitize_input_string,
+    commands::{create_cmd_thread, TkAction, TkControl, TkDeviceSelector},
+    inputs::sanitize_input_string,
+    settings::TkSettings,
+    Speed, Tk, TkEvent, TkPattern,
 };
 
 pub struct Telekinesis {
@@ -173,6 +174,10 @@ impl Tk for Telekinesis {
     }
 
     fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool {
+        self.vibrate_pattern(TkPattern::Linear(duration, speed), events)
+    }
+
+    fn vibrate_pattern(&self, pattern: TkPattern, events: Vec<String>) -> bool {
         info!("Sending Command: Vibrate Events");
         let evts: Vec<String> = sanitize_input_string(events);
         let selected = TkDeviceSelector::ByNames(Box::new(
@@ -188,8 +193,7 @@ impl Tk for Telekinesis {
 
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
             selector: selected,
-            duration: duration,
-            speed: speed // TkDeviceAction::Vibrate(speed),
+            pattern: pattern,
         })) {
             error!("Failed to send vibrate");
             return false;
@@ -201,8 +205,7 @@ impl Tk for Telekinesis {
         info!("Sending Command: Vibrate All");
         if let Err(_) = self.command_sender.try_send(TkAction::Control(TkControl {
             selector: TkDeviceSelector::All,
-            duration: duration,
-            speed: speed // TkDeviceAction::Vibrate(speed),
+            pattern: TkPattern::Linear(duration, speed),
         })) {
             error!("Failed to send vibrate");
             return false;
@@ -298,11 +301,9 @@ where
 #[cfg(test)]
 mod tests {
     use std::{thread, time::Duration, vec};
-
-    //use std::fmt::Display;
     use std::time::Instant;
 
-    // use crate::util::enable_log;
+    use crate::util::enable_log;
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,
@@ -313,6 +314,7 @@ mod tests {
     use super::*;
 
     impl Telekinesis {
+        /// should only be used by tests or fake backends
         pub fn await_connect(&self, devices: usize) {
             assert_timeout!(
                 self.devices.deref().lock().unwrap().deref().len() == devices,
@@ -414,25 +416,32 @@ mod tests {
         tk.settings_set_events("vib2", vec![String::from("device 2")]);
 
         // act
-        tk.vibrate(Speed::new(99), Duration::from_millis(3000), vec![String::from("device 1")]);
-        tk.vibrate(Speed::new(88), Duration::from_millis(3000), vec![String::from("device 2")]);
+        tk.vibrate(
+            Speed::new(99),
+            Duration::from_millis(3000),
+            vec![String::from("device 1")],
+        );
+        tk.vibrate(
+            Speed::new(88),
+            Duration::from_millis(3000),
+            vec![String::from("device 2")],
+        );
         thread::sleep(Duration::from_secs(5));
 
         // assert
         call_registry.assert_vibrated(1);
         call_registry.assert_vibrated(2);
     }
-     
+
     #[test]
     fn vibrate_the_same_device_simultaneously() {
         // call1  |111111111111111111111-->|
         // call2         |2222->|
-        // result |111111122222222222222-->|    
-        
+        // result |111111122222222222222-->|
+
         // arrange
-        let (tk, call_registry) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate)
-        ]);
+        let (tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
         tk.vibrate_all(Speed::new(10), Duration::from_secs(1));
@@ -446,7 +455,7 @@ mod tests {
         assert!(call_registry.get_device(1)[2].vibration_stopped());
         assert_eq!(call_registry.get_device(1).len(), 3)
     }
-    
+
     #[test]
     fn settings_only_vibrate_enabled_devices() {
         // arrange
@@ -595,7 +604,7 @@ mod tests {
     }
 
     fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {
-        let devices_names: Vec<String>  = devices.iter().map(|d| d.device_name().clone()).collect();
+        let devices_names: Vec<String> = devices.iter().map(|d| d.device_name().clone()).collect();
         let (connector, call_registry) = FakeDeviceConnector::new(devices);
         let count = connector.devices.len();
 
@@ -608,5 +617,22 @@ mod tests {
         }
 
         (tk, call_registry)
+    }
+
+    #[test]
+    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
+    fn test_funscript_vibrate_10s() {
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        tk.scan_for_devices();
+        tk.await_connect(1);
+        thread::sleep(Duration::from_secs(2));
+        tk.settings.set_enabled(tk.get_device_names().first().unwrap(), true);
+
+        enable_log();
+        tk.vibrate_pattern(
+            TkPattern::Funscript(Duration::from_secs(10), String::from("Data/SKSE/Plugins/Telekinesis/Patterns/tease-30s.vibrator.funscript")),
+            vec![]);
+        thread::sleep(Duration::from_secs(15)); // dont disconnect
+        tk.stop_all();
     }
 }
