@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand};
 use tokio::{runtime::Handle, sync::mpsc::unbounded_channel};
-use tracing::{error, info, span, Level, debug};
+use tracing::{error, info, span, Level, debug, trace};
 
 use crate::{event::TkEvent, pattern::TkPatternPlayer, settings::TkSettings, Speed, TkPattern};
 
@@ -117,12 +117,14 @@ impl DeviceAccess {
             .entry(device.index())
             .and_modify(|counter| *counter += 1)
             .or_insert(1);
+        trace!("Reserved device={} ref-count={}", device.name(), self.current_references(&device))
     }
     pub fn release(&mut self, device: &Arc<ButtplugClientDevice>) {
         self.access_list
             .entry(device.index())
             .and_modify(|counter| *counter -= 1)
             .or_insert(0);
+        trace!("Released device={} ref-count={}", device.name(), self.current_references(&device))
     }
     pub fn current_references(&self, device: &Arc<ButtplugClientDevice>) -> u32 {
         match self.access_list.get(&device.index()) {
@@ -152,16 +154,10 @@ pub fn create_cmd_thread(
         Handle::current().spawn(async move {
             loop {
                 if let Some(next_action) = device_action_receiver.recv().await {
-                    info!("Working device action {:?}", next_action);
+                    debug!("Exec device action {:?}", next_action);
                     match next_action {
                         TkDeviceAction::Vibrate(device, speed) => {
                             device_access.reserve(&device);
-                            info!(
-                                "Vibrate action {} speed={} (accesses={})",
-                                device.name(),
-                                speed,
-                                device_access.current_references(&device)
-                            );
                             device
                                 .vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
                                 .await
@@ -170,7 +166,6 @@ pub fn create_cmd_thread(
                                 });
                         }
                         TkDeviceAction::Update(device, speed) => {
-                            debug!("Update action {} speed={}", device.name(), speed);
                             device.vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
                                 .await
                                 .unwrap_or_else(|_| {
@@ -179,13 +174,8 @@ pub fn create_cmd_thread(
                         },
                         TkDeviceAction::Stop(device) => {
                             device_access.release(&device);
-                            info!(
-                                "Stop device action {} (accesses={})",
-                                device.name(),
-                                device_access.current_references(&device)
-                            );
                             if device_access.current_references(&device) == 0 {
-                                // nobody else is using the device, stop vibrating
+                                // nothing else is controlling the device, stop it
                                 device
                                     .vibrate(&ScalarValueCommand::ScalarValue(0.0))
                                     .await

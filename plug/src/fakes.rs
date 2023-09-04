@@ -66,7 +66,8 @@ impl FakeMessage {
             _ => panic!("Message is not scalar cmd")
         }
     }
-
+    
+    #[allow(dead_code)]
     pub fn vibration_started_strength(&self, speed: f64) -> bool {
         match self.message.clone() {
             message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => 
@@ -129,7 +130,6 @@ impl FakeConnectorCallRegistry {
         assert_eq!(self.get_device(device_id).len(), 0, "Device has not vibrated");
     }
 }
-
 
 // Connector that allows to instantiate various fake devices for testing purposes
 #[allow(dead_code)]
