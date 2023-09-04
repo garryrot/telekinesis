@@ -1,6 +1,8 @@
 use buttplug::client::ButtplugClientDevice;
 use event::TkEvent;
 use lazy_static::lazy_static;
+use pattern::get_pattern_names;
+use settings::PATTERN_PATH;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -42,15 +44,16 @@ mod ffi {
         fn tk_get_devices() -> Vec<String>;
         fn tk_get_device_connected(device_name: &str) -> bool;
         fn tk_get_device_capabilities(device_name: &str) -> Vec<String>;
-        fn tk_vibrate(speed: i64, secs: u64) -> bool;
-        fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>)
-            -> bool;
+        fn tk_get_pattern_names(vibration_devices: bool) -> Vec<String>;
+        fn tk_vibrate(speed: i64, secs: f32) -> bool;
+        fn tk_vibrate_events(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> bool;
+        fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
         fn tk_settings_set_enabled(device_name: &str, enabled: bool);
         fn tk_settings_get_enabled(device_name: &str) -> bool;
-        fn tk_settings_get_events(device_name: &str) -> Vec<String>; 
+        fn tk_settings_get_events(device_name: &str) -> Vec<String>;
         fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>);
         fn tk_settings_store() -> bool;
     }
@@ -161,16 +164,27 @@ pub fn tk_stop_scan() -> bool {
 }
 
 #[instrument]
-pub fn tk_vibrate(speed: i64, secs: u64) -> bool {
-    access_mutex(|tk| tk.vibrate(Speed::new(speed), Duration::from_secs(secs), vec![])).is_some()
+pub fn tk_vibrate(speed: i64, secs: f32) -> bool {
+    access_mutex(|tk| tk.vibrate(Speed::new(speed), Duration::from_millis((secs * 1000.0) as u64), vec![])).is_some()
 }
 
 #[instrument]
-pub fn tk_vibrate_events(speed: i64, secs: u64, events: &CxxVector<CxxString>) -> bool {
+pub fn tk_vibrate_events(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> bool {
     access_mutex(|tk| {
         tk.vibrate(
             Speed::new(speed),
-            Duration::from_secs(secs),
+            Duration::from_millis((secs * 1000.0) as u64),
+            read_input_string(&events),
+        )
+    })
+    .is_some()
+}
+
+#[instrument]
+pub fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> bool {
+    access_mutex(|tk| {
+        tk.vibrate_pattern(
+            TkPattern::Funscript(Duration::from_millis((secs * 1000.0) as u64), String::from(pattern_name)),
             read_input_string(&events),
         )
     })
@@ -199,6 +213,11 @@ pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
         return value;
     }
     vec![]
+}
+
+#[instrument]
+pub fn tk_get_pattern_names(vibration_patterns: bool) -> Vec<String> {
+    get_pattern_names(PATTERN_PATH, vibration_patterns)
 }
 
 #[instrument]
@@ -231,7 +250,7 @@ pub fn tk_settings_get_events(device_name: &str) -> Vec<String> {
     match access_mutex(|tk| tk.settings_get_events(device_name)) {
         Some(events) => events,
         None => vec![],
-    } 
+    }
 }
 
 #[instrument]
@@ -242,9 +261,7 @@ pub fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>) 
 #[instrument]
 pub fn tk_settings_get_enabled(device_name: &str) -> bool {
     match access_mutex(|tk| tk.settings_get_enabled(device_name)) {
-        Some(enabled) => {
-            enabled
-        },
+        Some(enabled) => enabled,
         None => false,
     }
 }

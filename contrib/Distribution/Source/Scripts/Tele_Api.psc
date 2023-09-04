@@ -38,6 +38,9 @@ bool function GetDeviceConnected(String device_name) global native
 ; Vibrate all enabled devices
 Bool function Vibrate(Int speed, Float duration_sec) global native
 
+; Vibrate devices by pattern name and events
+Bool function VibratePattern(String pattern_name, Float duration_sec, String[] events) global native
+
 ; Vibrate all enabled devices by events
 Bool function VibrateEvents(Int speed, Float duration_sec, String[] events) global native
 
@@ -71,3 +74,7 @@ function SetEvents(String device_name, String[] events) global native
 
 ; Persists settings in Telekinesis.json
 Bool function SettingsStore() global native
+
+; Get names of funscript patterns (either vibration or regular ones) from
+; the PATTERN_PATH (Data/SKSE/Plugins/Telekinesis/Patterns/*)
+String[] function GetPatternNames(Bool vibration_events) global native

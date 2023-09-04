@@ -4,7 +4,7 @@ use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand}
 use tokio::{runtime::Handle, sync::mpsc::unbounded_channel};
 use tracing::{error, info, span, Level, debug, trace};
 
-use crate::{event::TkEvent, pattern::TkPatternPlayer, settings::TkSettings, Speed, TkPattern};
+use crate::{event::TkEvent, pattern::TkPatternPlayer, settings::{TkSettings, PATTERN_PATH}, Speed, TkPattern};
 
 type DeviceNameList = Box<Vec<String>>;
 
@@ -154,7 +154,7 @@ pub fn create_cmd_thread(
         Handle::current().spawn(async move {
             loop {
                 if let Some(next_action) = device_action_receiver.recv().await {
-                    debug!("Exec device action {:?}", next_action);
+                    trace!("Exec device action {:?}", next_action);
                     match next_action {
                         TkDeviceAction::Vibrate(device, speed) => {
                             device_access.reserve(&device);
@@ -241,7 +241,8 @@ pub fn create_cmd_thread(
                                 devices: selection,
                                 action_sender: device_action_sender_clone,
                                 event_sender: event_sender_clone,
-                                resolution_ms: 100
+                                resolution_ms: 100,
+                                pattern_path: String::from(PATTERN_PATH)
                             };
                             player.play(control.pattern).await;
                         });

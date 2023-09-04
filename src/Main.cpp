@@ -29,6 +29,7 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("GetDeviceConnected", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetDeviceConnected);
     vm->RegisterFunction("Vibrate", PapyrusClass, (bool (*)(SFT, int, float))Tk::Vibrate);
     vm->RegisterFunction("VibrateEvents", PapyrusClass, (bool (*)(SFT, int, float, std::vector<std::string>))Tk::VibrateEvents);
+    vm->RegisterFunction("VibratePattern", PapyrusClass, (bool (*)(SFT, std::string, float, std::vector<std::string>))Tk::VibratePattern);
     vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(SFT))Tk::StopAll);
     vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::PollEvents);
     vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetEnabled);
@@ -36,6 +37,7 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("GetEvents", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetEvents);
     vm->RegisterFunction("SetEvents", PapyrusClass, (void (*)(SFT, std::string, std::vector<std::string>))Tk::SetEvents);
     vm->RegisterFunction("SettingsStore", PapyrusClass, (bool (*)(SFT))Tk::SettingsStore);
+    vm->RegisterFunction("GetPatternNames", PapyrusClass, (std::vector<std::string>(*)(SFT, bool))Tk::GetPatternNames);
     return true;
 }
 

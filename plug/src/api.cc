@@ -39,6 +39,9 @@ namespace Tk
     DllExport bool VibrateEvents(void*, int speed, float time_sec, std::vector<std::string> events) {
         return tk_vibrate_events(speed, time_sec, events);
     }
+    DllExport bool VibratePattern(void*, std::string pattern_name, float time_sec, std::vector<std::string> events) {
+        return tk_vibrate_pattern(pattern_name, time_sec, events);
+    }
     DllExport bool StopAll(void*) {
         return tk_stop_all(); 
     }
@@ -61,5 +64,9 @@ namespace Tk
     }
     DllExport bool SettingsStore(void*) {
         return tk_settings_store();
+    }   
+    DllExport std::vector<std::string> GetPatternNames(void*, bool vibration_patterns) {
+        auto patterns = tk_get_pattern_names(vibration_patterns);
+        return std::vector<std::string>(patterns.begin(), patterns.end());
     }
 }

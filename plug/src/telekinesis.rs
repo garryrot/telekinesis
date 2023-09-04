@@ -630,7 +630,7 @@ mod tests {
 
         enable_log();
         tk.vibrate_pattern(
-            TkPattern::Funscript(Duration::from_secs(10), String::from("Data/SKSE/Plugins/Telekinesis/Patterns/tease-30s.vibrator.funscript")),
+            TkPattern::Funscript(Duration::from_secs(10), String::from("Tease_30s")),
             vec![]);
         thread::sleep(Duration::from_secs(15)); // dont disconnect
         tk.stop_all();

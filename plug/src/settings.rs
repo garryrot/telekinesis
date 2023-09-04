@@ -294,9 +294,9 @@ mod tests {
         let settings2 =
             TkSettings::try_read_or_default(tmpdir.path().to_str().unwrap(), target_file);
         assert_eq!(settings2.devices[0].name, "foobar");
-
         assert_ok!(tmpdir.close());
     }
+
 
     fn create_temp_file(name: &str, content: &str) -> (String, TempDir) {
         let tmp_path = tempdir().unwrap();
