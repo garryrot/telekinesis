@@ -243,29 +243,36 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                     .send(response)
                     .await
                     .map_err(|_| ButtplugConnectorError::ConnectorNotConnected)
-            }.boxed(),
+            }
+            .boxed(),
             ButtplugCurrentSpecClientMessage::ScalarCmd(cmd) => {
-                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
+                self.call_registry
+                    .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::LinearCmd(cmd) => {
-                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
+                self.call_registry
+                    .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::RotateCmd(cmd) => {
-                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
+                self.call_registry
+                    .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::StopAllDevices(cmd) => {
-                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
+                self.call_registry
+                    .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::StartScanning(cmd) => {
-                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
+                self.call_registry
+                    .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::StopScanning(cmd) => {
-                self.call_registry.store_record(&cmd, FakeMessage::new(msg_clone) );
+                self.call_registry
+                    .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
             _ => {
@@ -380,7 +387,10 @@ mod tests {
     }
 
     pub fn await_devices(buttplug: &ButtplugClient, devices: usize) {
-        assert_timeout!(buttplug.devices().len() == devices, "Awaiting devices connected");
+        assert_timeout!(
+            buttplug.devices().len() == devices,
+            "Awaiting devices connected"
+        );
     }
 
     #[test]
