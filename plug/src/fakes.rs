@@ -260,9 +260,10 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                     .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
-            ButtplugCurrentSpecClientMessage::StopAllDevices(cmd) => {
-                self.call_registry
-                    .store_record(&cmd, FakeMessage::new(msg_clone));
+            ButtplugCurrentSpecClientMessage::StopAllDevices(_) => {
+                // doesn't work cause no id
+                // self.call_registry
+                //     .store_record(&cmd, FakeMessage::new(msg_clone));
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::StartScanning(cmd) => {

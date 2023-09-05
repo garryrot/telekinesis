@@ -11,50 +11,49 @@ use tokio::{
     sync::mpsc::UnboundedSender,
     time::{sleep, Instant},
 };
-use tracing::{error, info, trace};
+use tokio_util::sync::CancellationToken;
+use tracing::{error, info, trace, warn};
 
-use crate::{commands::TkDeviceAction, event::TkEvent, inputs::Speed, TkPattern};
+use crate::{commands::TkDeviceAction, event::TkEvent, inputs::Speed, TkDuration, TkPattern};
 
 pub struct TkPatternPlayer {
     pub devices: Vec<Arc<ButtplugClientDevice>>,
     pub action_sender: UnboundedSender<TkDeviceAction>,
     pub event_sender: UnboundedSender<TkEvent>,
     pub resolution_ms: i32,
-    pub pattern_path: String 
+    pub pattern_path: String,
 }
 
 impl TkPatternPlayer {
-    pub async fn play(self, pattern: TkPattern) {
+    pub async fn play(self, pattern: TkPattern, cancel: CancellationToken) {
         info!("Playing pattern {:?}", pattern);
         match pattern {
-            TkPattern::Linear(duration, speed) => {
-                match duration {
-                    crate::TkDuration::Infinite => {
-                        self.do_vibrate(speed);
-                        info!("Infinite started");
-                    },
-                    crate::TkDuration::Timed(duration) => {
-                        self.do_vibrate(speed);
-                        sleep(duration).await;
-                        self.do_stop();
-                        info!("Linear finished");
-                    },
+            TkPattern::Linear(duration, speed) => match duration {
+                TkDuration::Infinite => {
+                    self.do_vibrate(speed);
+                    info!("Infinite started");
                 }
-            }
+                TkDuration::Timed(duration) => {
+                    self.do_vibrate(speed);
+                    cancellable_wait(duration, &cancel).await;
+                    self.do_stop();
+                    info!("Linear finished");
+                }
+            },
             TkPattern::Stop() => {
                 self.do_stop();
                 info!("Stopped");
-            },
+            }
             TkPattern::Funscript(duration, pattern_name) => {
-                match read_pattern_name( &self.pattern_path, &pattern_name, true) {
+                match read_pattern_name(&self.pattern_path, &pattern_name, true) {
                     Ok(funscript) => {
                         let actions = funscript.actions;
                         if actions.len() == 0 {
                             return;
                         }
                         let duration = match duration {
-                            crate::TkDuration::Infinite => Duration::MAX,
-                            crate::TkDuration::Timed(duration) => duration,
+                            TkDuration::Infinite => Duration::MAX,
+                            TkDuration::Timed(duration) => duration,
                         };
 
                         let mut dropped = 0;
@@ -80,13 +79,21 @@ impl TkPatternPlayer {
                             let next_timer_us = (actions[i].at * 1000) as u64;
                             let elapsed_us = now.elapsed().as_micros() as u64;
                             if elapsed_us < next_timer_us {
-                                sleep(Duration::from_micros(next_timer_us - elapsed_us)).await;
-                            }
-                            if last_pos != point.pos {
-                                self.do_update(Speed::from_fs(point));
-                                last_pos = point.pos;
-                            } else {
-                                ignored += 1;
+                                if false
+                                    == cancellable_wait(
+                                        Duration::from_micros(next_timer_us - elapsed_us),
+                                        &cancel,
+                                    )
+                                    .await
+                                {
+                                    break;
+                                };
+                                if last_pos != point.pos {
+                                    self.do_update(Speed::from_fs(point));
+                                    last_pos = point.pos;
+                                } else {
+                                    ignored += 1;
+                                }
                             }
                             i += 1;
                         }
@@ -98,7 +105,10 @@ impl TkPatternPlayer {
                             ignored
                         );
                     }
-                    Err(err) => error!("Error loading funscript pattern={} err={}", pattern_name, err),
+                    Err(err) => error!(
+                        "Error loading funscript pattern={} err={}",
+                        pattern_name, err
+                    ),
                 }
             }
         }
@@ -138,6 +148,19 @@ impl TkPatternPlayer {
     }
 }
 
+async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> bool {
+    tokio::select! {
+        _ = cancel.cancelled() => {
+            info!("Action cancelled");
+            return false;
+        }
+        _ = sleep(duration) => {
+            info!("Sleep done");
+            return true;
+        }
+    };
+}
+
 struct TkPatternFile {
     path: PathBuf,
     is_vibration: bool,
@@ -163,14 +186,19 @@ fn read_pattern_name(
     pattern_name: &str,
     vibration_pattern: bool,
 ) -> Result<FScript, anyhow::Error> {
+    let now = Instant::now();
     let patterns = get_pattern_paths(pattern_path)?;
     let pattern = patterns
         .iter()
-        .filter(|d| d.is_vibration == vibration_pattern && d.name == pattern_name)
+        .filter(|d| {
+            d.is_vibration == vibration_pattern
+                && d.name.to_lowercase() == pattern_name.to_lowercase()
+        })
         .next()
         .ok_or_else(|| anyhow!("Pattern '{}' not found", pattern_name))?;
 
     let fs = funscript::load_funscript(pattern.path.to_str().unwrap())?;
+    info!("Read pattern {} in {:?}", pattern_name, now.elapsed());
     Ok(fs)
 }
 
@@ -198,17 +226,12 @@ fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::E
         } else {
             removal = file_name.len() - ".funscript".len();
         }
-        let name = &file_name[0..removal];
 
         patterns.push(TkPatternFile {
             path: path_clone,
-            is_vibration: is_vibration,
-            name: capitalize_first_letter(&name),
+            is_vibration,
+            name: String::from(&file_name[0..removal]),
         })
     }
     Ok(patterns)
-}
-
-fn capitalize_first_letter(s: &str) -> String {
-    s[0..1].to_uppercase() + &s[1..]
 }

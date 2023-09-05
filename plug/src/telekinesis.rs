@@ -18,8 +18,7 @@ use futures::{Future, StreamExt};
 
 use std::{
     fmt::{self},
-    sync::{Arc, Mutex},
-    time::Duration,
+    sync::{Arc, Mutex}
 };
 use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info, warn};
@@ -629,6 +628,21 @@ mod tests {
         call_registry.assert_started(1);
 
         tk.vibrate_stop(vec![]);
+        call_registry.assert_vibrated(1);
+    }
+
+    #[test]
+    fn vibrate_linear_then_cancel() {
+        // arrange
+        let (tk, call_registry) =
+        wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+
+        // act
+        tk.vibrate(Speed::max(), TkDuration::Timed(Duration::from_secs(10)), vec![]);
+        thread::sleep(Duration::from_secs(1));
+        call_registry.assert_started(1);
+
+        tk.stop_all();
         call_registry.assert_vibrated(1);
     }
 

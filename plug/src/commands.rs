@@ -1,10 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
 use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand};
-use tokio::{runtime::Handle, sync::mpsc::unbounded_channel};
-use tracing::{error, info, span, Level, debug, trace};
+use tokio::{runtime::Handle, sync::mpsc::unbounded_channel, task::JoinHandle};
+use tracing::{error, info, span, trace, Level, warn};
+use tokio_util::sync::CancellationToken;
 
-use crate::{event::TkEvent, pattern::TkPatternPlayer, settings::{TkSettings, PATTERN_PATH}, Speed, TkPattern};
+use crate::{
+    event::TkEvent,
+    pattern::TkPatternPlayer,
+    settings::{TkSettings, PATTERN_PATH},
+    Speed, TkPattern,
+};
 
 type DeviceNameList = Box<Vec<String>>;
 
@@ -117,14 +123,28 @@ impl DeviceAccess {
             .entry(device.index())
             .and_modify(|counter| *counter += 1)
             .or_insert(1);
-        trace!("Reserved device={} ref-count={}", device.name(), self.current_references(&device))
+        trace!(
+            "Reserved device={} ref-count={}",
+            device.name(),
+            self.current_references(&device)
+        )
     }
     pub fn release(&mut self, device: &Arc<ButtplugClientDevice>) {
         self.access_list
             .entry(device.index())
-            .and_modify(|counter| *counter -= 1)
+            .and_modify(|counter| {
+                if *counter > 0 {
+                    *counter -= 1
+                } else {
+                    warn!("Release on refcount 0")
+                }
+            })
             .or_insert(0);
-        trace!("Released device={} ref-count={}", device.name(), self.current_references(&device))
+        trace!(
+            "Released device={} ref-count={}",
+            device.name(),
+            self.current_references(&device)
+        )
     }
     pub fn current_references(&self, device: &Arc<ButtplugClientDevice>) -> u32 {
         match self.access_list.get(&device.index()) {
@@ -165,13 +185,10 @@ pub fn create_cmd_thread(
                                     error!("Failed to set device vibration speed.")
                                 });
                         }
-                        TkDeviceAction::Update(device, speed) => {
-                            device.vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
-                                .await
-                                .unwrap_or_else(|_| {
-                                    error!("Failed to set device vibration speed.")
-                                })
-                        },
+                        TkDeviceAction::Update(device, speed) => device
+                            .vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
+                            .await
+                            .unwrap_or_else(|_| error!("Failed to set device vibration speed.")),
                         TkDeviceAction::End(device) => {
                             device_access.release(&device);
                             if device_access.current_references(&device) == 0 {
@@ -181,10 +198,11 @@ pub fn create_cmd_thread(
                                     .await
                                     .unwrap_or_else(|_| error!("Failed to stop vibration"));
                                 info!("Device stopped {}", device.name())
-                            }
-                            else
-                            {
-                                info!("Device not stopped, open references: {}", device_access.current_references(&device));
+                            } else {
+                                info!(
+                                    "Device not stopped, open references: {}",
+                                    device_access.current_references(&device)
+                                );
                             }
                         }
                         TkDeviceAction::StopAll => {
@@ -197,6 +215,7 @@ pub fn create_cmd_thread(
         });
 
         // global operations and long running pattern execution
+        let mut cancellation_tokens: Vec<CancellationToken> = vec![];
         loop {
             let next_cmd = command_receiver.recv().await;
             if let Some(cmd) = next_cmd {
@@ -223,6 +242,11 @@ pub fn create_cmd_thread(
                         break;
                     }
                     TkAction::StopAll => {
+                        for token in &cancellation_tokens {
+                            info!("Cancelling token {:?}", token);
+                            token.cancel();
+                        }
+                        cancellation_tokens = vec![];
                         client
                             .stop_all_devices()
                             .await
@@ -240,15 +264,18 @@ pub fn create_cmd_thread(
                         let selection = control.filter_devices(devices);
                         let event_sender_clone = event_sender.clone();
                         let device_action_sender_clone = device_action_sender.clone();
+                        
+                        let cancel_token = CancellationToken::new();
+                        cancellation_tokens.push(cancel_token.clone());
                         Handle::current().spawn(async move {
                             let player = TkPatternPlayer {
                                 devices: selection,
                                 action_sender: device_action_sender_clone,
                                 event_sender: event_sender_clone,
                                 resolution_ms: 100,
-                                pattern_path: String::from(PATTERN_PATH)
+                                pattern_path: String::from(PATTERN_PATH),
                             };
-                            player.play(control.pattern).await;
+                            player.play(control.pattern, cancel_token).await;
                         });
                     }
                 }
