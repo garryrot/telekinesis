@@ -48,6 +48,7 @@ mod ffi {
         fn tk_vibrate(speed: i64, secs: f32) -> bool;
         fn tk_vibrate_events(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> bool;
         fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> bool;
+        fn tk_vibrate_stop(events: &CxxVector<CxxString>) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
@@ -68,9 +69,10 @@ pub trait Tk {
     fn get_device_names(&self) -> Vec<String>;
     fn get_device_connected(&self, device_name: &str) -> bool;
     fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
-    fn vibrate(&self, speed: Speed, duration: Duration, events: Vec<String>) -> bool;
+    fn vibrate(&self, speed: Speed, duration: TkDuration, events: Vec<String>) -> bool;
     fn vibrate_pattern(&self, pattern: TkPattern, events: Vec<String>) -> bool;
-    fn vibrate_all(&self, speed: Speed, duration: Duration) -> bool;
+    fn vibrate_all(&self, speed: Speed, duration: TkDuration) -> bool;
+    fn vibrate_stop(&self, events: Vec<String>) -> bool;
     fn stop_all(&self) -> bool;
     fn get_next_event(&mut self) -> Option<TkEvent>;
     fn get_next_events(&mut self) -> Vec<TkEvent>;
@@ -81,9 +83,33 @@ pub trait Tk {
 }
 
 #[derive(Clone, Debug)]
+pub enum TkDuration {
+    Infinite,
+    Timed(Duration)
+}
+
+impl TkDuration {
+    pub fn from_input_float(secs: f32) -> TkDuration {
+        if secs > 0.0 {
+            return TkDuration::Timed(Duration::from_millis((secs * 1000.0) as u64));
+        }
+        else {
+            return TkDuration::Infinite;
+        }
+    }
+    pub fn from_millis(ms: u64) -> TkDuration {
+        TkDuration::Timed(Duration::from_millis(ms))
+    }
+    pub fn from_secs(s: u64) -> TkDuration {
+        TkDuration::Timed(Duration::from_secs(s))
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum TkPattern {
-    Linear(Duration, Speed),
-    Funscript(Duration, String),
+    Stop(),
+    Linear(TkDuration, Speed),
+    Funscript(TkDuration, String),
 }
 
 pub fn new_with_default_settings() -> impl Tk {
@@ -165,7 +191,7 @@ pub fn tk_stop_scan() -> bool {
 
 #[instrument]
 pub fn tk_vibrate(speed: i64, secs: f32) -> bool {
-    access_mutex(|tk| tk.vibrate(Speed::new(speed), Duration::from_millis((secs * 1000.0) as u64), vec![])).is_some()
+    access_mutex(|tk| tk.vibrate(Speed::new(speed), TkDuration::from_input_float(secs), vec![])).is_some()
 }
 
 #[instrument]
@@ -173,7 +199,7 @@ pub fn tk_vibrate_events(speed: i64, secs: f32, events: &CxxVector<CxxString>) -
     access_mutex(|tk| {
         tk.vibrate(
             Speed::new(speed),
-            Duration::from_millis((secs * 1000.0) as u64),
+            TkDuration::from_input_float(secs),
             read_input_string(&events),
         )
     })
@@ -184,7 +210,18 @@ pub fn tk_vibrate_events(speed: i64, secs: f32, events: &CxxVector<CxxString>) -
 pub fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> bool {
     access_mutex(|tk| {
         tk.vibrate_pattern(
-            TkPattern::Funscript(Duration::from_millis((secs * 1000.0) as u64), String::from(pattern_name)),
+            TkPattern::Funscript(TkDuration::from_input_float(secs), String::from(pattern_name)),
+            read_input_string(&events),
+        )
+    })
+    .is_some()
+}
+
+#[instrument]
+pub fn tk_vibrate_stop(events: &CxxVector<CxxString>) -> bool {
+    access_mutex(|tk| {
+        tk.vibrate_pattern(
+            TkPattern::Stop(),
             read_input_string(&events),
         )
     })

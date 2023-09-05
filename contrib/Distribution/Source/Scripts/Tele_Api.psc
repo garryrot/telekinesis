@@ -35,14 +35,14 @@ String[] function GetDeviceCapabilities(String device_name) global native
 ; Will also return false when the device does not exist
 bool function GetDeviceConnected(String device_name) global native
 
-; Vibrate all enabled devices
-Bool function Vibrate(Int speed, Float duration_sec) global native
-
 ; Vibrate devices by pattern name and events
 Bool function VibratePattern(String pattern_name, Float duration_sec, String[] events) global native
 
 ; Vibrate all enabled devices by events
 Bool function VibrateEvents(Int speed, Float duration_sec, String[] events) global native
+
+; Stop currently running vibrations
+Bool function VibrateStop(String[] events) global native
 
 ; Immediately stops all connected devices. This can be used for
 ; shutdown of ALL device actions before calling `Close` to assure that

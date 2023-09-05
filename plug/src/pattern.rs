@@ -28,12 +28,23 @@ impl TkPatternPlayer {
         info!("Playing pattern {:?}", pattern);
         match pattern {
             TkPattern::Linear(duration, speed) => {
-                // vibrate with speed
-                self.do_vibrate(speed);
-                sleep(duration).await;
-                self.do_stop();
-                info!("Linear finished");
+                match duration {
+                    crate::TkDuration::Infinite => {
+                        self.do_vibrate(speed);
+                        info!("Infinite started");
+                    },
+                    crate::TkDuration::Timed(duration) => {
+                        self.do_vibrate(speed);
+                        sleep(duration).await;
+                        self.do_stop();
+                        info!("Linear finished");
+                    },
+                }
             }
+            TkPattern::Stop() => {
+                self.do_stop();
+                info!("Stopped");
+            },
             TkPattern::Funscript(duration, pattern_name) => {
                 match read_pattern_name( &self.pattern_path, &pattern_name, true) {
                     Ok(funscript) => {
@@ -41,6 +52,10 @@ impl TkPatternPlayer {
                         if actions.len() == 0 {
                             return;
                         }
+                        let duration = match duration {
+                            crate::TkDuration::Infinite => Duration::MAX,
+                            crate::TkDuration::Timed(duration) => duration,
+                        };
 
                         let mut dropped = 0;
                         let mut ignored = 0;
@@ -102,7 +117,7 @@ impl TkPatternPlayer {
         trace!("do_vibrate {}", speed);
         for device in self.devices.iter() {
             self.action_sender
-                .send(TkDeviceAction::Vibrate(device.clone(), speed))
+                .send(TkDeviceAction::Start(device.clone(), speed))
                 .unwrap_or_else(|_| error!("queue full"));
         }
         self.event_sender
@@ -111,10 +126,10 @@ impl TkPatternPlayer {
     }
 
     fn do_stop(&self) {
-        trace!("do_vibrate");
+        trace!("do_stop");
         for device in self.devices.iter() {
             self.action_sender
-                .send(TkDeviceAction::Stop(device.clone()))
+                .send(TkDeviceAction::End(device.clone()))
                 .unwrap_or_else(|_| error!("queue full"));
         }
         self.event_sender

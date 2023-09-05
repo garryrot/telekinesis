@@ -77,9 +77,9 @@ impl From<&TkSettings> for TkDeviceSelector {
 
 #[derive(Clone, Debug)]
 pub enum TkDeviceAction {
-    Vibrate(Arc<ButtplugClientDevice>, Speed),
+    Start(Arc<ButtplugClientDevice>, Speed),
     Update(Arc<ButtplugClientDevice>, Speed),
-    Stop(Arc<ButtplugClientDevice>),
+    End(Arc<ButtplugClientDevice>),
     StopAll, // global but required for resetting device state
 }
 
@@ -156,7 +156,7 @@ pub fn create_cmd_thread(
                 if let Some(next_action) = device_action_receiver.recv().await {
                     trace!("Exec device action {:?}", next_action);
                     match next_action {
-                        TkDeviceAction::Vibrate(device, speed) => {
+                        TkDeviceAction::Start(device, speed) => {
                             device_access.reserve(&device);
                             device
                                 .vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
@@ -172,7 +172,7 @@ pub fn create_cmd_thread(
                                     error!("Failed to set device vibration speed.")
                                 })
                         },
-                        TkDeviceAction::Stop(device) => {
+                        TkDeviceAction::End(device) => {
                             device_access.release(&device);
                             if device_access.current_references(&device) == 0 {
                                 // nothing else is controlling the device, stop it
@@ -181,6 +181,10 @@ pub fn create_cmd_thread(
                                     .await
                                     .unwrap_or_else(|_| error!("Failed to stop vibration"));
                                 info!("Device stopped {}", device.name())
+                            }
+                            else
+                            {
+                                info!("Device not stopped, open references: {}", device_access.current_references(&device));
                             }
                         }
                         TkDeviceAction::StopAll => {

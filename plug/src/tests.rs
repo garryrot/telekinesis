@@ -16,7 +16,7 @@ mod tests {
     #[test]
     fn vibrate_delayer_applied_after_timeout() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
-        tk.vibrate_all(Speed::new(0), Duration::from_millis(50));
+        tk.vibrate_all(Speed::new(0), TkDuration::from_millis(50));
         _assert_one_event(&mut tk);
         _assert_no_event(&mut tk);
         _sleep();
@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn vibrate_delayed_command_is_overwritten() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
-        tk.vibrate_all(Speed::new(33), Duration::from_millis(50));
+        tk.vibrate_all(Speed::new(33), TkDuration::from_millis(50));
         _assert_one_event(&mut tk)
     }
 
@@ -41,7 +41,7 @@ mod tests {
     fn get_next_events_after_action_returns_1() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
-        tk.vibrate_all(Speed::new(22), Duration::from_secs(10));
+        tk.vibrate_all(Speed::new(22), TkDuration::from_secs(10));
         _sleep();
         assert_eq!(tk.get_next_events().len(), 1);
     }
@@ -50,7 +50,7 @@ mod tests {
     fn get_next_events_multiple_actions_are_returned_in_correct_order() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
-        tk.vibrate_all(Speed::new(20), Duration::from_secs(10));
+        tk.vibrate_all(Speed::new(20), TkDuration::from_secs(10));
         tk.stop_all();
         _sleep();
         let events = tk.get_next_events();

@@ -7,8 +7,9 @@ namespace Tk
     std::vector<std::string> GetDevices(void*);
     std::vector<std::string> GetDeviceCapabilities(void*, std::string name);
     bool GetDeviceConnected(void*, std::string name);
-    bool Vibrate(void*, int speed, float time_sec);
     bool VibrateEvents(void*, int speed, float time_sec, std::vector<std::string> events);
+    bool VibratePattern(void*, std::string pattern_name, float time_sec, std::vector<std::string> events);
+    bool VibrateStop(void*, std::vector<std::string> events);
     bool StopAll(void*);
     std::vector<std::string> PollEvents(void*);
     bool GetEnabled(void*, std::string name);
@@ -16,4 +17,5 @@ namespace Tk
     std::vector<std::string> GetEvents(void*, std::string device_name);
     void SetEvents(void*, std::string device_name, std::vector<std::string> events);
     bool SettingsStore(void*);
+    std::vector<std::string> GetPatternNames(void*, bool vibration_patterns);
 }

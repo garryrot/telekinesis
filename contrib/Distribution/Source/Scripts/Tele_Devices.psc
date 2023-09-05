@@ -66,17 +66,18 @@ Function Disconnect()
     ScanningForDevices = false
 EndFunction
 
-Function Vibrate(Int speed, Float duration_sec)
+Function Vibrate(Int speed, Float duration_sec = -1.0)
     { Vibrate all specified devices for the given duration
         - speed (Percentage from 0=off to 100=full power)
         - duration_sec (Duratation in seconds. You can specify split seconds) }
     If Connects()
-        Tele_Api.Vibrate(InRange(speed, 0, 100), duration_sec)
+        String[] events = new String[1]
+        Tele_Api.VibrateEvents(InRange(speed, 0, 100), duration_sec, events)
     EndIf
     Trace("(Vibrate) speed='" + speed + "' duration='" + duration_sec + "' all")
 EndFunction
 
-Function VibrateEvents(Int speed, Float duration_sec, String[] events)
+Function VibrateEvents(Int speed, Float duration_sec = -1.0, String[] events)
     { See vibrate(speed, duration_sec), but additionally filters for events
         - events (Vibrate devices that match the specified events) }
     If Connects()
@@ -85,13 +86,31 @@ Function VibrateEvents(Int speed, Float duration_sec, String[] events)
     Trace("(Vibrate) events speed='" + speed + " duration=" + duration_sec + " events=" + events)
 EndFunction
 
-Function StopVibrate()
-    { Stops all vibrating devices (by setting speed to 0) }
+Function VibratePattern(String pattern, Float duration_sec = -1.0, String[] events)
+    { Like VibrateEvents(speed, duration_sec, events) but instead of a speed,
+      the vibration strength is regulated by the given funscript pattern }
     If Connects()
-        Tele_Api.Vibrate(0, 0.1)
+        Tele_Api.VibratePattern(pattern, duration_sec, events)
+    EndIf
+    Trace("(Vibrate) pattern pattern='" + pattern + " duration=" + duration_sec + " events=" + events)
+EndFunction
+
+Function VibrateStopAll()
+    String[] events = new String[1]
+    VibrateStop(events)
+EndFunction
+
+Function VibrateStop(String[] events)
+    { Should be called in conjunction with infinite duration vibrations (duration -1)
+      to stop the vibration. For simultaneous vibrations, this reduces the references 
+      to the selected devices by one, and only stops when the last vibration ends }
+    If Connects()
+        Tele_Api.VibrateStop(events)
     EndIf
     Trace("(Vibrate) stop all")
 EndFunction
+
+; TODO Move StopEmergency here
 
 Bool Function Connects()
     { Returns if the module connects at all (Connection is not Disable and the DLL was loaded) }

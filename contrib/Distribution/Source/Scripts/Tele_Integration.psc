@@ -240,7 +240,7 @@ EndFunction
 
 Event OnKeyUp(Int keyCode, Float HoldTime)
     If keyCode == _EmergencyHotkey
-        TeleDevices.StopVibrate()
+        TeleDevices.VibrateStopAll()
         Tele_Api.StopAll()
         TeleDevices.LogError("Emergency stop")
     Else
@@ -258,13 +258,13 @@ Function UpdateSexScene()
     Int speed = Utility.RandomInt(0, 100)
     If _InSexScene
         If Sexlab_AnimationDeviceSelector == 1
-            TeleDevices.VibrateEvents(speed, 10, _SceneTags)
+            TeleDevices.VibrateEvents(speed, 5, _SceneTags)
         Else
-            TeleDevices.Vibrate(speed, 10)
+            TeleDevices.Vibrate(speed, 5)
         EndIf
 	EndIf
     If _InToysSexScene
-		TeleDevices.Vibrate(speed, 10)
+		TeleDevices.Vibrate(speed, 5)
     EndIF
 EndFunction
 
@@ -276,11 +276,11 @@ EndFunction
 
 Function StopSexLabScene()
 	_InSexScene = False
-    If Sexlab_AnimationDeviceSelector == 1
-        TeleDevices.VibrateEvents(0, 0.1, _SceneTags)
-    Else
-        TeleDevices.Vibrate(0, 0.1)
-    EndIF
+    ; If Sexlab_AnimationDeviceSelector == 1
+    ;     TeleDevices.VibrateEvents(0, 0.1, _SceneTags)
+    ; Else
+    ;     TeleDevices.Vibrate(0, 0.1)
+    ; EndIF
 EndFunction
 
 Function StartToysScene()
@@ -290,7 +290,6 @@ EndFunction
 
 Function StopToysScene()
 	_InToysSexScene = False
-    TeleDevices.Vibrate(0, 0.1)
 EndFunction
 
 ; Devious Devices Events
@@ -304,41 +303,60 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
         return ; Should not happen
     EndIf
 
-    ; Reverse DD multi device calculation to get the actual strength
-    String[] events = new String[3]
-    Float numVibratorsMult = 0
-    If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
-        numVibratorsMult += 0.7
-        events[0] = Devious_VibrateEventVaginal
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
-        numVibratorsMult += 0.3
-        events[1] = Devious_VibrateEventAnal
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
-        numVibratorsMult += 0.25
-        events[2] = Devious_VibrateEventNipple
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
-        numVibratorsMult += 0.5
-        events[0] = Devious_VibrateEventVaginal
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
-        numVibratorsMult /= 1.15
-    EndIf
-
-    Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
+    String[] events = GetDDTags(player)
+    Int strength = Math.Floor((vibrationStrength / _NumVibratorsMult) * 20)
     If Devious_VibrateEffectDeviceSelector == 1
-        TeleDevices.VibrateEvents(strength, 30, events)
+        TeleDevices.VibrateEvents(strength, -1, events)
     Else
-        TeleDevices.Vibrate(strength, 30)
+        TeleDevices.Vibrate(strength, -1)
     EndIf
 	TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 
-Event OnVibrateEffectStop(string eventName, string argString, float argNum, form sender)
-	Tele_Api.Vibrate(0, 0.1)
+Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form sender)
+    Actor player = Game.GetPlayer()
+    If player.GetLeveledActorBase().GetName() != actorName
+        return ; Not the player
+    EndIf
+    If ZadLib == None
+        return ; Should not happen
+    EndIf
+
+    If Devious_VibrateEffectDeviceSelector == 1
+        String[] events = GetDDTags(player)
+        TeleDevices.VibrateStop(events)
+    Else
+        TeleDevices.VibrateStopAll()
+    EndIf
 EndEvent
+
+Float _NumVibratorsMult
+String[] Function GetDDTags(Actor player)
+    ; Reverse DD multi device calculation to get the actual strength
+    String[] events = new String[3]
+    _NumVibratorsMult = 0
+    If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
+        _NumVibratorsMult += 0.7
+        events[0] = Devious_VibrateEventVaginal
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
+        _NumVibratorsMult += 0.3
+        events[1] = Devious_VibrateEventAnal
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
+        _NumVibratorsMult += 0.25
+        events[2] = Devious_VibrateEventNipple
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
+        _NumVibratorsMult += 0.5
+        events[0] = Devious_VibrateEventVaginal
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
+        _NumVibratorsMult /= 1.15
+    EndIf
+    return events
+EndFunction
+
 
 ; Sexlab Events
 
@@ -347,7 +365,6 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 		TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
-
     sslThreadController Controller = Sexlab.GetController(threadID)
     sslBaseAnimation animation = Controller.Animation
 	StartSexLabScene(animation.GetTags()) 
@@ -404,17 +421,17 @@ Event OnToysSceneEnd(string eventName, string argString, float argNum, form send
 EndEvent
 
 Event OnToysClimax(string eventName, string argString, float argNum, form sender)
-	Tele_Api.Vibrate(80, 5)
+	TeleDevices.Vibrate(80, 5)
 	TeleDevices.LogDebug("OnToysClimax")
 EndEvent
 
 Event OnToysClimaxSimultaneous(string eventName, string argString, float argNum, form sender)
-	Tele_Api.Vibrate(100, 8)
+	TeleDevices.Vibrate(100, 8)
 	TeleDevices.LogDebug("OnToysClimaxSimultaneous")
 EndEvent
 
 Event OnToysDenied(string eventName, string argString, float argNum, form sender)
-	Tele_Api.Vibrate(0, 0.1)
+	TeleDevices.Vibrate(0, 5)
 	TeleDevices.LogDebug("OnToysDenied")
 EndEvent
 
@@ -437,6 +454,6 @@ EndEvent
 ; Skyrim Chain Beasts Events
 
 Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
-	Tele_Api.Vibrate(Utility.RandomInt(Chainbeasts_Min, Chainbeasts_Max), 3)
+	TeleDevices.Vibrate(Utility.RandomInt(Chainbeasts_Min, Chainbeasts_Max), 3)
 	TeleDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent

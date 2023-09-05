@@ -5,10 +5,7 @@ use buttplug::server::device::configuration::{
 };
 use serde::Serialize;
 use tokio::sync::mpsc::channel;
-use tokio::{
-    sync::mpsc::Sender,
-    time::sleep
-};
+use tokio::{sync::mpsc::Sender, time::sleep};
 
 use buttplug::{
     core::message::{self, ButtplugMessage, DeviceList},
@@ -21,15 +18,15 @@ use buttplug::core::{
     connector::{ButtplugConnector, ButtplugConnectorError},
     message::{
         ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage,
-       ButtplugSpecV3ServerMessage, DeviceAdded,
+        ButtplugSpecV3ServerMessage, DeviceAdded,
     },
 };
 use futures::{future::BoxFuture, FutureExt};
 use std::ops::{DerefMut, RangeInclusive};
 use std::sync::Mutex;
 use std::time::Duration;
-use std::{vec, thread};
 use std::{collections::HashMap, sync::Arc};
+use std::{thread, vec};
 use tracing::error;
 
 use crate::util::assert_timeout;
@@ -49,42 +46,42 @@ pub struct FakeDeviceConnector {
 #[derive(Clone)]
 pub struct FakeMessage {
     pub message: ButtplugCurrentSpecClientMessage,
-    pub time: Instant
+    pub time: Instant,
 }
 
 impl FakeMessage {
     pub fn new(msg: ButtplugCurrentSpecClientMessage) -> Self {
-        FakeMessage { message: msg, time: Instant::now() }
+        FakeMessage {
+            message: msg,
+            time: Instant::now(),
+        }
     }
 
     pub fn vibration_started(&self) -> bool {
         match self.message.clone() {
-            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => 
-            {
-                cmd.scalars().iter().any( |v| v.scalar() > 0.0 )
-            },
-            _ => panic!("Message is not scalar cmd")
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                cmd.scalars().iter().any(|v| v.scalar() > 0.0)
+            }
+            _ => panic!("Message is not scalar cmd"),
         }
     }
-    
+
     #[allow(dead_code)]
     pub fn vibration_started_strength(&self, speed: f64) -> bool {
         match self.message.clone() {
-            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => 
-            {
-                cmd.scalars().iter().any( |v| v.scalar() == speed )
-            },
-            _ => panic!("Message is not scalar cmd")
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                cmd.scalars().iter().any(|v| v.scalar() == speed)
+            }
+            _ => panic!("Message is not scalar cmd"),
         }
     }
 
     pub fn vibration_stopped(&self) -> bool {
         match self.message.clone() {
-            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => 
-            {
-                cmd.scalars().iter().all( |v| v.scalar() == 0.0 )
-            },
-            _ => panic!("Message is not scalar cmd")
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                cmd.scalars().iter().all(|v| v.scalar() == 0.0)
+            }
+            _ => panic!("Message is not scalar cmd"),
         }
     }
 }
@@ -114,20 +111,29 @@ impl FakeConnectorCallRegistry {
 
     pub fn get_device(&self, device_id: u32) -> Vec<FakeMessage> {
         match self.actions.lock().unwrap().get(&device_id) {
-            Some(some) => * some.clone(),
+            Some(some) => *some.clone(),
             None => vec![],
         }
     }
 
-    pub fn assert_vibrated( &self, device_id: u32 ) {
+    pub fn assert_started(&self, device_id: u32) {
+        assert_timeout!(self.get_device(device_id).len() == 1, "Device has vibrated");
+        self.get_device(device_id)[0].vibration_started();
+    }
+
+    pub fn assert_vibrated(&self, device_id: u32) {
         assert_timeout!(self.get_device(device_id).len() >= 2, "Device has vibrated");
         self.get_device(device_id)[0].vibration_started();
         self.get_device(device_id)[1].vibration_stopped();
     }
 
-    pub fn assert_not_vibrated( &self, device_id: u32 ) {
+    pub fn assert_not_vibrated(&self, device_id: u32) {
         thread::sleep(Duration::from_millis(100));
-        assert_eq!(self.get_device(device_id).len(), 0, "Device has not vibrated");
+        assert_eq!(
+            self.get_device(device_id).len(),
+            0,
+            "Device has not vibrated"
+        );
     }
 }
 
@@ -190,7 +196,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
             async_manager::spawn(async move {
                 // assure that other thread has registered listener when the test devices
                 // are added. Quick and dirty but its just test code anyways
-                sleep(Duration::from_millis(100)).await; 
+                sleep(Duration::from_millis(100)).await;
                 for device in devices {
                     if send
                         .send(ButtplugSpecV3ServerMessage::DeviceAdded(device))
@@ -227,7 +233,8 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                     )))
                     .await
                     .map_err(|_| ButtplugConnectorError::ConnectorNotConnected)
-            }.boxed(),
+            }
+            .boxed(),
             ButtplugCurrentSpecClientMessage::RequestDeviceList(_) => async move {
                 let mut response: ButtplugSpecV3ServerMessage =
                     ButtplugSpecV3ServerMessage::DeviceList(DeviceList::new(vec![]));
