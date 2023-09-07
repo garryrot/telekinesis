@@ -139,9 +139,41 @@ This if free software. If you want to change this, redistribute it, or integrate
 
 ## 1.1.0
 
-- Use vibration strength from vibration event for vibrator sync
-- Support for Skyrim Chain Beast vibrations (`SCB_VibeEvent`)
-- Reduce dll size by about 30%
+- Add support for funscript patterns
+  * Only works with vibrator files `vibration.funscript` files for now
+  * Other patterns are still being displayed
+
+- Add support for events (device tags)
+  * This allows associating devices with certain events that correlate to body parts
+    (see DD Integration)
+
+- Integration:
+  * Devious Devices
+    * Use DD vibration strength (device vibrated strongly, very strongly etc.)
+      instead of a random speed value.
+    * Tag/Event support to match equipped dd stimulation devices with body
+      parts (Nipple, Anal, Vaginal)
+
+  * Skyrim Chain Beast
+    * Support Gemmed Beast Vibrations (`SCB_VibeEvent`)
+    * Disclaimer: Seems to not work with Chainbeasts v7.0.0, unless SCB_VibeEffect.psc is recompiled
+      from source and the psx was replaced in Script folder
+
+  * Sexlab
+    * Add option to vibration only devices that have events matching the sexlab animation tags
+
+  * Toys&Love
+    * Add fine grained control for various T&L events
+    * TBD
+
+- Technical Improvements
+  * Add support for simultaneous and overlapping vibration events and patterns. 
+    * Previously every new device action aborted all running tasks
+    * Technical requirement for long running patterns and to assure a seamless
+      experience with mods that do a lof of different things at the same time.
+    * Papyrus API had to be reworked to use task handles
+  *  Reduce dll size by about 30%
+
 
 ## 1.0.0
 
