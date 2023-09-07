@@ -10,7 +10,7 @@ use std::{
 use tracing::{error, info, instrument};
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::{in_process_connector, Telekinesis};
+use telekinesis::{in_process_connector, Telekinesis, ERROR_HANDLE};
 
 use crate::{
     inputs::{read_input_string, Speed},
@@ -45,10 +45,9 @@ mod ffi {
         fn tk_get_device_connected(device_name: &str) -> bool;
         fn tk_get_device_capabilities(device_name: &str) -> Vec<String>;
         fn tk_get_pattern_names(vibration_devices: bool) -> Vec<String>;
-        fn tk_vibrate(speed: i64, secs: f32) -> bool;
-        fn tk_vibrate_events(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> bool;
-        fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> bool;
-        fn tk_vibrate_stop(events: &CxxVector<CxxString>) -> bool;
+        fn tk_vibrate(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> i32;
+        fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> i32;
+        fn tk_stop(handle: i32) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_poll_events() -> Vec<String>;
@@ -69,11 +68,11 @@ pub trait Tk {
     fn get_device_names(&self) -> Vec<String>;
     fn get_device_connected(&self, device_name: &str) -> bool;
     fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
-    fn vibrate(&self, speed: Speed, duration: TkDuration, events: Vec<String>) -> bool;
-    fn vibrate_pattern(&self, pattern: TkPattern, events: Vec<String>) -> bool;
-    fn vibrate_all(&self, speed: Speed, duration: TkDuration) -> bool;
-    fn vibrate_stop(&self, events: Vec<String>) -> bool;
+    fn vibrate(&mut self, speed: Speed, duration: TkDuration, events: Vec<String>) -> i32;
+    fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32;
+    fn stop(&self, handle: i32) -> bool;
     fn stop_all(&self) -> bool;
+    fn vibrate_all(&mut self, speed: Speed, duration: TkDuration) -> i32; // obsolete
     fn get_next_event(&mut self) -> Option<TkEvent>;
     fn get_next_events(&mut self) -> Vec<TkEvent>;
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
@@ -107,9 +106,8 @@ impl TkDuration {
 
 #[derive(Clone, Debug)]
 pub enum TkPattern {
-    Stop(),
     Linear(TkDuration, Speed),
-    Funscript(TkDuration, String),
+    Funscript(TkDuration, String)
 }
 
 pub fn new_with_default_settings() -> impl Tk {
@@ -190,40 +188,30 @@ pub fn tk_stop_scan() -> bool {
 }
 
 #[instrument]
-pub fn tk_vibrate(speed: i64, secs: f32) -> bool {
-    access_mutex(|tk| tk.vibrate(Speed::new(speed), TkDuration::from_input_float(secs), vec![])).is_some()
-}
-
-#[instrument]
-pub fn tk_vibrate_events(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> bool {
+pub fn tk_vibrate(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> i32 {
     access_mutex(|tk| {
         tk.vibrate(
             Speed::new(speed),
             TkDuration::from_input_float(secs),
             read_input_string(&events),
         )
-    })
-    .is_some()
+    }).unwrap_or(ERROR_HANDLE)
 }
 
 #[instrument]
-pub fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> bool {
+pub fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> i32 {
     access_mutex(|tk| {
         tk.vibrate_pattern(
             TkPattern::Funscript(TkDuration::from_input_float(secs), String::from(pattern_name)),
             read_input_string(&events),
         )
-    })
-    .is_some()
+    }).unwrap_or(ERROR_HANDLE)
 }
 
 #[instrument]
-pub fn tk_vibrate_stop(events: &CxxVector<CxxString>) -> bool {
+pub fn tk_stop(handle: i32) -> bool {
     access_mutex(|tk| {
-        tk.vibrate_pattern(
-            TkPattern::Stop(),
-            read_input_string(&events),
-        )
+        tk.stop(handle)
     })
     .is_some()
 }

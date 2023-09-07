@@ -12,7 +12,7 @@ use tokio::{
     time::{sleep, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, trace};
 
 use crate::{commands::TkDeviceAction, event::TkEvent, inputs::Speed, TkDuration, TkPattern};
 
@@ -31,7 +31,9 @@ impl TkPatternPlayer {
             TkPattern::Linear(duration, speed) => match duration {
                 TkDuration::Infinite => {
                     self.do_vibrate(speed);
-                    info!("Infinite started");
+                    cancel.cancelled().await;
+                    self.do_stop();
+                    info!("Infinite stopped")
                 }
                 TkDuration::Timed(duration) => {
                     self.do_vibrate(speed);
@@ -40,10 +42,6 @@ impl TkPatternPlayer {
                     info!("Linear finished");
                 }
             },
-            TkPattern::Stop() => {
-                self.do_stop();
-                info!("Stopped");
-            }
             TkPattern::Funscript(duration, pattern_name) => {
                 match read_pattern_name(&self.pattern_path, &pattern_name, true) {
                     Ok(funscript) => {
@@ -143,7 +141,7 @@ impl TkPatternPlayer {
                 .unwrap_or_else(|_| error!("queue full"));
         }
         self.event_sender
-            .send(TkEvent::DeviceStopped(self.devices.len() as i32))
+            .send(TkEvent::DeviceStopped())
             .unwrap_or_else(|_| error!("queue full"));
     }
 }

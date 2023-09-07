@@ -33,15 +33,15 @@ namespace Tk
     DllExport bool GetDeviceConnected(void*, std::string device_name) {
         return tk_get_device_connected(device_name);
     }
-    DllExport bool VibrateEvents(void*, int speed, float time_sec, std::vector<std::string> events) {
-        return tk_vibrate_events(speed, time_sec, events);
+    DllExport int Vibrate(void*, int speed, float time_sec, std::vector<std::string> events) {
+        return tk_vibrate(speed, time_sec, events);
     }
-    DllExport bool VibratePattern(void*, std::string pattern_name, float time_sec, std::vector<std::string> events) {
+    DllExport int VibratePattern(void*, std::string pattern_name, float time_sec, std::vector<std::string> events) {
         return tk_vibrate_pattern(pattern_name, time_sec, events);
     }
-    DllExport bool VibrateStop(void*, std::vector<std::string> events) {
-        return tk_vibrate_stop(events);
-    }
+    DllExport bool Stop(void*, int handle) {
+        return tk_stop(handle);
+    }    
     DllExport bool StopAll(void*) {
         return tk_stop_all(); 
     }

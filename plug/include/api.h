@@ -7,9 +7,9 @@ namespace Tk
     std::vector<std::string> GetDevices(void*);
     std::vector<std::string> GetDeviceCapabilities(void*, std::string name);
     bool GetDeviceConnected(void*, std::string name);
-    bool VibrateEvents(void*, int speed, float time_sec, std::vector<std::string> events);
-    bool VibratePattern(void*, std::string pattern_name, float time_sec, std::vector<std::string> events);
-    bool VibrateStop(void*, std::vector<std::string> events);
+    int Vibrate(void*, int speed, float time_sec, std::vector<std::string> events);
+    int VibratePattern(void*, std::string pattern_name, float time_sec, std::vector<std::string> events);
+    bool Stop(void*, int handle);
     bool StopAll(void*);
     std::vector<std::string> PollEvents(void*);
     bool GetEnabled(void*, std::string name);
