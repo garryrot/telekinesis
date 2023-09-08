@@ -1,0 +1,199 @@
+{
+  "version": "1.0",
+  "inverted": false,
+  "range": -1,
+  "bookmark": -1,
+  "lastPosition": -1,
+  "graphDuration": -1,
+  "speedRatio": -1.0,
+  "injectionSpeed": -1,
+  "injectionBias": -1.0,
+  "scriptingMode": -1,
+  "simulatorPresets": [],
+  "activeSimulator": -1,
+  "reductionTolerance": -1.0,
+  "reductionStretch": -1.0,
+  "clips": [],
+  "actions": [
+    {
+      "pos": 50,
+      "at": 0
+    },
+    {
+      "pos": 60,
+      "at": 100
+    },
+    {
+      "pos": 70,
+      "at": 200
+    },
+    {
+      "pos": 80,
+      "at": 300
+    },
+    {
+      "pos": 90,
+      "at": 400
+    },
+    {
+      "pos": 100,
+      "at": 500
+    },
+    {
+      "pos": 90,
+      "at": 600
+    },
+    {
+      "pos": 80,
+      "at": 700
+    },
+    {
+      "pos": 70,
+      "at": 800
+    },
+    {
+      "pos": 60,
+      "at": 900
+    },
+    {
+      "pos": 50,
+      "at": 1000
+    },
+    {
+      "pos": 60,
+      "at": 1100
+    },
+    {
+      "pos": 70,
+      "at": 1200
+    },
+    {
+      "pos": 80,
+      "at": 1300
+    },
+    {
+      "pos": 90,
+      "at": 1400
+    },
+    {
+      "pos": 100,
+      "at": 1500
+    },
+    {
+      "pos": 90,
+      "at": 1600
+    },
+    {
+      "pos": 80,
+      "at": 1700
+    },
+    {
+      "pos": 70,
+      "at": 1800
+    },
+    {
+      "pos": 60,
+      "at": 1900
+    },
+    {
+      "pos": 50,
+      "at": 2000
+    },
+    {
+      "pos": 60,
+      "at": 2100
+    },
+    {
+      "pos": 70,
+      "at": 2200
+    },
+    {
+      "pos": 80,
+      "at": 2300
+    },
+    {
+      "pos": 90,
+      "at": 2400
+    },
+    {
+      "pos": 100,
+      "at": 2500
+    },
+    {
+      "pos": 90,
+      "at": 2600
+    },
+    {
+      "pos": 80,
+      "at": 2700
+    },
+    {
+      "pos": 70,
+      "at": 2800
+    },
+    {
+      "pos": 60,
+      "at": 2900
+    },
+    {
+      "pos": 50,
+      "at": 3000
+    },
+    {
+      "pos": 60,
+      "at": 3100
+    },
+    {
+      "pos": 70,
+      "at": 3200
+    },
+    {
+      "pos": 80,
+      "at": 3300
+    },
+    {
+      "pos": 90,
+      "at": 3400
+    },
+    {
+      "pos": 100,
+      "at": 3500
+    },
+    {
+      "pos": 90,
+      "at": 3600
+    },
+    {
+      "pos": 80,
+      "at": 3700
+    },
+    {
+      "pos": 70,
+      "at": 3800
+    },
+    {
+      "pos": 60,
+      "at": 3900
+    },
+    {
+      "pos": 0,
+      "at": 4000
+    }
+  ],
+  "rawActions": [],
+  "metadata": {
+    "bookmarks": [],
+    "chapters": [],
+    "creator": "",
+    "description": "A faster sawtooth movement from 50% to 100%",
+    "duration": -1,
+    "license": "",
+    "notes": "",
+    "performers": [],
+    "script_url": "",
+    "tags": [],
+    "title": "",
+    "type": "",
+    "video_url": ""
+  }
+}

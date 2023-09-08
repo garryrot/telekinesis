@@ -1,0 +1,163 @@
+{
+  "version": "1.0",
+  "inverted": false,
+  "range": -1,
+  "bookmark": -1,
+  "lastPosition": -1,
+  "graphDuration": -1,
+  "speedRatio": -1.0,
+  "injectionSpeed": -1,
+  "injectionBias": -1.0,
+  "scriptingMode": -1,
+  "simulatorPresets": [],
+  "activeSimulator": -1,
+  "reductionTolerance": -1.0,
+  "reductionStretch": -1.0,
+  "clips": [],
+  "actions": [
+    {
+      "pos": 40,
+      "at": 0
+    },
+    {
+      "pos": 10,
+      "at": 1000
+    },
+    {
+      "pos": 40,
+      "at": 2000
+    },
+    {
+      "pos": 10,
+      "at": 3000
+    },
+    {
+      "pos": 40,
+      "at": 4000
+    },
+    {
+      "pos": 10,
+      "at": 5000
+    },
+    {
+      "pos": 40,
+      "at": 6000
+    },
+    {
+      "pos": 10,
+      "at": 7000
+    },
+    {
+      "pos": 40,
+      "at": 8000
+    },
+    {
+      "pos": 10,
+      "at": 9000
+    },
+    {
+      "pos": 40,
+      "at": 10000
+    },
+    {
+      "pos": 10,
+      "at": 11000
+    },
+    {
+      "pos": 40,
+      "at": 12000
+    },
+    {
+      "pos": 10,
+      "at": 13000
+    },
+    {
+      "pos": 40,
+      "at": 14000
+    },
+    {
+      "pos": 10,
+      "at": 15000
+    },
+    {
+      "pos": 40,
+      "at": 16000
+    },
+    {
+      "pos": 10,
+      "at": 17000
+    },
+    {
+      "pos": 40,
+      "at": 18000
+    },
+    {
+      "pos": 10,
+      "at": 19000
+    },
+    {
+      "pos": 40,
+      "at": 20000
+    },
+    {
+      "pos": 10,
+      "at": 21000
+    },
+    {
+      "pos": 40,
+      "at": 22000
+    },
+    {
+      "pos": 10,
+      "at": 23000
+    },
+    {
+      "pos": 40,
+      "at": 24000
+    },
+    {
+      "pos": 10,
+      "at": 25000
+    },
+    {
+      "pos": 40,
+      "at": 26000
+    },
+    {
+      "pos": 10,
+      "at": 27000
+    },
+    {
+      "pos": 40,
+      "at": 28000
+    },
+    {
+      "pos": 10,
+      "at": 29000
+    },
+    {
+      "pos": 40,
+      "at": 30000
+    },
+    {
+      "pos": 10,
+      "at": 31000
+    }
+  ],
+  "rawActions": [],
+  "metadata": {
+    "bookmarks": [],
+    "chapters": [],
+    "creator": "",
+    "description": "Alternates between 40% and 10% in a 1s interval",
+    "duration": -1,
+    "license": "",
+    "notes": "",
+    "performers": [],
+    "script_url": "",
+    "tags": [],
+    "title": "",
+    "type": "",
+    "video_url": ""
+  }
+}

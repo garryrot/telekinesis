@@ -136,10 +136,9 @@ Function EmergencyStop()
     Trace("(Stop) emergency stop")
 EndFunction
 
-; TODO Move StopEmergency here
-
 Bool Function Connects()
-    { Returns if the module connects at all (Connection is not Disable and the DLL was loaded) }
+    { Returns if the plugin connects to a backend
+      (true if dll is loadable AND backen is configure to connect) }
     return Tele_Api.Loaded() && ConnectionType != 2
 EndFunction
 

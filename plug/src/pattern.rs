@@ -57,10 +57,12 @@ impl TkPatternPlayer {
                         let mut dropped = 0;
                         let mut ignored = 0;
                         let now = Instant::now();
-                        self.do_vibrate(Speed::from_fs(&actions[0]));
+
+                        let first_speed = Speed::from_fs(&actions[0]);
+                        self.do_vibrate(first_speed);
 
                         let mut i = 1;
-                        let mut last_pos = 0;
+                        let mut last_speed = first_speed.value as i32;
                         while i < actions.len() && now.elapsed() < duration {
                             let point = &actions[i];
 
@@ -86,9 +88,9 @@ impl TkPatternPlayer {
                                 {
                                     break;
                                 };
-                                if last_pos != point.pos {
+                                if last_speed != point.pos {
                                     self.do_update(Speed::from_fs(point));
-                                    last_pos = point.pos;
+                                    last_speed = point.pos;
                                 } else {
                                     ignored += 1;
                                 }
