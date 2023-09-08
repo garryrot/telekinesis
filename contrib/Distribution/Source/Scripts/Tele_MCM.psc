@@ -8,12 +8,16 @@ String[] _DeviceSelectorOptions ; 0 = All, 1 = Match Tags
 
 Int[] _UseDeviceOids
 Int[] _DeviceEventOids
+Int[] _TestVibratePatternOid
+Int[] _TestStrokePatternOid
 
+String[] _StrokePatternNames
+String[] _VibratePatternNames
 String[] _DeviceNames
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 7
+    return 9
 EndFunction
 
 Event OnConfigInit()
@@ -26,19 +30,20 @@ Event OnVersionUpdate(int aVersion)
         TeleDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + aVersion)
     EndIf
 
-    If CurrentVersion > 0 && CurrentVersion < 7 ; 1.0.0 Beta
+    If CurrentVersion > 0 && CurrentVersion < 9 ; 1.0.0 Beta
         InitLocals()
         TeleIntegration.ResetIntegrationSettings()
     EndIf
 EndEvent
 
 Function InitLocals()
-    Pages = new String[5]
+    Pages = new String[6]
     Pages[0] = "General"
     Pages[1] = "Devices"
     Pages[2] = "Integration"
-    Pages[3] = "Debug"
-    Pages[4] = "Troubleshooting"
+    Pages[3] = "Patterns"
+    Pages[4] = "Debug"
+    Pages[5] = "Troubleshooting"
 
     _ConnectionMenuOptions = new String[3]
     _ConnectionMenuOptions[0] = "In-Process (Default)"
@@ -54,9 +59,16 @@ Function InitLocals()
     
     _DeviceNames = new String[1]
     _DebugSpellsAdded = false
+
+    _StrokePatternNames = new String[127]
+    _VibratePatternNames = new String[127]
+    _TestVibratePatternOid = new Int[127]
+    _TestStrokePatternOid = new Int[127]
 EndFunction
 
 Event OnPageReset(String page)
+    _VibratePatternNames = TeleDevices.GetPatternNames(true)
+    _StrokePatternNames = Tele_Api.GetPatternNames(false)
     If page == "General" || page == ""
         SetCursorFillMode(TOP_TO_BOTTOM)
 
@@ -146,9 +158,19 @@ Event OnPageReset(String page)
 
         AddHeaderOption("Toys & Love")
         AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Toys", TeleIntegration.Toys_VibrateEffect)
+        AddEmptyOption()
+
+        ; Match events
         AddToggleOptionST("OPTION_TOYS_ANIMATION", "Love Animation", TeleIntegration.Toys_Animation)
-        AddToggleOptionST("OPTION_TOYS_DENIAL", "Actor denial", TeleIntegration.Toys_Denial)
-        AddToggleOptionST("OPTION_TOYS_OTHER", "Actor tease or orgasm", TeleIntegration.Toys_OtherEvents)
+        AddToggleOptionST("OPTION_TOYS_VAGINAL_PENETRATION", "Vaginal Penetration", TeleIntegration.Toys_Vaginal_Penetration)
+        AddToggleOptionST("OPTION_TOYS_ANAL_PENETRATION", "Anal Penetration", TeleIntegration.Toys_Anal_Penetration)
+        AddToggleOptionST("OPTION_TOYS_ORAL_PENETRATION", "Vaginal Penetration", TeleIntegration.Toys_Oral_Penetration)
+        AddEmptyOption()
+
+        AddToggleOptionST("OPTION_TOYS_DENIAL", "Denial", TeleIntegration.Toys_Denial)
+        AddToggleOptionST("OPTION_TOYS_FONDLE", "Fondle", TeleIntegration.Toys_Fondle)
+        AddToggleOptionST("OPTION_TOYS_SQUIRT", "Squirt", TeleIntegration.Toys_Squirt)
+        AddEmptyOption()
 
         SetCursorPosition(1)
         AddHeaderOption("Sexlab")
@@ -171,6 +193,28 @@ Event OnPageReset(String page)
 	    AddSliderOptionST("SLIDER_CHAINBEAST_MIN", "Min Strength", TeleIntegration.Chainbeasts_Min)
 	    AddSliderOptionST("SLIDER_CHAINBEAST_MAX", "Max Strength", TeleIntegration.Chainbeasts_Max)
     EndIf
+    
+    If page == "Patterns"
+        SetCursorFillMode(TOP_TO_BOTTOM)
+        AddHeaderOption("Vibrator Patterns")
+        Int j = 0
+        While j < _VibratePatternNames.Length && j < 63
+            String vibrate_pattern = _VibratePatternNames[j]
+            _TestVibratePatternOid[j] = AddTextOption(vibrate_pattern, "(test me)")
+		    SetTextOptionValue(_TestVibratePatternOid[j], "running...")
+            j += 1
+        EndWhile
+
+        SetCursorPosition(1)
+        AddHeaderOption("Stroker Patterns")
+        Int i = 0
+        While i < _StrokePatternNames.Length && i < 63
+            String stroker_pattern = _StrokePatternNames[i]
+            _TestStrokePatternOid[j] = AddTextOption(stroker_pattern, "(test me)")
+		    SetTextOptionValue(_TestStrokePatternOid[j], "running...")
+            i += 1
+        EndWhile
+    Endif
 
     If page == "Debug"
         SetCursorFillMode(TOP_TO_BOTTOM)
@@ -516,23 +560,87 @@ State OPTION_TOYS_DENIAL
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Stop device movement on denial (toys denial event)")
+        SetInfoText("Stop device movement on 'denial' event")
     EndEvent
 EndState
 
-State OPTION_TOYS_OTHER
+State OPTION_TOYS_VAGINAL_PENETRATION
     Event OnSelectST()
-        TeleIntegration.Toys_OtherEvents = !TeleIntegration.Toys_OtherEvents
-        SetToggleOptionValueST(TeleIntegration.Toys_OtherEvents)
+        TeleIntegration.Toys_Vaginal_Penetration = !TeleIntegration.Toys_Vaginal_Penetration
+        SetToggleOptionValueST(TeleIntegration.Toys_Vaginal_Penetration)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_OtherEvents = TeleIntegration.Toys_OtherEvents_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_OtherEvents)
+        TeleIntegration.Toys_Vaginal_Penetration = TeleIntegration.Toys_Vaginal_Penetration_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Vaginal_Penetration)
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Move devices during other 'Toys & Love' events: Fondled, Fondle, Squirt, Climax, ClimaxSimultaneous, Caressed, Denied")
+        SetInfoText("Emits a strong vibration on 'Vaginal' event/tag on 'vaginal penetration' event")
+    EndEvent
+EndState
+
+State OPTION_TOYS_ANAL_PENETRATION
+    Event OnSelectST()
+        TeleIntegration.Toys_Anal_Penetration = !TeleIntegration.Toys_Anal_Penetration
+        SetToggleOptionValueST(TeleIntegration.Toys_Anal_Penetration)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Toys_Anal_Penetration = TeleIntegration.Toys_Anal_Penetration_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Anal_Penetration)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Emits a strong vibration on 'Anal' event/tag on 'anal penetration' event")
+    EndEvent
+EndState
+
+State OPTION_TOYS_ORAL_PENETRATION
+    Event OnSelectST()
+        TeleIntegration.Toys_Oral_Penetration = !TeleIntegration.Toys_Oral_Penetration
+        SetToggleOptionValueST(TeleIntegration.Toys_Oral_Penetration)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Toys_Oral_Penetration = TeleIntegration.Toys_Oral_Penetration_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Oral_Penetration)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Emits a strong vibration on 'Oral' event/tag on 'oral penetration' event")
+    EndEvent
+EndState
+
+State OPTION_TOYS_FONDLE
+    Event OnSelectST()
+        TeleIntegration.Toys_Fondle = !TeleIntegration.Toys_Fondle
+        SetToggleOptionValueST(TeleIntegration.Toys_Fondle)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Toys_Fondle = TeleIntegration.Toys_Fondle_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Fondle)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("A light vibration on all devices during a 'fondle' event")
+    EndEvent
+EndState
+
+State OPTION_TOYS_SQUIRT
+    Event OnSelectST()
+        TeleIntegration.Toys_Squirt = !TeleIntegration.Toys_Squirt
+        SetToggleOptionValueST(TeleIntegration.Toys_Squirt)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Toys_Squirt = TeleIntegration.Toys_Squirt_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Squirt)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Emits a strong timed vibration on each 'squirt' event")
     EndEvent
 EndState
 
@@ -695,6 +803,23 @@ Event OnOptionSelect(int oid)
             Bool isUsed = ! Tele_Api.GetEnabled(device)
             SetToggleOptionValue(oid, isUsed)
             Tele_Api.SetEnabled(device, isUsed)
+        EndIf
+        i += 1
+    EndWhile
+    i = 0
+    While (i < _TestVibratePatternOid.Length)
+        If (oid == _TestVibratePatternOid[i])
+            String patternName = _VibratePatternNames[i]
+            String[] allEvents = new String[1]
+            TeleDevices.VibratePattern(patternName, 30, allEvents)
+        EndIf
+        i += 1
+    EndWhile
+    i = 0
+    While (i < _TestStrokePatternOid.Length)
+        If (oid == _TestStrokePatternOid[i])
+            String patternName = _StrokePatternNames[i]
+            Debug.MessageBox("Not supported yet")
         EndIf
         i += 1
     EndWhile
