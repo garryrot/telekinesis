@@ -102,13 +102,14 @@ Int Function VibrateEvents(Int speed, Float duration_sec = -1.0, String[] events
     return -1
 EndFunction
 
-Function VibratePattern(String pattern, Float duration_sec = -1.0, String[] events)
+Int Function VibratePattern(String pattern, Float duration_sec = -1.0, String[] events)
     { Like VibrateEvents(speed, duration_sec, events) but instead of a speed,
         the vibration strength is regulated by the given funscript pattern
       Returns an Int handle to stop the vibration early, see StopHandle(Int) }
     If Connects()
-        Tele_Api.VibratePattern(pattern, duration_sec, events)
+        return Tele_Api.VibratePattern(pattern, duration_sec, events)
     EndIf
+    return -1
     Trace("(Vibrate) pattern='" + pattern + " duration=" + duration_sec + " events=" + events)
 EndFunction
 
