@@ -1,4 +1,4 @@
-use std::{collections::HashMap,sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand};
 use tokio::{runtime::Handle, sync::mpsc::unbounded_channel};
@@ -8,7 +8,7 @@ use tracing::{error, info, span, trace, warn, Level};
 use crate::{
     event::TkEvent,
     pattern::TkPatternPlayer,
-    settings::{TkDeviceSettings, TkSettings, PATTERN_PATH},
+    settings::{TkDeviceSettings, TkSettings},
     Speed, TkPattern,
 };
 
@@ -27,7 +27,7 @@ pub enum TkAction {
 #[derive(Clone, Debug)]
 pub struct TkParams {
     pub selector: TkDeviceSelector,
-    pub pattern: TkPattern
+    pub pattern: TkPattern,
 }
 
 impl TkParams {
@@ -96,9 +96,9 @@ impl From<&TkSettings> for TkDeviceSelector {
 
 #[derive(Clone, Debug)]
 pub enum TkDeviceAction {
-    Start(Arc<ButtplugClientDevice>, Speed),
+    Start(Arc<ButtplugClientDevice>, Speed, bool, i32),
     Update(Arc<ButtplugClientDevice>, Speed),
-    End(Arc<ButtplugClientDevice>),
+    End(Arc<ButtplugClientDevice>, bool, i32),
     StopAll, // global but required for resetting device state
 }
 
@@ -122,12 +122,66 @@ pub async fn cmd_stop_scan(client: &ButtplugClient) -> bool {
 }
 
 pub struct DeviceAccess {
-    access_list: HashMap<u32, u32>,
+    device_actions: HashMap<u32, Vec<(i32, Speed)>>,
 }
 
 impl DeviceAccess {
     pub fn new() -> Self {
         DeviceAccess {
+            device_actions: HashMap::new(),
+        }
+    }
+
+    pub fn record_start(&mut self, device: &Arc<ButtplugClientDevice>, handle: i32, action: Speed) {
+        self.device_actions
+            .entry(device.index())
+            .and_modify(|bag| bag.push((handle, action)))
+            .or_insert(vec![(handle, action)]);
+    }
+
+    pub fn record_stop(&mut self, device: &Arc<ButtplugClientDevice>, handle: i32) {
+        if let Some(action) = self.device_actions.remove(&device.index()) {
+            let except_handle: Vec<(i32, Speed)> =
+                action.into_iter().filter(|t| t.0 != handle).collect();
+            self.device_actions.insert(device.index(), except_handle);
+        }
+    }
+
+    pub fn get_remaining_speed(&self, device: &Arc<ButtplugClientDevice>) -> Option<Speed> {
+        if let Some(actions) = self.device_actions.get(&device.index()) {
+            let mut sorted: Vec<(i32, Speed)> = actions.clone();
+            sorted.sort_by_key(|b| b.0);
+            if let Some(tuple) = sorted.last() {
+                return Some(tuple.1);
+            }
+        }
+        None
+    }
+
+    pub fn calculate_actual_speed(
+        &self,
+        device: &Arc<ButtplugClientDevice>,
+        new_speed: Speed,
+    ) -> Speed {
+        if let Some(actions) = self.device_actions.get(&device.index()) {
+            let mut sorted: Vec<(i32, Speed)> = actions.clone();
+            sorted.sort_by_key(|b| b.0);
+            if let Some(tuple) = sorted.last() {
+                warn!("Speed {} overrids provided speed {}", tuple.1, new_speed);
+                return tuple.1;
+            }
+        }
+        new_speed
+    }
+}
+
+pub struct ReferenceCounter {
+    access_list: HashMap<u32, u32>,
+}
+
+impl ReferenceCounter {
+    pub fn new() -> Self {
+        ReferenceCounter {
             access_list: HashMap::new(),
         }
     }
@@ -149,7 +203,7 @@ impl DeviceAccess {
                 if *counter > 0 {
                     *counter -= 1
                 } else {
-                    warn!("Release on refcount 0")
+                    warn!("Release on ref-count=0")
                 }
             })
             .or_insert(0);
@@ -159,7 +213,11 @@ impl DeviceAccess {
             self.current_references(&device)
         )
     }
-    pub fn current_references(&self, device: &Arc<ButtplugClientDevice>) -> u32 {
+
+    pub fn needs_to_stop(&self, device: &Arc<ButtplugClientDevice>) -> bool {
+        self.current_references(device) == 0
+    }
+    fn current_references(&self, device: &Arc<ButtplugClientDevice>) -> u32 {
         match self.access_list.get(&device.index()) {
             Some(count) => *count,
             None => 0,
@@ -174,6 +232,7 @@ pub fn create_cmd_thread(
     client: ButtplugClient,
     event_sender: tokio::sync::mpsc::UnboundedSender<TkEvent>,
     mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>,
+    pattern_path: String,
 ) {
     Handle::current().spawn(async move {
         info!("Comand handling thread started");
@@ -183,43 +242,64 @@ pub fn create_cmd_thread(
             unbounded_channel::<TkDeviceAction>();
 
         // immediate device actions received from pattern handling
+        let mut device_counter = ReferenceCounter::new();
         let mut device_access = DeviceAccess::new();
+
         Handle::current().spawn(async move {
             loop {
                 if let Some(next_action) = device_action_receiver.recv().await {
                     trace!("Exec device action {:?}", next_action);
                     match next_action {
-                        TkDeviceAction::Start(device, speed) => {
-                            device_access.reserve(&device);
+                        TkDeviceAction::Start(device, speed, priority, handle) => {
+                            device_counter.reserve(&device);
+                            if priority {
+                                device_access.record_start(&device, handle, speed);
+                            }
                             device
-                                .vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
+                                .vibrate(&ScalarValueCommand::ScalarValue(
+                                    device_access
+                                        .calculate_actual_speed(&device, speed)
+                                        .as_float(),
+                                ))
                                 .await
                                 .unwrap_or_else(|_| {
                                     error!("Failed to set device vibration speed.")
                                 });
                         }
                         TkDeviceAction::Update(device, speed) => device
-                            .vibrate(&ScalarValueCommand::ScalarValue(speed.as_float()))
+                            .vibrate(&ScalarValueCommand::ScalarValue(
+                                device_access
+                                    .calculate_actual_speed(&device, speed)
+                                    .as_float(),
+                            ))
                             .await
                             .unwrap_or_else(|_| error!("Failed to set device vibration speed.")),
-                        TkDeviceAction::End(device) => {
-                            device_access.release(&device);
-                            if device_access.current_references(&device) == 0 {
+                        TkDeviceAction::End(device, priority, handle) => {
+                            device_counter.release(&device);
+                            if priority {
+                                device_access.record_stop(&device, handle);
+                            }
+                            if device_counter.needs_to_stop(&device) {
                                 // nothing else is controlling the device, stop it
                                 device
                                     .vibrate(&ScalarValueCommand::ScalarValue(0.0))
                                     .await
                                     .unwrap_or_else(|_| error!("Failed to stop vibration"));
                                 info!("Device stopped {}", device.name())
-                            } else {
-                                info!(
-                                    "Device not stopped, open references: {}",
-                                    device_access.current_references(&device)
-                                );
+                            } else if let Some(remaining_speed) =
+                                device_access.get_remaining_speed(&device)
+                            {
+                                // see if we have a lower priority vibration still running
+                                device
+                                    .vibrate(&ScalarValueCommand::ScalarValue(
+                                        remaining_speed.as_float(),
+                                    ))
+                                    .await
+                                    .unwrap_or_else(|_| error!("Failed to reset vibration"))
                             }
                         }
                         TkDeviceAction::StopAll => {
-                            device_access.clear();
+                            device_counter.clear();
                             info!("Stop all action");
                         }
                     }
@@ -276,28 +356,32 @@ pub fn create_cmd_thread(
                         let device_action_sender_clone = device_action_sender.clone();
 
                         let cancel_token = CancellationToken::new();
-                        if let Some(_old) = cancellation_tokens.insert(handle, cancel_token.clone()) {
+                        if let Some(_old) = cancellation_tokens.insert(handle, cancel_token.clone())
+                        {
                             error!("Handle {} already existed", handle);
                         }
+                        let pattern_path_clone = pattern_path.clone();
                         Handle::current().spawn(async move {
                             let player = TkPatternPlayer {
                                 devices: selection,
                                 action_sender: device_action_sender_clone,
                                 event_sender: event_sender_clone,
                                 resolution_ms: 100,
-                                pattern_path: String::from(PATTERN_PATH),
+                                pattern_path: pattern_path_clone,
                             };
-                            player.play(params.pattern, cancel_token).await;
+                            player.play(params.pattern, cancel_token, handle).await;
                         });
                     }
                     TkAction::Stop(handle) => {
                         if cancellation_tokens.contains_key(&handle) {
                             cancellation_tokens.remove(&handle).unwrap().cancel();
-                            event_sender.send(TkEvent::DeviceStopped());
+                            event_sender
+                                .send(TkEvent::DeviceStopped())
+                                .unwrap_or_else(|_| error!(queue_full_err));
                         } else {
                             error!("Unknown handle {}", handle);
                         }
-                    },
+                    }
                 }
             } else {
                 info!("Command stream closed");

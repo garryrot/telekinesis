@@ -34,6 +34,9 @@ pub struct TkSettings {
     pub log_level: TkLogLevel,
     pub connection: TkConnectionType,
     pub devices: Vec<TkDeviceSettings>,
+
+    #[serde(skip)]
+    pub pattern_path: String
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -60,13 +63,17 @@ impl TkSettings {
             log_level: TkLogLevel::Debug,
             connection: TkConnectionType::InProcess,
             devices: vec![],
+            pattern_path: String::from(PATTERN_PATH)
         }
     }
     pub fn try_read_or_default(settings_path: &str, settings_file: &str) -> Self {
         let path = [settings_path, settings_file].iter().collect::<PathBuf>();
         match fs::read_to_string(path) {
-            Ok(settings_json) => match serde_json::from_str(&settings_json) {
-                Ok(settings) => settings,
+            Ok(settings_json) => match serde_json::from_str::<TkSettings>(&settings_json) {
+                Ok(mut settings) => {
+                    settings.pattern_path = String::from(PATTERN_PATH);
+                    settings
+                },
                 Err(err) => {
                     error!("Settings path '{}' could not be parsed. Error: {}. Using default configuration.", settings_path, err);
                     TkSettings::default()

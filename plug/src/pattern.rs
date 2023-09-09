@@ -25,20 +25,20 @@ pub struct TkPatternPlayer {
 }
 
 impl TkPatternPlayer {
-    pub async fn play(self, pattern: TkPattern, cancel: CancellationToken) {
+    pub async fn play(self, pattern: TkPattern, cancel: CancellationToken, handle: i32) {
         info!("Playing pattern {:?}", pattern);
         match pattern {
             TkPattern::Linear(duration, speed) => match duration {
                 TkDuration::Infinite => {
-                    self.do_vibrate(speed);
+                    self.do_vibrate(speed, true, handle);
                     cancel.cancelled().await;
-                    self.do_stop();
+                    self.do_stop(true, handle);
                     info!("Infinite stopped")
                 }
                 TkDuration::Timed(duration) => {
-                    self.do_vibrate(speed);
+                    self.do_vibrate(speed, true, handle);
                     cancellable_wait(duration, &cancel).await;
-                    self.do_stop();
+                    self.do_stop(true, handle);
                     info!("Linear finished");
                 }
             },
@@ -59,7 +59,7 @@ impl TkPatternPlayer {
                         let now = Instant::now();
 
                         let first_speed = Speed::from_fs(&actions[0]);
-                        self.do_vibrate(first_speed);
+                        self.do_vibrate(first_speed, false, handle);
 
                         let mut i = 1;
                         let mut last_speed = first_speed.value as i32;
@@ -97,7 +97,7 @@ impl TkPatternPlayer {
                             }
                             i += 1;
                         }
-                        self.do_stop();
+                        self.do_stop(false, handle);
                         info!(
                             "Pattern finished in {:?} dropped={} ignored={}",
                             now.elapsed(),
@@ -117,29 +117,35 @@ impl TkPatternPlayer {
     fn do_update(&self, speed: Speed) {
         trace!("do_update {}", speed);
         for device in self.devices.iter() {
-            self.action_sender
-                .send(TkDeviceAction::Update(device.clone(), speed))
-                .unwrap_or_else(|_| error!("queue full"));
+             let a = self.action_sender
+                .send(TkDeviceAction::Update(device.clone(), speed));
+            match a {
+                Ok(_) => info!("ok"),
+                Err(err) => error!("Update error {:?}", err),
+            };
         }
     }
 
-    fn do_vibrate(&self, speed: Speed) {
+    fn do_vibrate(&self, speed: Speed, priority: bool, handle: i32) {
         trace!("do_vibrate {}", speed);
         for device in self.devices.iter() {
-            self.action_sender
-                .send(TkDeviceAction::Start(device.clone(), speed))
-                .unwrap_or_else(|_| error!("queue full"));
+            let a = self.action_sender
+                .send(TkDeviceAction::Start(device.clone(), speed, priority, handle));
+            match a {
+                Ok(_ok) => info!("ok"),
+                Err(err) => error!("Vibrate error {:?}", err),
+            };
         }
         self.event_sender
             .send(TkEvent::DeviceVibrated(self.devices.len() as i32, speed))
             .unwrap_or_else(|_| error!("queue full"));
     }
 
-    fn do_stop(&self) {
+    fn do_stop(&self, priority: bool, handle: i32) {
         trace!("do_stop");
         for device in self.devices.iter() {
             self.action_sender
-                .send(TkDeviceAction::End(device.clone()))
+                .send(TkDeviceAction::End(device.clone(), priority, handle))
                 .unwrap_or_else(|_| error!("queue full"));
         }
         self.event_sender

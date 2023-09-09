@@ -57,7 +57,7 @@ pub fn in_process_connector() -> ButtplugInProcessClientConnector {
 impl Telekinesis {
     pub fn connect_with<T, Fn, Fut>(
         connector_factory: Fn,
-        settings: Option<TkSettings>,
+        provided_settings: Option<TkSettings>,
     ) -> Result<Telekinesis, anyhow::Error>
     where
         Fn: FnOnce() -> Fut + Send + 'static,
@@ -69,13 +69,15 @@ impl Telekinesis {
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
         let devices = Arc::new(Mutex::new(vec![]));
         let devices_clone = devices.clone();
+        let settings = provided_settings.or(Some(TkSettings::default())).unwrap();
+        let pattern_path = settings.pattern_path.clone();
 
         let runtime = Runtime::new()?;
         runtime.spawn(async move {
             info!("Main thread started");
             let buttplug = with_connector(connector_factory().await).await;
             let mut events = buttplug.event_stream();
-            create_cmd_thread(buttplug, event_sender.clone(), command_receiver);
+            create_cmd_thread(buttplug, event_sender.clone(), command_receiver, pattern_path);
             while let Some(event) = events.next().await {
                 match event.clone() {
                     ButtplugClientEvent::DeviceAdded(device) => {
@@ -99,10 +101,7 @@ impl Telekinesis {
             event_receiver: event_receiver,
             devices: devices,
             thread: runtime,
-            settings: match settings {
-                Some(settings) => settings,
-                None => TkSettings::default(),
-            },
+            settings: settings,
             last_handle: 0
         })
     }
@@ -313,7 +312,7 @@ mod tests {
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
 
-    use crate::util::{enable_log, enable_trace};
+    use crate::util::{enable_log};
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,
@@ -444,26 +443,120 @@ mod tests {
     }
 
     #[test]
-    fn vibrate_the_same_device_simultaneously() {
+    fn linear_correct_priority_2() {
         // call1  |111111111111111111111-->|
         // call2         |2222->|
-        // result |111111122222222222222-->|
+        // result |111111122222211111111-->|
 
         // arrange
+        let start = Instant::now();
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
-        tk.vibrate_all(Speed::new(10), TkDuration::from_secs(1));
+        tk.vibrate(Speed::new(50), TkDuration::from_secs(1), vec![]);
         thread::sleep(Duration::from_millis(500));
-        tk.vibrate_all(Speed::new(20), TkDuration::from_millis(10));
+        tk.vibrate(Speed::new(100), TkDuration::from_millis(10), vec![]);
         thread::sleep(Duration::from_secs(1));
 
         // assert
-        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.1));
-        assert!(call_registry.get_device(1)[1].vibration_started_strength(0.2));
-        assert!(call_registry.get_device(1)[2].vibration_stopped());
-        assert_eq!(call_registry.get_device(1).len(), 3)
+        print_device_calls( &call_registry, 1, start );
+
+        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.5));
+        assert!(call_registry.get_device(1)[1].vibration_started_strength(1.0));
+        assert!(call_registry.get_device(1)[2].vibration_started_strength(0.5));
+        assert!(call_registry.get_device(1)[3].vibration_stopped());
+        assert_eq!(call_registry.get_device(1).len(), 4);
+    }
+
+    #[test]
+    fn linear_correct_priority_3() {
+        // call1  |111111111111111111111111111-->|
+        // call2       |22222222222222->|
+        // call3            |333->|
+        // result |111122222333332222222111111-->|
+
+        // arrange
+        let start = Instant::now();
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+
+        // act
+        tk.vibrate(Speed::new(20), TkDuration::from_secs(3), vec![]);
+        thread::sleep(Duration::from_millis(250));
+        tk.vibrate(Speed::new(40), TkDuration::from_secs(2), vec![]);
+        thread::sleep(Duration::from_millis(250));
+        tk.vibrate(Speed::new(80), TkDuration::from_secs(1), vec![]);
+
+        thread::sleep(Duration::from_secs(3));
+
+        // assert
+        print_device_calls( &call_registry, 1, start );
+
+        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.2));
+        assert!(call_registry.get_device(1)[1].vibration_started_strength(0.4));
+        assert!(call_registry.get_device(1)[2].vibration_started_strength(0.8));
+        assert!(call_registry.get_device(1)[3].vibration_started_strength(0.4));
+        assert!(call_registry.get_device(1)[4].vibration_started_strength(0.2));
+        assert!(call_registry.get_device(1)[5].vibration_stopped());
+        assert_eq!(call_registry.get_device(1).len(), 6);
+    }
+
+    #[test]
+    fn linear_correct_priority_4() {
+        // call1  |111111111111111111111111111-->|
+        // call2       |22222222222->|
+        // call3            |333333333-->|
+        // result |111122222222222233333331111-->|
+
+        // arrange
+        let start = Instant::now();
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+
+        // act
+        tk.vibrate(Speed::new(20), TkDuration::from_secs(3), vec![]);
+        thread::sleep(Duration::from_millis(250));
+        tk.vibrate(Speed::new(40), TkDuration::from_secs(1), vec![]);
+        thread::sleep(Duration::from_millis(250));
+        tk.vibrate(Speed::new(80), TkDuration::from_secs(2), vec![]);
+        thread::sleep(Duration::from_secs(3));
+
+        // assert
+        print_device_calls( &call_registry, 1, start );
+
+        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.2));
+        assert!(call_registry.get_device(1)[1].vibration_started_strength(0.4));
+        assert!(call_registry.get_device(1)[2].vibration_started_strength(0.8));
+        assert!(call_registry.get_device(1)[3].vibration_started_strength(0.8));
+        assert!(call_registry.get_device(1)[4].vibration_started_strength(0.2));
+        assert!(call_registry.get_device(1)[5].vibration_stopped());
+        assert_eq!(call_registry.get_device(1).len(), 6);
+    }
+
+    #[test]
+    fn linear_overrides_pattern() {
+        // lin1   |11111111111111111-->|
+        // pat1       |23452345234523452345234-->|
+        // result |1111111111111111111123452345234-->|
+
+        // arrange
+        let start = Instant::now();
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+
+        // act
+        let _lin1 = tk.vibrate(Speed::new(99), TkDuration::Infinite, vec![]);
+        thread::sleep(Duration::from_millis(10));
+        let _pat1 = tk.vibrate_pattern(TkPattern::Funscript(TkDuration::Infinite, String::from("12_Sine-Fast")), vec![]);
+
+        // assert
+        print_device_calls( &call_registry, 1, start );
+
+        thread::sleep(Duration::from_secs(2));
+        tk.stop(_lin1);
+        thread::sleep(Duration::from_secs(2));
+        assert!(call_registry.get_device(1).len() > 3);
     }
 
     #[test]
@@ -639,7 +732,9 @@ mod tests {
         let count = connector.devices.len();
 
         // act
-        let mut tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
+        let mut settings = TkSettings::default();
+        settings.pattern_path = String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+        let mut tk = Telekinesis::connect_with(|| async move { connector }, Some(settings)).unwrap();
         tk.await_connect(count);
 
         for name in devices_names {
@@ -652,8 +747,11 @@ mod tests {
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
     fn vibrate_pattern_then_cancel() {
+        let mut settings = TkSettings::default();
+        settings.pattern_path = String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+
         let mut tk =
-            Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+            Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings)).unwrap();
         tk.scan_for_devices();
         tk.await_connect(1);
         thread::sleep(Duration::from_secs(2));
@@ -662,7 +760,7 @@ mod tests {
 
         enable_log();
         let handle = tk.vibrate_pattern(
-            TkPattern::Funscript(TkDuration::from_secs(10), String::from("Tease_30s")),
+            TkPattern::Funscript(TkDuration::from_secs(10), String::from("02_Cruel-Tease")),
             vec![],
         );
         thread::sleep(Duration::from_secs(2)); // dont disconnect
@@ -688,5 +786,15 @@ mod tests {
         );
         thread::sleep(Duration::from_secs(15)); // dont disconnect
         tk.stop_all();
+    }
+
+    fn print_device_calls( call_registry: &FakeConnectorCallRegistry, index: u32, test_start: Instant ) {
+        for i in 0..call_registry.get_device(index).len() {
+            let fake_call = call_registry.get_device(1)[i].clone();
+            let s = fake_call.get_scalar_strength();
+            let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
+            let perc = (s * 100.0).round();
+            println!("{:02} @{:04} ms {percent:>3}% {empty:=>width$}", i, t, percent=perc as i32, empty = "", width = (perc/5.0).floor() as usize);
+        }
     }
 }

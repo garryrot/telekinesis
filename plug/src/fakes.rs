@@ -76,6 +76,16 @@ impl FakeMessage {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn get_scalar_strength(&self) -> f64 {
+        match self.message.clone() {
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                cmd.scalars().iter().next().unwrap().scalar()
+            }
+            _ => panic!("Message is not scalar cmd"),
+        }
+    }
+
     pub fn vibration_stopped(&self) -> bool {
         match self.message.clone() {
             message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
