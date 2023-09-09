@@ -12,7 +12,6 @@ SexLabFramework Property SexLab Auto
 String[] _SceneTags
 
 Bool _InSexScene = false
-Bool _InToysSexScene = false
 Bool _Devious_VibrateEffect = false
 Bool _Sexlab_Animation = false
 Bool _Sexlab_ActorOrgasm = false
@@ -231,7 +230,6 @@ Bool Property Toys_Animation
             RegisterForModEvent("ToysLoveSceneEnd", "OnToysSceneEnd") ; Sex scene ends
             RegisterForModEvent("ToysLoveSceneInfo", "OnToysLoveSceneInfo") ; Animation starts
         Else
-            _InToysSexScene = False ; end running scene
             UnregisterForModEvent("ToysStartLove")
             UnregisterForModEvent("ToysLoveSceneEnd")
             UnregisterForModEvent("ToysLoveSceneInfo")
@@ -345,18 +343,16 @@ Event OnUpdate()
     UpdateSexScene()
 EndEvent
 
+Int _SexlabSceneVibrationHandle
 Function UpdateSexScene()
     Int speed = Utility.RandomInt(0, 100)
     If _InSexScene
         If Sexlab_AnimationDeviceSelector == 1
-            TeleDevices.VibrateEvents(speed, 5, _SceneTags)
+            _SexlabSceneVibrationHandle = TeleDevices.VibrateEvents(speed, 5, _SceneTags)
         Else
-            TeleDevices.Vibrate(speed, 5)
+            _SexlabSceneVibrationHandle = TeleDevices.Vibrate(speed, 5)
         EndIf
 	EndIf
-    If _InToysSexScene
-		TeleDevices.Vibrate(speed, 5)
-    EndIF
 EndFunction
 
 Function StartSexLabScene(String[] tags)
@@ -367,20 +363,13 @@ EndFunction
 
 Function StopSexLabScene()
 	_InSexScene = False
-    ; If Sexlab_AnimationDeviceSelector == 1
-    ;     TeleDevices.VibrateEvents(0, 0.1, _SceneTags)
-    ; Else
-    ;     TeleDevices.Vibrate(0, 0.1)
-    ; EndIF
+    TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
 EndFunction
 
 Function StartToysScene()
-	_InToysSexScene = True
-	UpdateSexScene()
 EndFunction
 
 Function StopToysScene()
-	_InToysSexScene = False
 EndFunction
 
 ; Devious Devices Events
@@ -486,7 +475,7 @@ EndEvent
 Int _ToysFondleHandle = -1
 Event OnToysFondleStart(string eventName, string argString, float argNum, form sender)
     ; Fondle started - successfully increased rousing
-	_ToysFondleHandle = TeleDevices.Vibrate(10, -1)
+	_ToysFondleHandle = TeleDevices.Vibrate(40, -1)
 	TeleDevices.LogDebug("ToysFondleStart")
 EndEvent
 
@@ -510,13 +499,15 @@ Event OnToysLoveSceneInfo(string LoveName, Bool PlayerInScene, int NumStages, Bo
     TeleDevices.LogDebug("OnToysLoveSceneInfo LoveName=" + LoveName + " PlayerInScene + " + PlayerInScene + " Stages: " + NumStages + " PlayerConsent: " + PlayerConsent)
 EndEvent 
 
+Int _ToysSceneVibrationHandle
 Event OnToysSceneStart(string eventName, string argString, float argNum, form sender)
-	StartToysScene()
+    String[] all = new String[1]
+	_ToysSceneVibrationHandle = TeleDevices.VibratePattern("02_Cruel-Tease", 180, all)
 	TeleDevices.LogDebug("ToysSceneStart")
 EndEvent
 
 Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
-	StopToysScene()
+    TeleDevices.StopHandle(_ToysSceneVibrationHandle)
 	TeleDevices.LogDebug("OnToysSceneEnd")
 EndEvent
 
@@ -526,33 +517,33 @@ Event OnToysClimax(string eventName, string argString, float argNum, form sender
 EndEvent
 
 Event OnToysClimaxSimultaneous(string eventName, string argString, float argNum, form sender)
-	TeleDevices.Vibrate(100, 8)
+	TeleDevices.Vibrate(100, 7)
 	TeleDevices.LogDebug("OnToysClimaxSimultaneous")
 EndEvent
 
 Event OnToysDenied(string eventName, string argString, float argNum, form sender)
-	TeleDevices.Vibrate(0, 5)
+	TeleDevices.Vibrate(0, 7)
 	TeleDevices.LogDebug("OnToysDenied")
 EndEvent
 
 Event OnToysVaginalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Vaginal"
-    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), Utility.RandomInt(20,30), events)
+    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
  	TeleDevices.LogDebug("OnToysVaginalPenetration")
 EndEvent
 
 Event OnToysAnalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Anal"
-    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), Utility.RandomInt(20,30), events)
+    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
  	TeleDevices.LogDebug("OnToysAnalPenetration")
 EndEvent
 
 Event OnToysOralPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Oral"
-    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), Utility.RandomInt(20,30), events)
+    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
  	TeleDevices.LogDebug("OnToysOralPenetration")
 EndEvent
 

@@ -544,7 +544,7 @@ State OPTION_TOYS_ANIMATION
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Move devices during 'Toys & Love' player sex animation")
+        SetInfoText("Plays a long and soft vibration patttern during each toys&love animation that involves the player")
     EndEvent
 EndState
 
@@ -560,7 +560,7 @@ State OPTION_TOYS_DENIAL
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Stop device movement on 'denial' event")
+        SetInfoText("'Rewards' a successfull 'denial' event with a 7s long stop period (no device will vibrate)")
     EndEvent
 EndState
 
@@ -576,7 +576,9 @@ State OPTION_TOYS_VAGINAL_PENETRATION
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Emits a strong vibration on 'Vaginal' event/tag on 'vaginal penetration' event")
+        String t = "Emits a strong 12s vibration on 'Vaginal' event/tag on 'vaginal penetration' event.\n"
+        t += "This will override the base animation pattern on all affected devices during that time."
+        SetInfoText(t)
     EndEvent
 EndState
 
@@ -592,7 +594,9 @@ State OPTION_TOYS_ANAL_PENETRATION
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Emits a strong vibration on 'Anal' event/tag on 'anal penetration' event")
+        String t = "Emits a strong 12s vibration on 'Anal' event/tag on 'anal penetration' event.\n"
+        t += "This will override the base animation pattern on all affected devices during that time."
+        SetInfoText(t)
     EndEvent
 EndState
 
@@ -608,7 +612,9 @@ State OPTION_TOYS_ORAL_PENETRATION
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Emits a strong vibration on 'Oral' event/tag on 'oral penetration' event")
+        String t = "Emits a strong 12s vibration on 'Oral' event/tag on 'oral penetration' event.\n"
+        t += "This will override the base animation pattern on all affected devices during that time."
+        SetInfoText(t)
     EndEvent
 EndState
 
@@ -624,7 +630,7 @@ State OPTION_TOYS_FONDLE
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("A light vibration on all devices during a 'fondle' event")
+        SetInfoText("A light vibration on all devices during the 'fondle' event")
     EndEvent
 EndState
 
@@ -640,7 +646,7 @@ State OPTION_TOYS_SQUIRT
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Emits a strong timed vibration on each 'squirt' event")
+        SetInfoText("A strong 12s vibration on each 'squirt' event")
     EndEvent
 EndState
 
