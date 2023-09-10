@@ -69,9 +69,17 @@ Bool Property DeviousDevices_Vibrate
     EndFunction
 EndProperty
 
-Int Property Sexlab_AnimationDeviceSelector = 0 Auto
-Int Property Sexlab_AnimationDeviceSelector_Default = 0 AutoReadOnly
-Bool Property Sexlab_Animation_Default = false AutoReadOnly
+String Property Sexlab_Animation_Funscript = "" Auto
+String Property Sexlab_Animation_Funscript_Default = "" Auto
+Int Property Sexlab_Animation_DeviceSelector = 0 Auto
+Int Property Sexlab_Animation_DeviceSelector_Default = 0 AutoReadOnly
+String Property Sexlab_Animation_Event = "Vaginal" Auto
+String Property Sexlab_Animation_Event_Default = "Vaginal" AutoReadOnly
+Int Property Sexlab_Animation_Pattern = 0 Auto
+Int Property Sexlab_Animation_Pattern_Default = 0 AutoReadOnly
+Int Property Sexlab_Animation_Linear_Strength = 80 Auto
+Int Property Sexlab_Animation_Linear_Strength_Default = 80 AutoReadOnly
+Bool Property Sexlab_Animation_Default = true AutoReadOnly
 Bool Property Sexlab_Animation
     Function Set(Bool enable)
         _Sexlab_Animation = enable
@@ -326,7 +334,11 @@ Function ResetIntegrationSettings()
     DeviousDevices_Vibrate_Funscript = DeviousDevices_Vibrate_Funscript_Default
     DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
     Sexlab_Animation = Sexlab_Animation_Default
-    Sexlab_AnimationDeviceSelector = Sexlab_AnimationDeviceSelector_Default
+    Sexlab_Animation_DeviceSelector = Sexlab_Animation_DeviceSelector_Default
+    Sexlab_Animation_Event = Sexlab_Animation_Event_Default
+    Sexlab_Animation_Funscript = Sexlab_Animation_Funscript_Default
+    Sexlab_Animation_Pattern = Sexlab_Animation_Pattern_Default
+    Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
     Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
     Sexlab_ActorEdge = Sexlab_ActorEdge_Default
     Toys_Animation = Toys_Animation_Default
@@ -366,31 +378,15 @@ EndEvent
 
 Int _SexlabSceneVibrationHandle
 Function UpdateSexScene()
-    Int speed = Utility.RandomInt(0, 100)
     If _InSexScene
-        If Sexlab_AnimationDeviceSelector == 1
-            _SexlabSceneVibrationHandle = TeleDevices.VibrateEvents(speed, 5, _SceneTags)
-        Else
-            _SexlabSceneVibrationHandle = TeleDevices.Vibrate(speed, 5)
+        String[] events = new String[1]
+        If Sexlab_Animation_DeviceSelector == 1
+            events = _SceneTags
+        EndIf
+        If Sexlab_Animation_Pattern == 0
+            _SexlabSceneVibrationHandle = TeleDevices.VibrateEvents(Utility.RandomInt(0, 100), 5, events)
         EndIf
 	EndIf
-EndFunction
-
-Function StartSexLabScene(String[] tags)
-	_InSexScene = True
-    _SceneTags = tags
-	UpdateSexScene()
-EndFunction
-
-Function StopSexLabScene()
-	_InSexScene = False
-    TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
-EndFunction
-
-Function StartToysScene()
-EndFunction
-
-Function StopToysScene()
 EndFunction
 
 ; Devious Devices Events
@@ -472,7 +468,17 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	EndIf
     sslThreadController Controller = Sexlab.GetController(threadID)
     sslBaseAnimation animation = Controller.Animation
-	StartSexLabScene(animation.GetTags()) 
+
+    String[] events = animation.GetTags()
+    If Sexlab_Animation_Pattern == 2
+        _SexlabSceneVibrationHandle = TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), -1, events)
+    ElseIf Sexlab_Animation_Pattern == 1
+        _SexlabSceneVibrationHandle = TeleDevices.VibratePattern(Sexlab_Animation_Funscript, -1, events)
+    Else 
+        _InSexScene = True
+        _SceneTags = events
+        UpdateSexScene()
+    EndIf
 EndEvent
 
 Event OnSexlabAnimationEnd(int _, bool hasPlayer)
@@ -480,7 +486,8 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
         TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
-	StopSexLabScene()
+	_InSexScene = False
+    TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
 EndEvent
 
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)

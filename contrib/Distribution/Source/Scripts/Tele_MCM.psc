@@ -147,50 +147,51 @@ Event OnPageReset(String page)
         AddHeaderOption("Devious Devices")
         If TeleIntegration.ZadLib != None
             AddToggleOptionST("OPTION_DEVIOUS_DEVICES_VIBRATE", "In-Game Vibrators", TeleIntegration.DeviousDevices_Vibrate)
-            Int devioues_devices_vibrate_selector_flag = OPTION_FLAG_DISABLED
+            Int devious_devices_vibrate_selector_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate
-                devioues_devices_vibrate_selector_flag = OPTION_FLAG_NONE
+                devious_devices_vibrate_selector_flag = OPTION_FLAG_NONE
             EndIf
 
             AddEmptyOption()
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR", "Devices", _DeviceSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_DeviceSelector], devioues_devices_vibrate_selector_flag)
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR", "Device Filter", _DeviceSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_DeviceSelector], devious_devices_vibrate_selector_flag)
 
-            Int devioues_devices_vibrate_event_flag = OPTION_FLAG_DISABLED
+            Int devious_devices_vibrate_event_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_DeviceSelector == 1
-                devioues_devices_vibrate_event_flag = OPTION_FLAG_NONE
+                devious_devices_vibrate_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.DeviousDevices_Vibrate_Event_Anal, devioues_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devioues_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devioues_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.DeviousDevices_Vibrate_Event_Anal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
         
-            Int devioues_devices_vibrate_pattern_flag = OPTION_FLAG_DISABLED
+            Int devious_devices_vibrate_pattern_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate
-                devioues_devices_vibrate_pattern_flag = OPTION_FLAG_NONE
+                devious_devices_vibrate_pattern_flag = OPTION_FLAG_NONE
             EndIf
 
             AddEmptyOption()
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_Pattern], devioues_devices_vibrate_pattern_flag)
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_Pattern], devious_devices_vibrate_pattern_flag)
         
-            Int devioues_devices_vibrate_funscript_flag = OPTION_FLAG_DISABLED
+            Int devious_devices_vibrate_funscript_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_Pattern == 1
-                devioues_devices_vibrate_funscript_flag = OPTION_FLAG_NONE
+                devious_devices_vibrate_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT", "Vibration Funscript", TeleIntegration.DeviousDevices_Vibrate_Funscript, devioues_devices_vibrate_funscript_flag)
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT", "Vibration Funscript", TeleIntegration.DeviousDevices_Vibrate_Funscript, devious_devices_vibrate_funscript_flag)
         
-            Int devioues_devices_vibrate_linear_flag = OPTION_FLAG_DISABLED
+            Int devious_devices_vibrate_linear_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_Pattern == 0
-                devioues_devices_vibrate_linear_flag = OPTION_FLAG_NONE
+                devious_devices_vibrate_linear_flag = OPTION_FLAG_NONE
             EndIf      
         Else
             AddTextOption("In-Game Vibrators", "Not Installed", OPTION_FLAG_DISABLED)
         EndIf
 
         AddHeaderOption("Toys & Love")
-        AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Toys", TeleIntegration.Toys_VibrateEffect)
+        AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Vibrators", TeleIntegration.Toys_VibrateEffect)
         AddEmptyOption()
 
         ; Match events
         AddToggleOptionST("OPTION_TOYS_ANIMATION", "Love Animation", TeleIntegration.Toys_Animation)
+
         AddToggleOptionST("OPTION_TOYS_VAGINAL_PENETRATION", "Vaginal Penetration", TeleIntegration.Toys_Vaginal_Penetration)
         AddToggleOptionST("OPTION_TOYS_ANAL_PENETRATION", "Anal Penetration", TeleIntegration.Toys_Anal_Penetration)
         AddToggleOptionST("OPTION_TOYS_ORAL_PENETRATION", "Vaginal Penetration", TeleIntegration.Toys_Oral_Penetration)
@@ -204,12 +205,27 @@ Event OnPageReset(String page)
         SetCursorPosition(1)
         AddHeaderOption("Sexlab")
         If TeleIntegration.SexLab != None
-            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Sexlab Animation", TeleIntegration.Sexlab_Animation)
-            int sl_selector_flags = OPTION_FLAG_DISABLED
+            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Animations", TeleIntegration.Sexlab_Animation)
+            Int sexlab_animation_selector_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Sexlab_Animation
-                sl_selector_flags = OPTION_FLAG_NONE
+                sexlab_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_SEXLAB_DEVICE_SELECTOR", "Device Selector", _DeviceSelectorOptions[TeleIntegration.Sexlab_AnimationDeviceSelector], sl_selector_flags)
+            
+            AddEmptyOption()
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR", "Device Filter", _DeviceSelectorOptions[TeleIntegration.Sexlab_Animation_DeviceSelector], sexlab_animation_selector_flag)
+        
+            Int sexlab_animation_pattern_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Sexlab_Animation
+                sexlab_animation_pattern_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.Sexlab_Animation_Pattern], sexlab_animation_pattern_flag)
+        
+            Int sexlab_animation_funscript_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Sexlab_Animation && TeleIntegration.Sexlab_Animation_Pattern == 1
+                sexlab_animation_funscript_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_FUNSCRIPT", "Vibration Funscript", TeleIntegration.Sexlab_Animation_Funscript, sexlab_animation_funscript_flag)
+        
             AddEmptyOption()
             AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
             AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", TeleIntegration.Sexlab_ActorEdge)
@@ -296,130 +312,8 @@ Event OnPageReset(String page)
     EndIf
 EndEvent
 
-State OPTION_CHAINBEASTS_VIBRATE
-    Event OnSelectST()
-        TeleIntegration.Chainbeasts_Vibrate = !TeleIntegration.Chainbeasts_Vibrate
-        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
-        ForcePageReset()
-    EndEvent
-    
-    Event OnDefaultST()
-        TeleIntegration.Chainbeasts_Vibrate = TeleIntegration.Chainbeasts_Vibrate_Default
-        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
-        ForcePageReset()
-    EndEvent
 
-    Event OnHighlightST()
-        SetInfoText("Vibrates devices during gemmed chainbeast capture (Requires Chainbeasts Version >= 0.7.0)")
-    EndEvent
-EndState
-
-State MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR
-    Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.Chainbeasts_Vibrate_DeviceSelector)
-        SetMenuDialogDefaultIndex(0)
-        SetMenuDialogOptions(_DeviceSelectorOptions)
-    EndEvent
-
-    event OnMenuAcceptST(int index)
-        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = index
-        SetMenuOptionValueST(_DeviceSelectorOptions[index])
-        ForcePageReset()
-    EndEvent
-
-    Event OnDefaultST()
-        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = TeleIntegration.Chainbeasts_Vibrate_DeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector])
-        ForcePageReset()
-    EndEvent
-
-    Event OnHighlightST()
-        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
-        SetInfoText(text)
-    EndEvent
-EndState
-
-State INPUT_CHAINBEASTS_VIBRATE_EVENT
-	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Chainbeasts_Vibrate_Event)
-	EndEvent
-	
-	Event OnInputAcceptST(String value)
-		TeleIntegration.Chainbeasts_Vibrate_Event = value
-		SetInputOptionValueST(value)
-	EndEvent
-
-    Event OnHighlightST()
-        SetInfoText("Select only devices matching the input event")
-    EndEvent
-EndState
-
-State MENU_CHAINBEASTS_VIBRATE_PATTERN
-    Event OnMenuOpenST()
-        SetMenuDialogStartIndex(0)
-        SetMenuDialogDefaultIndex(0)
-        SetMenuDialogOptions(_PatternSelectorOptions)
-    EndEvent
-
-    Event OnMenuAcceptST(int index)
-        TeleIntegration.Chainbeasts_Vibrate_Pattern = index
-        SetMenuOptionValueST(_PatternSelectorOptions[index])
-        ForcePageReset()
-    EndEvent
-
-    Event OnDefaultST()
-        SetMenuOptionValueST(_PatternSelectorOptions[0])
-        ForcePageReset()
-    EndEvent
-
-    Event OnHighlightST()
-        SetInfoText("'Linear': Constant vibration strength. 'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
-    EndEvent
-EndState
-
-State MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT
-    Event OnMenuOpenST()
-        SetMenuDialogStartIndex(0)
-        SetMenuDialogDefaultIndex(0)
-        SetMenuDialogOptions(_VibrateFunscriptNames)
-    EndEvent
-
-    Event OnMenuAcceptST(int index)
-        TeleIntegration.Chainbeasts_Vibrate_Funscript = _VibrateFunscriptNames[index]
-        SetMenuOptionValueST(_VibrateFunscriptNames[index])
-    EndEvent
-
-    Event OnDefaultST()
-        SetMenuOptionValueST(_VibrateFunscriptNames[0])
-    EndEvent
-
-    Event OnHighlightST()
-        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
-    EndEvent
-EndState
-
-State SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH
-	Event OnSliderOpenST()
-		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
-		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default)
-		SetSliderDialogRange(0, 100)
-		SetSliderDialogInterval(1)
-	EndEvent
-
-	Event OnSliderAcceptST(float value)
-		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = value as int
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
-	EndEvent
-
-	Event OnDefaultST()
-		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
-	EndEvent
-
-	Event OnHighlightST()
-		SetInfoText("Vibration strength for linear pattern")
-	EndEvent
-EndState
+; General
 
 State CONNECTION_MENU
     Event OnMenuOpenST()
@@ -489,6 +383,31 @@ State EMERGENCY_HOTKEY
         SetInfoText("A hotkey for immediately stopping all devices from moving (Default: DEL)")
     EndEvent
 EndState
+
+; Devices 
+
+State ACTION_SCAN_FOR_DEVICES
+    Event OnSelectST()
+        If TeleDevices.ScanningForDevices
+            Tele_Api.StopScan()
+        Else
+            Tele_Api.ScanForDevices()
+        EndIf
+        TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
+        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleDevices.ScanningForDevices = true
+        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Automatically scan for new devices (resets to 'true' on each restart)")
+    EndEvent
+EndState
+
+; Devious Devices
 
 State OPTION_DEVIOUS_DEVICES_VIBRATE
     Event OnSelectST()
@@ -622,6 +541,8 @@ State MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT
     EndEvent
 EndState
 
+; Sexlab
+
 State OPTION_SEXLAB_ANIMATION
     Event OnSelectST()
         TeleIntegration.Sexlab_Animation = !TeleIntegration.Sexlab_Animation
@@ -636,33 +557,77 @@ State OPTION_SEXLAB_ANIMATION
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Move devices on sexlab player animation")
+        SetInfoText("Move devices during sexlab player animation")
     EndEvent
 EndState
 
-State MENU_SEXLAB_DEVICE_SELECTOR
+State MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.Sexlab_AnimationDeviceSelector)
+        SetMenuDialogStartIndex(TeleIntegration.Sexlab_Animation_DeviceSelector)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_DeviceSelectorOptions)
-        ForcePageReset()
     EndEvent
 
     event OnMenuAcceptST(int index)
-        TeleIntegration.Sexlab_AnimationDeviceSelector = index
+        TeleIntegration.Sexlab_Animation_DeviceSelector = index
         SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.Sexlab_AnimationDeviceSelector = TeleIntegration.Sexlab_AnimationDeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Sexlab_AnimationDeviceSelector])
+        TeleIntegration.Sexlab_Animation_DeviceSelector = TeleIntegration.Sexlab_Animation_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Sexlab_Animation_DeviceSelector])
+        ForcePageReset()
     EndEvent
 
     Event OnHighlightST()
         String txt = "Set to 'Match Events' when you only want to vibrate devices that match any of the sexlab animation tags\n"
-        txt += "Note: Will match any tag, but Anal, Boobjob, Vaginal, Masturbation, Oral are probably the events you want to match."
+        txt += "Note: Will match any tag, but Anal, Boobjob, Vaginal, Masturbation, Oral are probably the events you want to associate with your devices"
         SetInfoText(txt)
+    EndEvent
+EndState
+
+State MENU_SEXLAB_ANIMATION_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Sexlab_Animation_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptions[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Linear': Constant vibration strength. 'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+State MENU_SEXLAB_ANIMATION_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_VibrateFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Sexlab_Animation_Funscript = _VibrateFunscriptNames[index]
+        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
     EndEvent
 EndState
 
@@ -697,6 +662,8 @@ State OPTION_SEXLAB_ACTOR_EDGE
         SetInfoText("Move devices on player edge")
     EndEvent
 EndState
+
+; Toys & Love
 
 State OPTION_TOYS_VIBRATE
     Event OnSelectST()
@@ -832,6 +799,136 @@ State OPTION_TOYS_SQUIRT
     EndEvent
 EndState
 
+
+; Chainbeasts
+
+State OPTION_CHAINBEASTS_VIBRATE
+    Event OnSelectST()
+        TeleIntegration.Chainbeasts_Vibrate = !TeleIntegration.Chainbeasts_Vibrate
+        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Chainbeasts_Vibrate = TeleIntegration.Chainbeasts_Vibrate_Default
+        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibrates devices during gemmed chainbeast capture (Requires Chainbeasts Version >= 0.7.0)")
+    EndEvent
+EndState
+
+State MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TeleIntegration.Chainbeasts_Vibrate_DeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = TeleIntegration.Chainbeasts_Vibrate_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        SetInfoText(text)
+    EndEvent
+EndState
+
+State INPUT_CHAINBEASTS_VIBRATE_EVENT
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Chainbeasts_Vibrate_Event)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Chainbeasts_Vibrate_Event = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select only devices matching the input event")
+    EndEvent
+EndState
+
+State MENU_CHAINBEASTS_VIBRATE_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Chainbeasts_Vibrate_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptions[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Linear': Constant vibration strength. 'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+State MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_VibrateFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Chainbeasts_Vibrate_Funscript = _VibrateFunscriptNames[index]
+        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+    EndEvent
+EndState
+
+State SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH
+	Event OnSliderOpenST()
+		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
+		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default)
+		SetSliderDialogRange(0, 100)
+		SetSliderDialogInterval(1)
+	EndEvent
+
+	Event OnSliderAcceptST(float value)
+		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = value as int
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
+	EndEvent
+
+	Event OnDefaultST()
+		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
+	EndEvent
+
+	Event OnHighlightST()
+		SetInfoText("Vibration strength for linear pattern")
+	EndEvent
+EndState
+
+; Debug
+
 State OPTION_LOG_CONNECTS
     Event OnSelectST()
         TeleDevices.LogDeviceConnects = !TeleDevices.LogDeviceConnects
@@ -878,26 +975,6 @@ State OPTION_LOG_DEBUG
     EndEvent
 EndState
 
-State ACTION_SCAN_FOR_DEVICES
-    Event OnSelectST()
-        If TeleDevices.ScanningForDevices
-            Tele_Api.StopScan()
-        Else
-            Tele_Api.ScanForDevices()
-        EndIf
-        TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
-        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
-    EndEvent
-    
-    Event OnDefaultST()
-        TeleDevices.ScanningForDevices = true
-        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
-    EndEvent
-
-    Event OnHighlightST()
-        SetInfoText("Automatically scan for new devices (resets to 'true' on each restart)")
-    EndEvent
-EndState
 
 State ACTION_ADD_SPELLS_TO_PLAYER
     Event OnSelectST()
@@ -942,6 +1019,8 @@ State ACTION_ADD_SPELLS_TO_PLAYER
         SetInfoText("Add spells for controlling device vibration")
     EndEvent
 EndState
+
+; Help
 
 State HELP_DEVICE_NOT_CONNECTING
     Event OnSelectST()
