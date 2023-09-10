@@ -548,7 +548,7 @@ mod tests {
         // act
         let _lin1 = tk.vibrate(Speed::new(99), TkDuration::Infinite, vec![]);
         thread::sleep(Duration::from_millis(10));
-        let _pat1 = tk.vibrate_pattern(TkPattern::Funscript(TkDuration::Infinite, String::from("12_Sine-Fast")), vec![]);
+        let _pat1 = tk.vibrate_pattern(TkPattern::Funscript(TkDuration::Infinite, String::from("31_Sawtooth-Fast")), vec![]);
 
         // assert
         print_device_calls( &call_registry, 1, start );
