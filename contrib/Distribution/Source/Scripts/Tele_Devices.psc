@@ -44,12 +44,10 @@ Event OnUpdate()
                 LogConnection(evt)
                 ; Event Removed
             ElseIf StringUtil.Find( evt, "Vibrated") != -1
-                If StringUtil.Find( evt, "Stopped") != -1
-                    ; Stop Vibrate
-                Else
-                    ; Start vibrate
-                    LogEvent(evt)
-                EndIf
+                ; Start vibrate
+                LogEvent(evt)
+            ElseIf StringUtil.Find( evt, "Stopped") != -1
+                ; Ignore
             Else
                 ; Other Event
                 LogDebug(evt)
