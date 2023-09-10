@@ -12,7 +12,7 @@ SexLabFramework Property SexLab Auto
 String[] _SceneTags
 
 Bool _InSexScene = false
-Bool _Devious_VibrateEffect = false
+Bool _DeviousDevices_Vibrate = false
 Bool _Sexlab_Animation = false
 Bool _Sexlab_ActorOrgasm = false
 Bool _Sexlab_ActorEdge = false
@@ -40,16 +40,23 @@ Int Property EmergencyHotkey
     EndFunction
 EndProperty
 
-String Property Devious_VibrateEventAnal = "Anal" Auto
-String Property Devious_VibrateEventVaginal = "Vaginal" Auto
-String Property Devious_VibrateEventNipple = "Nipple" Auto
-Int Property Devious_VibrateEffectDeviceSelector = 0 Auto
-Int Property Devious_VibrateEffectDeviceSelector_Default = 0 AutoReadOnly
-Bool Property Devious_VibrateEffect_Default = true AutoReadOnly
-Bool Property Devious_VibrateEffect
+Int Property DeviousDevices_Vibrate_DeviceSelector = 0 Auto
+Int Property DeviousDevices_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
+String Property DeviousDevices_Vibrate_Event_Anal = "Anal" Auto
+String Property DeviousDevices_Vibrate_Event_Anal_Default = "Anal" Auto
+String Property DeviousDevices_Vibrate_Event_Vaginal = "Vaginal" Auto
+String Property DeviousDevices_Vibrate_Event_Vaginal_Default = "Vaginal" Auto
+String Property DeviousDevices_Vibrate_Event_Nipple = "Nipple" Auto
+String Property DeviousDevices_Vibrate_Event_Nipple_Default = "Nipple" Auto
+Int Property DeviousDevices_Vibrate_Pattern = 0 Auto
+Int Property DeviousDevices_Vibrate_Pattern_Default = 0 AutoReadOnly
+Bool Property DeviousDevices_Vibrate_Default = true AutoReadOnly
+String Property DeviousDevices_Vibrate_Funscript = "30_Sawtooth" Auto
+String Property DeviousDevices_Vibrate_Funscript_Default = "30_Sawtooth" Auto
+Bool Property DeviousDevices_Vibrate
     Function Set(Bool enable)
-        _Devious_VibrateEffect = enable
-        If enable 
+        _DeviousDevices_Vibrate = enable
+        If enable
             RegisterForModEvent("DeviceVibrateEffectStart", "OnVibrateEffectStart")
             RegisterForModEvent("DeviceVibrateEffectStop", "OnVibrateEffectStop")
         Else
@@ -58,7 +65,7 @@ Bool Property Devious_VibrateEffect
         EndIf
     EndFunction
     Bool Function Get()
-        return _Devious_VibrateEffect
+        return _DeviousDevices_Vibrate
     EndFunction
 EndProperty
 
@@ -270,8 +277,8 @@ Bool Property Toys_Denial
     EndFunction
 EndProperty
 
-String Property Chainbeasts_Vibrate_Funscript = "" Auto
-String Property Chainbeasts_Vibrate_Funscript_Default = "" Auto
+String Property Chainbeasts_Vibrate_Funscript = "30_Sawtooth" Auto
+String Property Chainbeasts_Vibrate_Funscript_Default = "30_Sawtooth" Auto
 Int Property Chainbeasts_Vibrate_DeviceSelector = 0 Auto
 Int Property Chainbeasts_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
 String Property Chainbeasts_Vibrate_Event = "Vaginal" Auto
@@ -304,15 +311,20 @@ EndEvent
 
 Function InitDefaultOnEventHandlers()
     EmergencyHotkey = EmergencyHotkey_Default
-    Devious_VibrateEffect = true
+    ; Devious_VibrateEffect = true
     Toys_VibrateEffect = true
     Chainbeasts_Vibrate = true
 EndFunction
 
 Function ResetIntegrationSettings()
     TeleDevices.Notify("Resetting integration settings")
-    Devious_VibrateEffect = Devious_VibrateEffect_Default
-    Devious_VibrateEffectDeviceSelector = Devious_VibrateEffectDeviceSelector_Default
+    DeviousDevices_Vibrate = DeviousDevices_Vibrate_Default
+    DeviousDevices_Vibrate_DeviceSelector = DeviousDevices_Vibrate_DeviceSelector_Default
+    DeviousDevices_Vibrate_Event_Anal = DeviousDevices_Vibrate_Event_Anal_Default
+    DeviousDevices_Vibrate_Event_Vaginal = DeviousDevices_Vibrate_Event_Vaginal_Default
+    DeviousDevices_Vibrate_Event_Nipple = DeviousDevices_Vibrate_Event_Nipple_Default
+    DeviousDevices_Vibrate_Funscript = DeviousDevices_Vibrate_Funscript_Default
+    DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
     Sexlab_Animation = Sexlab_Animation_Default
     Sexlab_AnimationDeviceSelector = Sexlab_AnimationDeviceSelector_Default
     Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
@@ -395,11 +407,20 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     EndIf
 
     String[] events = GetDDTags(player)
+    String[] all = new String[1]
+    If DeviousDevices_Vibrate_DeviceSelector == 1
+        all = events
+    EndIf
+
+    ; TODO Also use strength for patterns, once pattern strength is supported
     Int strength = Math.Floor((vibrationStrength / _NumVibratorsMult) * 20)
-    If Devious_VibrateEffectDeviceSelector == 1
-        _VibrateEffectHandle = TeleDevices.VibrateEvents(strength, -1, events)
+
+    If DeviousDevices_Vibrate_Pattern == 2
+        _VibrateEffectHandle = TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), -1, all)
+    ElseIf DeviousDevices_Vibrate_Pattern == 1
+        _VibrateEffectHandle = TeleDevices.VibratePattern(DeviousDevices_Vibrate_Funscript, -1, all)
     Else
-        _VibrateEffectHandle = TeleDevices.Vibrate(strength, -1)
+        _VibrateEffectHandle = TeleDevices.VibrateEvents(strength, -1, all)
     EndIf
 	TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
@@ -412,7 +433,6 @@ Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form
     If ZadLib == None
         return ; Should not happen
     EndIf
-
     TeleDevices.StopHandle(_VibrateEffectHandle)
 EndEvent
 
@@ -422,19 +442,19 @@ String[] Function GetDDTags(Actor player)
     _NumVibratorsMult = 0
     If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
         _NumVibratorsMult += 0.7
-        events[0] = Devious_VibrateEventVaginal
+        events[0] = DeviousDevices_Vibrate_Event_Vaginal
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
         _NumVibratorsMult += 0.3
-        events[1] = Devious_VibrateEventAnal
+        events[1] = DeviousDevices_Vibrate_Event_Anal
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
         _NumVibratorsMult += 0.25
-        events[2] = Devious_VibrateEventNipple
+        events[2] = DeviousDevices_Vibrate_Event_Nipple
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
         _NumVibratorsMult += 0.5
-        events[0] = Devious_VibrateEventVaginal
+        events[0] = DeviousDevices_Vibrate_Event_Vaginal
     EndIf
     If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
         _NumVibratorsMult /= 1.15
