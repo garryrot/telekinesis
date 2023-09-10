@@ -149,11 +149,22 @@ String[] Function GetPatternNames(Bool vibrator)
     EndIf
     
     String[] defaultPatterns = new String[4]
-    defaultPatterns[0] = "Tease-30s"
-    defaultPatterns[1] = "Slow-Tease-30s"
-    defaultPatterns[2] = "Sine"
-    defaultPatterns[3] = "On-Off"
+    defaultPatterns[0] = "01_Tease"
+    defaultPatterns[1] = "02_Cruel-Tease"
+    defaultPatterns[2] = "03_Wub-Wub-Wub"
+    defaultPatterns[3] = "30_Sawtooth"
+    defaultPatterns[4] = "30_Sawtooth-Fast"
+    defaultPatterns[5] = "31_Sawtooth-Fast"
+    defaultPatterns[6] = "35_On-Off"
+    defaultPatterns[7] = "36_On-Off-Fast"
+    defaultPatterns[8] = "40_Square"
+    defaultPatterns[9] = "50_Sine"
     return defaultPatterns
+EndFunction
+
+String Function GetRandomPattern(Bool vibrator)
+    String[] patterns = GetPatternNames(vibrator)
+    return patterns[Utility.RandomInt(0, patterns.Length - 1)]
 EndFunction
 
 ; Utility

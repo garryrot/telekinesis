@@ -5,14 +5,16 @@ Tele_Integration Property TeleIntegration Auto
 
 String[] _ConnectionMenuOptions
 String[] _DeviceSelectorOptions ; 0 = All, 1 = Match Tags
+String[] _PatternSelectorOptions
 
 Int[] _UseDeviceOids
 Int[] _DeviceEventOids
 Int[] _TestVibratePatternOid
 Int[] _TestStrokePatternOid
 
-String[] _StrokePatternNames
-String[] _VibratePatternNames
+String[] _StrokeFunscriptNames
+String[] _VibrateFunscriptNames
+
 String[] _DeviceNames
 Bool _DebugSpellsAdded
 
@@ -54,21 +56,26 @@ Function InitLocals()
     _DeviceSelectorOptions[0] = "All"
     _DeviceSelectorOptions[1] = "Match Events"
 
+    _PatternSelectorOptions = new String[3]
+    _PatternSelectorOptions[0] = "Linear"
+    _PatternSelectorOptions[1] = "Funscript"
+    _PatternSelectorOptions[2] = "Random Funscript"
+
     _UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
     _DeviceEventOids = new Int[20]
     
     _DeviceNames = new String[1]
     _DebugSpellsAdded = false
 
-    _StrokePatternNames = new String[127]
-    _VibratePatternNames = new String[127]
+    _StrokeFunscriptNames = new String[127]
+    _VibrateFunscriptNames = new String[127]
     _TestVibratePatternOid = new Int[127]
     _TestStrokePatternOid = new Int[127]
 EndFunction
 
 Event OnPageReset(String page)
-    _VibratePatternNames = TeleDevices.GetPatternNames(true)
-    _StrokePatternNames = Tele_Api.GetPatternNames(false)
+    _VibrateFunscriptNames = TeleDevices.GetPatternNames(true)
+    _StrokeFunscriptNames = Tele_Api.GetPatternNames(false)
     If page == "General" || page == ""
         SetCursorFillMode(TOP_TO_BOTTOM)
 
@@ -189,17 +196,44 @@ Event OnPageReset(String page)
         EndIf
 
         AddHeaderOption("Skyrim Chainbeasts")
-        AddToggleOptionST("OPTION_CHAINBESTS_VIBRATE", "Gemmed Beasts", TeleIntegration.Chainbeasts_Vibrate)
-	    AddSliderOptionST("SLIDER_CHAINBEAST_MIN", "Min Strength", TeleIntegration.Chainbeasts_Min)
-	    AddSliderOptionST("SLIDER_CHAINBEAST_MAX", "Max Strength", TeleIntegration.Chainbeasts_Max)
+        AddToggleOptionST("OPTION_CHAINBEASTS_VIBRATE", "Gemmed Beasts", TeleIntegration.Chainbeasts_Vibrate)
+        Int chainbeasts_vibrate_selector_flag = OPTION_FLAG_DISABLED
+        If TeleIntegration.Chainbeasts_Vibrate
+            chainbeasts_vibrate_selector_flag = OPTION_FLAG_NONE
+        EndIf
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR", "Devices", _DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector], chainbeasts_vibrate_selector_flag)
+
+        Int chainbeasts_vibrate_event_flag = OPTION_FLAG_DISABLED
+        If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_DeviceSelector == 1
+            chainbeasts_vibrate_event_flag = OPTION_FLAG_NONE
+        EndIf
+        AddInputOptionST("INPUT_CHAINBEASTS_VIBRATE_EVENT", "Match Event", TeleIntegration.Chainbeasts_Vibrate_Event, chainbeasts_vibrate_event_flag)
+
+        Int chainbeasts_vibrate_pattern_flag = OPTION_FLAG_DISABLED
+        If TeleIntegration.Chainbeasts_Vibrate
+            chainbeasts_vibrate_pattern_flag = OPTION_FLAG_NONE
+        EndIf
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_Pattern], chainbeasts_vibrate_pattern_flag)
+
+        Int chainbeast_vibrate_funscript_flag = OPTION_FLAG_DISABLED
+        If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_Pattern == 1
+            chainbeast_vibrate_funscript_flag = OPTION_FLAG_NONE
+        EndIf
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT", "Funscript", TeleIntegration.Chainbeasts_Vibrate_Funscript, chainbeast_vibrate_funscript_flag)
+
+        Int chainbeasts_vibrate_linear_flag = OPTION_FLAG_DISABLED
+        If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_Pattern == 0
+            chainbeasts_vibrate_linear_flag = OPTION_FLAG_NONE
+        EndIf
+	    AddSliderOptionST("SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH", "Linear Strength", TeleIntegration.Chainbeasts_Vibrate_Linear_Strength, "{0}", chainbeasts_vibrate_linear_flag)
     EndIf
     
     If page == "Patterns"
         SetCursorFillMode(TOP_TO_BOTTOM)
         AddHeaderOption("Vibrator Patterns")
         Int j = 0
-        While j < _VibratePatternNames.Length && j < 63
-            String vibrate_pattern = _VibratePatternNames[j]
+        While j < _VibrateFunscriptNames.Length && j < 63
+            String vibrate_pattern = _VibrateFunscriptNames[j]
             _TestVibratePatternOid[j] = AddTextOption(vibrate_pattern, "(test me)")
 		    SetTextOptionValue(_TestVibratePatternOid[j], "running...")
             j += 1
@@ -208,8 +242,8 @@ Event OnPageReset(String page)
         SetCursorPosition(1)
         AddHeaderOption("Stroker Patterns")
         Int i = 0
-        While i < _StrokePatternNames.Length && i < 63
-            String stroker_pattern = _StrokePatternNames[i]
+        While i < _StrokeFunscriptNames.Length && i < 63
+            String stroker_pattern = _StrokeFunscriptNames[i]
             _TestStrokePatternOid[j] = AddTextOption(stroker_pattern, "(test me)")
 		    SetTextOptionValue(_TestStrokePatternOid[j], "running...")
             i += 1
@@ -236,49 +270,129 @@ Event OnPageReset(String page)
     EndIf
 EndEvent
 
-State SLIDER_CHAINBEAST_MIN
-	Event OnSliderOpenST()
-		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Min)
-		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Min_Default)
-		SetSliderDialogRange(0, TeleIntegration.Chainbeasts_Max)
-		SetSliderDialogInterval(1)
-	EndEvent
+State OPTION_CHAINBEASTS_VIBRATE
+    Event OnSelectST()
+        TeleIntegration.Chainbeasts_Vibrate = !TeleIntegration.Chainbeasts_Vibrate
+        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Chainbeasts_Vibrate = TeleIntegration.Chainbeasts_Vibrate_Default
+        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
+        ForcePageReset()
+    EndEvent
 
-	Event OnSliderAcceptST(float value)
-		TeleIntegration.Chainbeasts_Min = value as int
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Min)
-	EndEvent
-
-	Event OnDefaultST()
-		TeleIntegration.Chainbeasts_Min = TeleIntegration.Chainbeasts_Min_Default
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Min)
-	EndEvent
-
-	Event OnHighlightST()
-		SetInfoText("Min vibration strength for chainbeast events")
-	EndEvent
+    Event OnHighlightST()
+        SetInfoText("Vibrates devices during gemmed chainbeast capture (Requires Chainbeasts Version >= 0.7.0)")
+    EndEvent
 EndState
 
-State SLIDER_CHAINBEAST_MAX
+State MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TeleIntegration.Chainbeasts_Vibrate_DeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = TeleIntegration.Chainbeasts_Vibrate_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        SetInfoText(text)
+    EndEvent
+EndState
+
+State INPUT_CHAINBEASTS_VIBRATE_EVENT
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Chainbeasts_Vibrate_Event)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Chainbeasts_Vibrate_Event = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select only devices matching the input event")
+    EndEvent
+EndState
+
+State MENU_CHAINBEASTS_VIBRATE_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Chainbeasts_Vibrate_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptions[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Linear': Constant vibration strength. 'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+Int[] _ChainBeastsFunscriptSelection
+State MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_VibrateFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Chainbeasts_Vibrate_Funscript = _VibrateFunscriptNames[index]
+        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+    EndEvent
+EndState
+
+State SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH
 	Event OnSliderOpenST()
-		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Max)
-		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Max_Default)
-		SetSliderDialogRange(TeleIntegration.Chainbeasts_Min, 100)
+		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
+		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default)
+		SetSliderDialogRange(0, 100)
 		SetSliderDialogInterval(1)
 	EndEvent
 
 	Event OnSliderAcceptST(float value)
-		TeleIntegration.Chainbeasts_Max = value as int
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Max)
+		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = value as int
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
 	EndEvent
 
 	Event OnDefaultST()
-		TeleIntegration.Chainbeasts_Max = TeleIntegration.Chainbeasts_Max_Default
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Max)
+		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default
+		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
 	EndEvent
 
 	Event OnHighlightST()
-		SetInfoText("Max vibration strength for chainbeast events")
+		SetInfoText("Vibration strength for linear pattern")
 	EndEvent
 EndState
 
@@ -650,22 +764,6 @@ State OPTION_TOYS_SQUIRT
     EndEvent
 EndState
 
-State OPTION_CHAINBESTS_VIBRATE
-    Event OnSelectST()
-        TeleIntegration.Chainbeasts_Vibrate = !TeleIntegration.Chainbeasts_Vibrate
-        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
-    EndEvent
-    
-    Event OnDefaultST()
-        TeleIntegration.Chainbeasts_Vibrate = TeleIntegration.Chainbeasts_Vibrate_Default
-        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
-    EndEvent
-
-    Event OnHighlightST()
-        SetInfoText("Vibrates devices during gemmed chainbeast capture (Requires Chainbeasts Version >= 0.7.0)")
-    EndEvent
-EndState
-
 State OPTION_LOG_CONNECTS
     Event OnSelectST()
         TeleDevices.LogDeviceConnects = !TeleDevices.LogDeviceConnects
@@ -815,7 +913,7 @@ Event OnOptionSelect(int oid)
     i = 0
     While (i < _TestVibratePatternOid.Length)
         If (oid == _TestVibratePatternOid[i])
-            String patternName = _VibratePatternNames[i]
+            String patternName = _VibrateFunscriptNames[i]
             String[] allEvents = new String[1]
             TeleDevices.VibratePattern(patternName, 30, allEvents)
         EndIf
@@ -824,7 +922,7 @@ Event OnOptionSelect(int oid)
     i = 0
     While (i < _TestStrokePatternOid.Length)
         If (oid == _TestStrokePatternOid[i])
-            String patternName = _StrokePatternNames[i]
+            String patternName = _StrokeFunscriptNames[i]
             Debug.MessageBox("Not supported yet")
         EndIf
         i += 1

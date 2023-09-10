@@ -270,10 +270,16 @@ Bool Property Toys_Denial
     EndFunction
 EndProperty
 
-Int Property Chainbeasts_Min = 80 Auto
-Int Property Chainbeasts_Min_Default = 80 AutoReadOnly
-Int Property Chainbeasts_Max = 100 Auto
-Int Property Chainbeasts_Max_Default = 100 AutoReadOnly
+String Property Chainbeasts_Vibrate_Funscript = "" Auto
+String Property Chainbeasts_Vibrate_Funscript_Default = "" Auto
+Int Property Chainbeasts_Vibrate_DeviceSelector = 0 Auto
+Int Property Chainbeasts_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
+String Property Chainbeasts_Vibrate_Event = "Vaginal" Auto
+String Property Chainbeasts_Vibrate_Event_Default = "Vaginal" AutoReadOnly
+Int Property Chainbeasts_Vibrate_Pattern = 0 Auto
+Int Property Chainbeasts_Vibrate_Pattern_Default = 0 AutoReadOnly
+Int Property Chainbeasts_Vibrate_Linear_Strength = 80 Auto
+Int Property Chainbeasts_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
 Bool Property Chainbeasts_Vibrate_Default = true AutoReadOnly
 Bool Property Chainbeasts_Vibrate
     Function Set(Bool enable)
@@ -322,8 +328,11 @@ Function ResetIntegrationSettings()
     Toys_Anal_Penetration = Toys_Anal_Penetration_Default
     Toys_Oral_Penetration = Toys_Oral_Penetration_Default
     Chainbeasts_Vibrate = Chainbeasts_Vibrate_Default
-    Chainbeasts_Min = Chainbeasts_Min_Default
-    Chainbeasts_Max = Chainbeasts_Max_Default
+    Chainbeasts_Vibrate_DeviceSelector = Chainbeasts_Vibrate_DeviceSelector_Default
+    Chainbeasts_Vibrate_Event = Chainbeasts_Vibrate_Event_Default
+    Chainbeasts_Vibrate_Funscript = Chainbeasts_Vibrate_Funscript_Default
+    Chainbeasts_Vibrate_Pattern = Chainbeasts_Vibrate_Pattern_Default
+    Chainbeasts_Vibrate_Linear_Strength = Chainbeasts_Vibrate_Linear_Strength_Default
     EmergencyHotkey = EmergencyHotkey_Default
 EndFunction
 
@@ -550,6 +559,16 @@ EndEvent
 ; Skyrim Chain Beasts Events
 
 Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
-	TeleDevices.Vibrate(Utility.RandomInt(Chainbeasts_Min, Chainbeasts_Max), 3)
+    String[] events = new String[1]
+    If Chainbeasts_Vibrate_DeviceSelector == 1
+        events[0] = Chainbeasts_Vibrate_Event
+    EndIf
+    If Chainbeasts_Vibrate_Pattern == 2
+        TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), 3, events)
+    ElseIf Chainbeasts_Vibrate_Pattern == 1
+        TeleDevices.VibratePattern(Chainbeasts_Vibrate_Funscript, 3, events)
+    Else
+        TeleDevices.VibrateEvents(Chainbeasts_Vibrate_Linear_Strength, 3, events)
+    EndIf
 	TeleDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent
