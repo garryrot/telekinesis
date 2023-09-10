@@ -22,12 +22,13 @@ Bool _Toys_Climax = false
 Bool _Toys_Denial = false
 Bool _Toys_Fondle = false
 Bool _Toys_Squirt = false
-Bool _Toys_VibrateEffect = false
+Bool _Toys_Vibrate = false
 Bool _Toys_Vaginal_Penetration = false
 Bool _Toys_Anal_Penetration = false
 Bool _Toys_Oral_Penetration = false
 Bool _Chainbeasts_Vibrate = false
 Int _EmergencyHotkey = 211
+
 Int Property EmergencyHotkey_Default = 211 AutoReadOnly ; del
 Int Property EmergencyHotkey
     Function Set(Int keyCode)
@@ -87,7 +88,7 @@ Bool Property Sexlab_Animation
             RegisterForModEvent("HookAnimationStart", "OnSexlabAnimationStart")
             RegisterForModEvent("HookAnimationEnd", "OnSexlabAnimationEnd")
         Else
-            _InSexScene = False ; End running scene
+            _InSexScene = False
             UnregisterForModEvent("HookAnimationStart")
             UnregisterForModEvent("HookAnimationEnd")
         EndIf
@@ -194,7 +195,7 @@ Bool Property Toys_Squirt
     Function Set(Bool enable)
         _Toys_Squirt = enable
         If enable
-            RegisterForModEvent("ToysSquirt", "OnToysSquirt") ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
+            RegisterForModEvent("ToysSquirt", "OnToysSquirt")
         Else
             UnregisterForModEvent("ToysSquirt")
         EndIf
@@ -209,8 +210,8 @@ Bool Property Toys_Climax
     Function Set(Bool enable)
         _Toys_Climax = enable
         If enable
-            RegisterForModEvent("ToysClimax", "OnToysClimax") ; Player has climaxed
-            RegisterForModEvent("ToysClimaxSimultaneous", "OnToysClimaxSimultaneous") ; Simultaneous Orgasm. Both player & NPC have climaxed. This can happen multiple times. Sent in addition to other climax events. This event always first
+            RegisterForModEvent("ToysClimax", "OnToysClimax")
+            RegisterForModEvent("ToysClimaxSimultaneous", "OnToysClimaxSimultaneous")
         Else
             UnregisterForModEvent("ToysClimax")
             UnregisterForModEvent("ToysClimaxSimultaneous")
@@ -221,10 +222,21 @@ Bool Property Toys_Climax
     EndFunction
 EndProperty
 
-Bool Property Toys_VibrateEffect_Default = true AutoReadOnly
-Bool Property Toys_VibrateEffect
+; EndProperty
+String Property Toys_Vibrate_Funscript = "" Auto
+String Property Toys_Vibrate_Funscript_Default = "" Auto
+Int Property Toys_Vibrate_DeviceSelector = 0 Auto
+Int Property Toys_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
+String Property Toys_Vibrate_Event = "Vaginal" Auto
+String Property Toys_Vibrate_Event_Default = "Vaginal" AutoReadOnly
+Int Property Toys_Vibrate_Pattern = 0 Auto
+Int Property Toys_Vibrate_Pattern_Default = 0 AutoReadOnly
+Int Property Toys_Vibrate_Linear_Strength = 80 Auto
+Int Property Toys_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
+Bool Property Toys_Vibrate_Default = true AutoReadOnly
+Bool Property Toys_Vibrate
     Function Set(Bool enable)
-        _Toys_VibrateEffect = enable
+        _Toys_Vibrate = enable
         If enable
             RegisterForModEvent("ToysPulsate", "OnToysPulsate")
         Else
@@ -232,7 +244,7 @@ Bool Property Toys_VibrateEffect
         EndIf
     EndFunction
     Bool Function Get()
-        return _Toys_VibrateEffect
+        return _Toys_Vibrate
     EndFunction
 EndProperty
 
@@ -316,49 +328,6 @@ Event OnInit()
     RegisterForUpdate(5)
     InitDefaultOnEventHandlers()
 EndEvent
-
-Function InitDefaultOnEventHandlers()
-    EmergencyHotkey = EmergencyHotkey_Default
-    ; Devious_VibrateEffect = true
-    Toys_VibrateEffect = true
-    Chainbeasts_Vibrate = true
-EndFunction
-
-Function ResetIntegrationSettings()
-    TeleDevices.Notify("Resetting integration settings")
-    DeviousDevices_Vibrate = DeviousDevices_Vibrate_Default
-    DeviousDevices_Vibrate_DeviceSelector = DeviousDevices_Vibrate_DeviceSelector_Default
-    DeviousDevices_Vibrate_Event_Anal = DeviousDevices_Vibrate_Event_Anal_Default
-    DeviousDevices_Vibrate_Event_Vaginal = DeviousDevices_Vibrate_Event_Vaginal_Default
-    DeviousDevices_Vibrate_Event_Nipple = DeviousDevices_Vibrate_Event_Nipple_Default
-    DeviousDevices_Vibrate_Funscript = DeviousDevices_Vibrate_Funscript_Default
-    DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
-    Sexlab_Animation = Sexlab_Animation_Default
-    Sexlab_Animation_DeviceSelector = Sexlab_Animation_DeviceSelector_Default
-    Sexlab_Animation_Event = Sexlab_Animation_Event_Default
-    Sexlab_Animation_Funscript = Sexlab_Animation_Funscript_Default
-    Sexlab_Animation_Pattern = Sexlab_Animation_Pattern_Default
-    Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
-    Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
-    Sexlab_ActorEdge = Sexlab_ActorEdge_Default
-    Toys_Animation = Toys_Animation_Default
-    Toys_Caressed = Toys_Caressed_Default
-    Toys_Climax = Toys_Climax_Default
-    Toys_Denial = Toys_Denial_Default
-    Toys_Fondle = Toys_Fondle_Default
-    Toys_Squirt = Toys_Squirt_Default
-    Toys_VibrateEffect = Toys_VibrateEffect_Default
-    Toys_Vaginal_Penetration = Toys_Vaginal_Penetration_Default
-    Toys_Anal_Penetration = Toys_Anal_Penetration_Default
-    Toys_Oral_Penetration = Toys_Oral_Penetration_Default
-    Chainbeasts_Vibrate = Chainbeasts_Vibrate_Default
-    Chainbeasts_Vibrate_DeviceSelector = Chainbeasts_Vibrate_DeviceSelector_Default
-    Chainbeasts_Vibrate_Event = Chainbeasts_Vibrate_Event_Default
-    Chainbeasts_Vibrate_Funscript = Chainbeasts_Vibrate_Funscript_Default
-    Chainbeasts_Vibrate_Pattern = Chainbeasts_Vibrate_Pattern_Default
-    Chainbeasts_Vibrate_Linear_Strength = Chainbeasts_Vibrate_Linear_Strength_Default
-    EmergencyHotkey = EmergencyHotkey_Default
-EndFunction
 
 ; Key Events
 
@@ -504,7 +473,18 @@ EndEvent
 
 Event OnToysPulsate(string eventName, string argString, float argNum, form sender)
     ; Duration is random lasting from approx. 12 to 35 seconds
-	TeleDevices.Vibrate(Utility.RandomInt(1, 100), Utility.RandomInt(12,35))
+    Int duration = Utility.RandomInt(12,35)
+    String[] events = new String[1]
+    If Toys_Vibrate_DeviceSelector == 1
+        events[0] = Toys_Vibrate_Event
+    EndIf
+    If Toys_Vibrate_Pattern == 2
+        TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), duration, events)
+    ElseIf Toys_Vibrate_Pattern == 1
+        TeleDevices.VibratePattern(Toys_Vibrate_Funscript, duration, events)
+    Else
+        TeleDevices.VibrateEvents(Toys_Vibrate_Linear_Strength, duration, events)
+    EndIf
 	TeleDevices.LogDebug("ToysPulsate")
 EndEvent
 
@@ -522,6 +502,7 @@ Event OnToysFondleEnd(string eventName, string argString, float argNum, form sen
 EndEvent
 
 Event OnToysSquirt(string eventName, string argString, float argNum, form sender)
+     ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
 	TeleDevices.Vibrate(100, 12.0)
 	TeleDevices.LogDebug("ToysSquirt")
 EndEvent
@@ -548,6 +529,7 @@ Event OnToysSceneEnd(string eventName, string argString, float argNum, form send
 EndEvent
 
 Event OnToysClimax(string eventName, string argString, float argNum, form sender)
+    ; Simultaneous Orgasm. Both player & NPC have climaxed. This can happen multiple times. Sent in addition to other climax events. This event always first
 	TeleDevices.Vibrate(80, 5)
 	TeleDevices.LogDebug("OnToysClimax")
 EndEvent
@@ -599,3 +581,53 @@ Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender
     EndIf
 	TeleDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent
+
+; Privates
+
+Function InitDefaultOnEventHandlers()
+    EmergencyHotkey = EmergencyHotkey_Default
+    DeviousDevices_Vibrate = true
+    Toys_Vibrate = true
+    Chainbeasts_Vibrate = true
+EndFunction
+
+Function ResetIntegrationSettings()
+    TeleDevices.Notify("Resetting integration settings")
+    DeviousDevices_Vibrate = DeviousDevices_Vibrate_Default
+    DeviousDevices_Vibrate_DeviceSelector = DeviousDevices_Vibrate_DeviceSelector_Default
+    DeviousDevices_Vibrate_Event_Anal = DeviousDevices_Vibrate_Event_Anal_Default
+    DeviousDevices_Vibrate_Event_Vaginal = DeviousDevices_Vibrate_Event_Vaginal_Default
+    DeviousDevices_Vibrate_Event_Nipple = DeviousDevices_Vibrate_Event_Nipple_Default
+    DeviousDevices_Vibrate_Funscript = DeviousDevices_Vibrate_Funscript_Default
+    DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
+    Sexlab_Animation = Sexlab_Animation_Default
+    Sexlab_Animation_DeviceSelector = Sexlab_Animation_DeviceSelector_Default
+    Sexlab_Animation_Event = Sexlab_Animation_Event_Default
+    Sexlab_Animation_Funscript = Sexlab_Animation_Funscript_Default
+    Sexlab_Animation_Pattern = Sexlab_Animation_Pattern_Default
+    Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
+    Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
+    Sexlab_ActorEdge = Sexlab_ActorEdge_Default
+    Toys_Animation = Toys_Animation_Default
+    Toys_Caressed = Toys_Caressed_Default
+    Toys_Climax = Toys_Climax_Default
+    Toys_Denial = Toys_Denial_Default
+    Toys_Fondle = Toys_Fondle_Default
+    Toys_Squirt = Toys_Squirt_Default
+    Toys_Vibrate = Toys_Vibrate_Default
+    Toys_Vibrate_DeviceSelector = Toys_Vibrate_DeviceSelector_Default
+    Toys_Vibrate_Event = Toys_Vibrate_Event_Default
+    Toys_Vibrate_Funscript = Toys_Vibrate_Funscript_Default
+    Toys_Vibrate_Pattern = Toys_Vibrate_Pattern_Default
+    Toys_Vibrate_Linear_Strength = Toys_Vibrate_Linear_Strength_Default
+    Toys_Vaginal_Penetration = Toys_Vaginal_Penetration_Default
+    Toys_Anal_Penetration = Toys_Anal_Penetration_Default
+    Toys_Oral_Penetration = Toys_Oral_Penetration_Default
+    Chainbeasts_Vibrate = Chainbeasts_Vibrate_Default
+    Chainbeasts_Vibrate_DeviceSelector = Chainbeasts_Vibrate_DeviceSelector_Default
+    Chainbeasts_Vibrate_Event = Chainbeasts_Vibrate_Event_Default
+    Chainbeasts_Vibrate_Funscript = Chainbeasts_Vibrate_Funscript_Default
+    Chainbeasts_Vibrate_Pattern = Chainbeasts_Vibrate_Pattern_Default
+    Chainbeasts_Vibrate_Linear_Strength = Chainbeasts_Vibrate_Linear_Strength_Default
+    EmergencyHotkey = EmergencyHotkey_Default
+EndFunction
