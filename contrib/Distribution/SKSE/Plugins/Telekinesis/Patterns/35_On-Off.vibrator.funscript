@@ -16,131 +16,131 @@
   "clips": [],
   "actions": [
     {
-      "pos": 40,
+      "pos": 100,
       "at": 0
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 1000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 2000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 3000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 4000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 5000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 6000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 7000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 8000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 9000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 10000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 11000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 12000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 13000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 14000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 15000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 16000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 17000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 18000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 19000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 20000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 21000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 22000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 23000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 24000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 25000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 26000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 27000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 28000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 29000
     },
     {
-      "pos": 40,
+      "pos": 100,
       "at": 30000
     },
     {
-      "pos": 10,
+      "pos": 0,
       "at": 31000
     }
   ],
@@ -149,7 +149,7 @@
     "bookmarks": [],
     "chapters": [],
     "creator": "",
-    "description": "Alternates between 40% and 10% in a 1s interval",
+    "description": "On/Off in 1 second interval",
     "duration": -1,
     "license": "",
     "notes": "",

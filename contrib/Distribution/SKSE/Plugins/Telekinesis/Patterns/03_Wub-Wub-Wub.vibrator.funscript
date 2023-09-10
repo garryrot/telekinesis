@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "inverted": false,
-  "range": -1,
+  "range": 100,
   "bookmark": -1,
   "lastPosition": -1,
   "graphDuration": -1,
@@ -21,31 +21,27 @@
     },
     {
       "pos": 0,
-      "at": 2000
+      "at": 750
     },
     {
       "pos": 100,
-      "at": 4000
+      "at": 900
     },
     {
       "pos": 0,
-      "at": 6000
+      "at": 1750
     },
     {
       "pos": 100,
-      "at": 8000
+      "at": 1900
     },
     {
       "pos": 0,
-      "at": 10000
-    },
-    {
-      "pos": 100,
-      "at": 12000
+      "at": 2750
     },
     {
       "pos": 0,
-      "at": 14000
+      "at": 3050
     }
   ],
   "rawActions": [],
@@ -53,15 +49,15 @@
     "bookmarks": [],
     "chapters": [],
     "creator": "",
-    "description": "On/Off in 2 second interval",
-    "duration": -1,
+    "description": "",
+    "duration": 347,
     "license": "",
     "notes": "",
     "performers": [],
     "script_url": "",
     "tags": [],
     "title": "",
-    "type": "",
+    "type": "basic",
     "video_url": ""
   }
 }
