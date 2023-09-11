@@ -14,15 +14,24 @@ EndEvent
 
 Function LoadTelekinesis()
 	TeleDevices.LogDebug("Loading")
+
     If Game.GetModByName("Devious Devices - Expansion.esm") != 255
         TeleIntegration.ZadLib = (Quest.GetQuest("zadQuest") As ZadLibs)
     Else
         TeleIntegration.ZadLib = None
     EndIf
+
     If Game.GetModByName("SexLab.esm") != 255
         TeleIntegration.SexLab = (Quest.GetQuest("SexLabQuestFramework") As SexLabFramework)
     Else
         TeleIntegration.SexLab = None
     EndIf
+
+    If Game.GetModByName("Toys.esm") != 255
+        TeleIntegration.Toys = (Quest.GetQuest("ToysFramework") As ToysFramework)
+    Else
+        TeleIntegration.Toys = None
+    EndIf
+    
     TeleDevices.ConnectAndScanForDevices()
 EndFunction

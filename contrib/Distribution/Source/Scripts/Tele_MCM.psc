@@ -39,13 +39,16 @@ Event OnVersionUpdate(int aVersion)
 EndEvent
 
 Function InitLocals()
-    Pages = new String[6]
+    Pages = new String[9]
     Pages[0] = "General"
     Pages[1] = "Devices"
-    Pages[2] = "Integration"
-    Pages[3] = "Patterns"
-    Pages[4] = "Debug"
-    Pages[5] = "Troubleshooting"
+    Pages[2] = "Funscript Patterns"
+    Pages[3] = "Devious Devices"
+    Pages[4] = "Sexlab"
+    Pages[5] = "Toys & Love"
+    Pages[6] = "Skyrim Chain Beasts"
+    Pages[7] = "Debug"
+    Pages[8] = "Troubleshooting"
 
     _ConnectionMenuOptions = new String[3]
     _ConnectionMenuOptions[0] = "In-Process (Default)"
@@ -141,19 +144,19 @@ Event OnPageReset(String page)
         EndIf
     EndIf
 
-    If page == "Integration"
+    If page == "Devious Devices"
         SetCursorFillMode(TOP_TO_BOTTOM)
 
-        AddHeaderOption("Devious Devices")
         If TeleIntegration.ZadLib != None
-            AddToggleOptionST("OPTION_DEVIOUS_DEVICES_VIBRATE", "In-Game Vibrators", TeleIntegration.DeviousDevices_Vibrate)
+            AddHeaderOption("In-Game Vibrators")
+            AddToggleOptionST("OPTION_DEVIOUS_DEVICES_VIBRATE", "Enable", TeleIntegration.DeviousDevices_Vibrate)
             Int devious_devices_vibrate_selector_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate
                 devious_devices_vibrate_selector_flag = OPTION_FLAG_NONE
             EndIf
 
-            AddEmptyOption()
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR", "Device Filter", _DeviceSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_DeviceSelector], devious_devices_vibrate_selector_flag)
+            AddHeaderOption("Devices")
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_DeviceSelector], devious_devices_vibrate_selector_flag)
 
             Int devious_devices_vibrate_event_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_DeviceSelector == 1
@@ -163,118 +166,162 @@ Event OnPageReset(String page)
             AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
             AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
         
+            AddHeaderOption("Actions")
             Int devious_devices_vibrate_pattern_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate
                 devious_devices_vibrate_pattern_flag = OPTION_FLAG_NONE
             EndIf
-
-            AddEmptyOption()
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_Pattern], devious_devices_vibrate_pattern_flag)
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_Pattern], devious_devices_vibrate_pattern_flag)
         
             Int devious_devices_vibrate_funscript_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_Pattern == 1
                 devious_devices_vibrate_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT", "Vibration Funscript", TeleIntegration.DeviousDevices_Vibrate_Funscript, devious_devices_vibrate_funscript_flag)
-        
-            Int devious_devices_vibrate_linear_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_Pattern == 0
-                devious_devices_vibrate_linear_flag = OPTION_FLAG_NONE
-            EndIf      
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.DeviousDevices_Vibrate_Funscript, devious_devices_vibrate_funscript_flag)
+            AddTextOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_STRENGTH", "Strength", "Controlled by DD", OPTION_FLAG_DISABLED)
         Else
-            AddTextOption("In-Game Vibrators", "Not Installed", OPTION_FLAG_DISABLED)
+            AddTextOption("Devious Devices", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
-        AddEmptyOption()        
+    EndIf
 
-        AddHeaderOption("Toys")
-        AddToggleOptionST("OPTION_TOYS_VIBRATE", "In-Game Vibrators", TeleIntegration.Toys_Vibrate)
-
-        AddEmptyOption()        
-        Int toys_vibrate_selector_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Toys_Vibrate
-            toys_vibrate_selector_flag = OPTION_FLAG_NONE
-        EndIf
-        AddMenuOptionST("MENU_TOYS_VIBRATE_DEVICE_SELECTOR", "Devices", _DeviceSelectorOptions[TeleIntegration.Toys_Vibrate_DeviceSelector], toys_vibrate_selector_flag)
-    
-        Int toys_vibrate_event_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_DeviceSelector == 1
-            toys_vibrate_event_flag = OPTION_FLAG_NONE
-        EndIf
-        AddInputOptionST("INPUT_TOYS_VIBRATE_EVENT", "Match Event", TeleIntegration.Toys_Vibrate_Event, toys_vibrate_event_flag)
-    
-        Int toys_vibrate_pattern_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Toys_Vibrate
-            toys_vibrate_pattern_flag = OPTION_FLAG_NONE
-        EndIf
-        AddMenuOptionST("MENU_TOYS_VIBRATE_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.Toys_Vibrate_Pattern], toys_vibrate_pattern_flag)
-    
-        Int toys_vibrate_funscript_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_Pattern == 1
-            toys_vibrate_funscript_flag = OPTION_FLAG_NONE
-        EndIf
-        AddMenuOptionST("MENU_TOYS_VIBRATE_FUNSCRIPT", "Vibration Funscript", TeleIntegration.Toys_Vibrate_Funscript, toys_vibrate_funscript_flag)
-    
-        Int toys_vibrate_linear_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_Pattern == 0
-            toys_vibrate_linear_flag = OPTION_FLAG_NONE
-        EndIf
-        AddSliderOptionST("SLIDER_TOYS_VIBRATE_LINEAR_STRENGTH", "Linear Strength", TeleIntegration.Toys_Vibrate_Linear_Strength, "{0}", toys_vibrate_linear_flag)
-    
-        AddEmptyOption()
-        AddHeaderOption("Love")
-        AddToggleOptionST("OPTION_TOYS_ANIMATION", "Love Animation", TeleIntegration.Toys_Animation)
-
-        AddToggleOptionST("OPTION_TOYS_VAGINAL_PENETRATION", "Vaginal Penetration", TeleIntegration.Toys_Vaginal_Penetration)
-        AddToggleOptionST("OPTION_TOYS_ANAL_PENETRATION", "Anal Penetration", TeleIntegration.Toys_Anal_Penetration)
-        AddToggleOptionST("OPTION_TOYS_ORAL_PENETRATION", "Vaginal Penetration", TeleIntegration.Toys_Oral_Penetration)
-        AddEmptyOption()
-
-        AddToggleOptionST("OPTION_TOYS_DENIAL", "Denial", TeleIntegration.Toys_Denial)
-        AddToggleOptionST("OPTION_TOYS_FONDLE", "Fondle", TeleIntegration.Toys_Fondle)
-        AddToggleOptionST("OPTION_TOYS_SQUIRT", "Squirt", TeleIntegration.Toys_Squirt)
-        AddEmptyOption()
-
-        SetCursorPosition(1)
-        AddHeaderOption("Sexlab")
+    If page == "Sexlab"
+        SetCursorFillMode(TOP_TO_BOTTOM)
         If TeleIntegration.SexLab != None
-            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Animations", TeleIntegration.Sexlab_Animation)
+            AddHeaderOption("In-Game Vibrators")
+            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Enable", TeleIntegration.Sexlab_Animation)
             Int sexlab_animation_selector_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Sexlab_Animation
                 sexlab_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
             
-            AddEmptyOption()
-            AddMenuOptionST("MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR", "Device Filter", _DeviceSelectorOptions[TeleIntegration.Sexlab_Animation_DeviceSelector], sexlab_animation_selector_flag)
+            AddHeaderOption("Devices")
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Sexlab_Animation_DeviceSelector], sexlab_animation_selector_flag)
         
             Int sexlab_animation_pattern_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Sexlab_Animation
                 sexlab_animation_pattern_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_SEXLAB_ANIMATION_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.Sexlab_Animation_Pattern], sexlab_animation_pattern_flag)
+
+            AddHeaderOption("Actions")
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Sexlab_Animation_Pattern], sexlab_animation_pattern_flag)
         
             Int sexlab_animation_funscript_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Sexlab_Animation && TeleIntegration.Sexlab_Animation_Pattern == 1
                 sexlab_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_SEXLAB_ANIMATION_FUNSCRIPT", "Vibration Funscript", TeleIntegration.Sexlab_Animation_Funscript, sexlab_animation_funscript_flag)
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Sexlab_Animation_Funscript, sexlab_animation_funscript_flag)
         
-            AddEmptyOption()
-            AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Actor Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
-            AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Actor Edge", TeleIntegration.Sexlab_ActorEdge)
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Vibrate on Actor Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Stop on Actor Edge", TeleIntegration.Sexlab_ActorEdge)
         Else
-            AddTextOption("Sexlab", "Not Installed", OPTION_FLAG_DISABLED)
+            AddTextOption("Sexlab", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
-        AddEmptyOption()
+    EndIf
 
-        AddHeaderOption("Skyrim Chainbeasts")
-        AddToggleOptionST("OPTION_CHAINBEASTS_VIBRATE", "Gemmed Beasts", TeleIntegration.Chainbeasts_Vibrate)
+    If page == "Toys & Love"
+        SetCursorFillMode(TOP_TO_BOTTOM)
+        If TeleIntegration.Toys != None
+            AddHeaderOption("In-Game Vibrators")
+            AddToggleOptionST("OPTION_TOYS_VIBRATE", "Enable", TeleIntegration.Toys_Vibrate)    
+
+            AddHeaderOption("Devices")
+            Int toys_vibrate_selector_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Vibrate
+                toys_vibrate_selector_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_TOYS_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Toys_Vibrate_DeviceSelector], toys_vibrate_selector_flag)
+        
+            Int toys_vibrate_event_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_DeviceSelector == 1
+                toys_vibrate_event_flag = OPTION_FLAG_NONE
+            EndIf
+            AddInputOptionST("INPUT_TOYS_VIBRATE_EVENT", "Match Event", TeleIntegration.Toys_Vibrate_Event, toys_vibrate_event_flag)
+        
+            AddHeaderOption("Actions")
+            Int toys_vibrate_pattern_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Vibrate
+                toys_vibrate_pattern_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_TOYS_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Toys_Vibrate_Pattern], toys_vibrate_pattern_flag)
+        
+            Int toys_vibrate_funscript_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_Pattern == 1
+                toys_vibrate_funscript_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_TOYS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Toys_Vibrate_Funscript, toys_vibrate_funscript_flag)
+        
+            Int toys_vibrate_linear_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_Pattern == 0
+                toys_vibrate_linear_flag = OPTION_FLAG_NONE
+            EndIf
+            AddSliderOptionST("SLIDER_TOYS_VIBRATE_LINEAR_STRENGTH", "Strength", TeleIntegration.Toys_Vibrate_Linear_Strength, "{0}", toys_vibrate_linear_flag)
+            
+            SetCursorPosition(1)
+            AddHeaderOption("Love Animations")
+            AddToggleOptionST("OPTION_TOYS_ANIMATION", "Enable", TeleIntegration.Toys_Animation)
+
+            AddHeaderOption("Devices")
+            Int toys_animation_selector_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Animation
+                toys_animation_selector_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_TOYS_ANIMATION_DEVICE_SELECTOR", "Devices", _DeviceSelectorOptions[TeleIntegration.Toys_Animation_DeviceSelector], toys_animation_selector_flag)
+
+            Int toys_animation_event_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_DeviceSelector == 1
+                toys_animation_event_flag = OPTION_FLAG_NONE
+            EndIf
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT", "Match Event", TeleIntegration.Toys_Animation_Event, toys_animation_event_flag)
+
+            AddHeaderOption("Actions")
+            Int toys_animation_rousing = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Animation
+                toys_animation_rousing = OPTION_FLAG_NONE
+            EndIf
+            AddToggleOptionST("OPTION_TOYS_ANIMATION_ROUSING", "Rousing = Vibration Pattern", TeleIntegration.Toys_Animation_Rousing, toys_animation_rousing)
+
+            Int toys_animation_pattern_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Animation && ! TeleIntegration.Toys_Animation_Rousing
+                toys_animation_pattern_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_TOYS_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Toys_Animation_Pattern], toys_animation_pattern_flag)
+        
+            Int toys_animation_funscript_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Animation && ! TeleIntegration.Toys_Animation_Rousing &&  TeleIntegration.Toys_Animation_Pattern == 1
+                toys_animation_funscript_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_TOYS_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Toys_Animation_Funscript, toys_animation_funscript_flag)
+        
+            Int toys_animation_linear_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Toys_Animation && ! TeleIntegration.Toys_Animation_Rousing && TeleIntegration.Toys_Animation_Pattern == 0
+                toys_animation_linear_flag = OPTION_FLAG_NONE
+            EndIf
+            AddSliderOptionST("SLIDER_TOYS_ANIMATION_LINEAR_STRENGTH", "Strength (Linear)", TeleIntegration.Toys_Animation_Linear_Strength, "{0}", toys_animation_linear_flag)
+
+            AddHeaderOption("Extra Actions")
+            AddToggleOptionST("OPTION_TOYS_DENIAL", "Pause on Denial", TeleIntegration.Toys_Denial)
+            AddToggleOptionST("OPTION_TOYS_VAGINAL_PENETRATION", "Strong Vaginal Penetration", TeleIntegration.Toys_Vaginal_Penetration)
+            AddToggleOptionST("OPTION_TOYS_ANAL_PENETRATION", "Strong Anal Penetration", TeleIntegration.Toys_Anal_Penetration)
+            AddToggleOptionST("OPTION_TOYS_ORAL_PENETRATION", "Strong Vaginal Penetration", TeleIntegration.Toys_Oral_Penetration)
+            AddToggleOptionST("OPTION_TOYS_FONDLE", "Vibration on Fondle", TeleIntegration.Toys_Fondle)
+            AddToggleOptionST("OPTION_TOYS_SQUIRT", "Vibration on Squirt", TeleIntegration.Toys_Squirt)
+        Else
+            AddTextOption("Toys & Love", "Mod not found", OPTION_FLAG_DISABLED)
+        EndIf
+    EndIf
+
+    If page == "Skyrim Chain Beasts"
+        SetCursorFillMode(TOP_TO_BOTTOM)
+
+        AddHeaderOption("Gemmed Beasts")
+        AddToggleOptionST("OPTION_CHAINBEASTS_VIBRATE", "Enable", TeleIntegration.Chainbeasts_Vibrate)
         Int chainbeasts_vibrate_selector_flag = OPTION_FLAG_DISABLED
         If TeleIntegration.Chainbeasts_Vibrate
             chainbeasts_vibrate_selector_flag = OPTION_FLAG_NONE
         EndIf
         
-        AddEmptyOption()
-        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR", "Devices", _DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector], chainbeasts_vibrate_selector_flag)
+        AddHeaderOption("Devices")
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector], chainbeasts_vibrate_selector_flag)
 
         Int chainbeasts_vibrate_event_flag = OPTION_FLAG_DISABLED
         If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_DeviceSelector == 1
@@ -282,28 +329,27 @@ Event OnPageReset(String page)
         EndIf
         AddInputOptionST("INPUT_CHAINBEASTS_VIBRATE_EVENT", "Match Event", TeleIntegration.Chainbeasts_Vibrate_Event, chainbeasts_vibrate_event_flag)
 
+        AddHeaderOption("Action")
         Int chainbeasts_vibrate_pattern_flag = OPTION_FLAG_DISABLED
         If TeleIntegration.Chainbeasts_Vibrate
             chainbeasts_vibrate_pattern_flag = OPTION_FLAG_NONE
         EndIf
-        
-        AddEmptyOption()
-        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_PATTERN", "Vibration Pattern", _PatternSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_Pattern], chainbeasts_vibrate_pattern_flag)
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_Pattern], chainbeasts_vibrate_pattern_flag)
 
         Int chainbeast_vibrate_funscript_flag = OPTION_FLAG_DISABLED
         If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_Pattern == 1
             chainbeast_vibrate_funscript_flag = OPTION_FLAG_NONE
         EndIf
-        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT", "Vibration Funscript", TeleIntegration.Chainbeasts_Vibrate_Funscript, chainbeast_vibrate_funscript_flag)
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Chainbeasts_Vibrate_Funscript, chainbeast_vibrate_funscript_flag)
 
         Int chainbeasts_vibrate_linear_flag = OPTION_FLAG_DISABLED
         If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_Pattern == 0
             chainbeasts_vibrate_linear_flag = OPTION_FLAG_NONE
         EndIf
-	    AddSliderOptionST("SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH", "Linear Strength", TeleIntegration.Chainbeasts_Vibrate_Linear_Strength, "{0}", chainbeasts_vibrate_linear_flag)
+	    AddSliderOptionST("SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH", "Strength", TeleIntegration.Chainbeasts_Vibrate_Linear_Strength, "{0}", chainbeasts_vibrate_linear_flag)
     EndIf
     
-    If page == "Patterns"
+    If page == "Funscript Patterns"
         SetCursorFillMode(TOP_TO_BOTTOM)
         AddHeaderOption("Vibrator Patterns")
         Int j = 0
@@ -827,16 +873,143 @@ State OPTION_TOYS_ANIMATION
     Event OnSelectST()
         TeleIntegration.Toys_Animation = !TeleIntegration.Toys_Animation
         SetToggleOptionValueST(TeleIntegration.Toys_Animation)
+        ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
         TeleIntegration.Toys_Animation = TeleIntegration.Toys_Animation_Default
         SetToggleOptionValueST(TeleIntegration.Toys_Animation)
+        ForcePageReset()
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Plays a long and soft vibration patttern during each toys&love animation that involves the player")
+        SetInfoText("Enable vibration during Toys & Love Sex animations")
     EndEvent
+EndState
+
+State MENU_TOYS_ANIMATION_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TeleIntegration.Toys_Animation_DeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleIntegration.Toys_Animation_DeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TeleIntegration.Toys_Animation_DeviceSelector = TeleIntegration.Toys_Animation_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Toys_Animation_DeviceSelector])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        SetInfoText(text)
+    EndEvent
+EndState
+
+State INPUT_TOYS_ANIMATION_EVENT
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Toys_Animation_Event = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select only devices matching the input event")
+    EndEvent
+EndState
+
+State OPTION_TOYS_ANIMATION_ROUSING
+    Event OnSelectST()
+        TeleIntegration.Toys_Animation_Rousing = !TeleIntegration.Toys_Animation_Rousing
+        SetToggleOptionValueST(TeleIntegration.Toys_Animation_Rousing)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Toys_Animation_Rousing = TeleIntegration.Toys_Animation_Rousing_Default
+        SetToggleOptionValueST(TeleIntegration.Toys_Animation_Rousing)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibration strength is directly controlled by rousing: 10 = 10% strength, 100 = 100% strength...")
+    EndEvent
+EndState
+
+State MENU_TOYS_ANIMATION_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Toys_Animation_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptions[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Linear': Constant vibration strength. 'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+State MENU_TOYS_ANIMATION_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_VibrateFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Toys_Animation_Funscript = _VibrateFunscriptNames[index]
+        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+    EndEvent
+EndState
+
+State SLIDER_TOYS_ANIMATION_LINEAR_STRENGTH
+	Event OnSliderOpenST()
+		SetSliderDialogStartValue(TeleIntegration.Toys_Animation_Linear_Strength)
+		SetSliderDialogDefaultValue(TeleIntegration.Toys_Animation_Linear_Strength_Default)
+		SetSliderDialogRange(0, 100)
+		SetSliderDialogInterval(1)
+	EndEvent
+
+	Event OnSliderAcceptST(float value)
+		TeleIntegration.Toys_Animation_Linear_Strength = value as int
+		SetSliderOptionValueST(TeleIntegration.Toys_Animation_Linear_Strength)
+	EndEvent
+
+	Event OnDefaultST()
+		TeleIntegration.Toys_Animation_Linear_Strength = TeleIntegration.Toys_Animation_Linear_Strength_Default
+		SetSliderOptionValueST(TeleIntegration.Toys_Animation_Linear_Strength)
+	EndEvent
+
+	Event OnHighlightST()
+		SetInfoText("Vibration strength for linear pattern")
+	EndEvent
 EndState
 
 State OPTION_TOYS_DENIAL
@@ -957,7 +1130,7 @@ State OPTION_CHAINBEASTS_VIBRATE
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Vibrates devices during gemmed chainbeast capture (Requires Chainbeasts Version >= 0.7.0)")
+        SetInfoText("Vibrates devices during gemmed chainbeast capture (Requires V. >= 0.7.0 and recompiled SCB_VibeEffectScript.pex)")
     EndEvent
 EndState
 
