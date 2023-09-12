@@ -35,6 +35,7 @@ Event OnVersionUpdate(int aVersion)
     If CurrentVersion > 0 && CurrentVersion < 9 ; 1.0.0 Beta
         InitLocals()
         TeleIntegration.ResetIntegrationSettings()
+        TeleIntegration.UnregisterLegacyUpdate()
     EndIf
 EndEvent
 
@@ -187,7 +188,7 @@ Event OnPageReset(String page)
     If page == "Sexlab"
         SetCursorFillMode(TOP_TO_BOTTOM)
         If TeleIntegration.SexLab != None
-            AddHeaderOption("In-Game Vibrators")
+            AddHeaderOption("Sexlab Animations")
             AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Enable", TeleIntegration.Sexlab_Animation)
             Int sexlab_animation_selector_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Sexlab_Animation
@@ -196,23 +197,32 @@ Event OnPageReset(String page)
             
             AddHeaderOption("Devices")
             AddMenuOptionST("MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Sexlab_Animation_DeviceSelector], sexlab_animation_selector_flag)
-        
-            Int sexlab_animation_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Sexlab_Animation
-                sexlab_animation_pattern_flag = OPTION_FLAG_NONE
+            AddHeaderOption("Actions")
+            If TeleIntegration.SexLabAroused != None
+                Int sexlab_animation_rousing_flag = OPTION_FLAG_DISABLED
+                If TeleIntegration.Sexlab_Animation
+                    sexlab_animation_rousing_flag = OPTION_FLAG_NONE
+                EndIf    
+                AddToggleOptionST("OPTION_SEXLAB_ANIMATION_ROUSING", "Arousal = Vibration Strength", TeleIntegration.Sexlab_Animation_Rousing, sexlab_animation_rousing_flag)
+            Else
+                AddTextOption("Arousal = Vibration Strength", "Requires SLA", OPTION_FLAG_DISABLED)
             EndIf
 
-            AddHeaderOption("Actions")
+            Int sexlab_animation_pattern_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Sexlab_Animation && ! TeleIntegration.Sexlab_Animation_Rousing
+                sexlab_animation_pattern_flag = OPTION_FLAG_NONE
+            EndIf
             AddMenuOptionST("MENU_SEXLAB_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Sexlab_Animation_Pattern], sexlab_animation_pattern_flag)
         
             Int sexlab_animation_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Sexlab_Animation && TeleIntegration.Sexlab_Animation_Pattern == 1
+            If TeleIntegration.Sexlab_Animation && ! TeleIntegration.Sexlab_Animation_Rousing && TeleIntegration.Sexlab_Animation_Pattern == 1
                 sexlab_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_SEXLAB_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Sexlab_Animation_Funscript, sexlab_animation_funscript_flag)
         
-            AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Vibrate on Actor Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
-            AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Stop on Actor Edge", TeleIntegration.Sexlab_ActorEdge)
+            AddHeaderOption("Extra Actions")
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Pause on Actor Edge", TeleIntegration.Sexlab_ActorEdge)
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Strong Vibration on Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
         Else
             AddTextOption("Sexlab", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
@@ -278,7 +288,7 @@ Event OnPageReset(String page)
             If TeleIntegration.Toys_Animation
                 toys_animation_rousing = OPTION_FLAG_NONE
             EndIf
-            AddToggleOptionST("OPTION_TOYS_ANIMATION_ROUSING", "Rousing = Vibration Pattern", TeleIntegration.Toys_Animation_Rousing, toys_animation_rousing)
+            AddToggleOptionST("OPTION_TOYS_ANIMATION_ROUSING", "Rousing = Vibration Strength", TeleIntegration.Toys_Animation_Rousing, toys_animation_rousing)
 
             Int toys_animation_pattern_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Toys_Animation && ! TeleIntegration.Toys_Animation_Rousing
@@ -542,7 +552,7 @@ State OPTION_DEVIOUS_EVENT_ANAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The event that is triggered for 'Anal' devices. Default: Anal")
+        SetInfoText("Change the event that is triggered for 'Anal' devices. Default: Anal")
     EndEvent
 EndState
 
@@ -557,7 +567,7 @@ State OPTION_DEVIOUS_EVENT_NIPPLE
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The event that is triggered for 'Nipple' devices. Default: Nipple")
+        SetInfoText("Change the event that is triggered for 'Nipple' devices. Default: Nipple")
     EndEvent
 EndState
 
@@ -572,7 +582,7 @@ State OPTION_DEVIOUS_EVENT_VAGINAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The event that is triggered for 'Vaginal' devices. Default: Vaginal")
+        SetInfoText("Change event that is triggered for 'Vaginal' devices. Default: Vaginal")
     EndEvent
 EndState
 
@@ -707,6 +717,24 @@ State MENU_SEXLAB_ANIMATION_FUNSCRIPT
 
     Event OnHighlightST()
         SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+    EndEvent
+EndState
+
+State OPTION_SEXLAB_ANIMATION_ROUSING
+    Event OnSelectST()
+        TeleIntegration.Sexlab_Animation_Rousing = !TeleIntegration.Sexlab_Animation_Rousing
+        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation_Rousing)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Sexlab_Animation_Rousing = TeleIntegration.Sexlab_Animation_Rousing_Default
+        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation_Rousing)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibration strength is controlled by SLA Arousal: 10 = 10% strength, 100 = 100% strength...")
     EndEvent
 EndState
 

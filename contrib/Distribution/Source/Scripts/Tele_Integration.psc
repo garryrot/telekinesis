@@ -9,9 +9,10 @@ Tele_Devices Property TeleDevices Auto
 ZadLibs Property ZadLib Auto
 SexLabFramework Property SexLab Auto
 ToysFramework Property Toys Auto
+SlaFrameworkScr Property SexLabAroused Auto
 
 String[] _SceneTags
-Bool _InSexScene = false
+Bool _InSexlabScene = false
 Bool _InToysScene = false
 
 Bool _DeviousDevices_Vibrate = false
@@ -80,8 +81,8 @@ String Property Sexlab_Animation_Funscript = "" Auto
 String Property Sexlab_Animation_Funscript_Default = "" Auto
 Int Property Sexlab_Animation_DeviceSelector = 0 Auto
 Int Property Sexlab_Animation_DeviceSelector_Default = 0 AutoReadOnly
-String Property Sexlab_Animation_Event = "Vaginal" Auto
-String Property Sexlab_Animation_Event_Default = "Vaginal" AutoReadOnly
+Bool Property Sexlab_Animation_Rousing = False Auto
+Bool Property Sexlab_Animation_Rousing_Default = False AutoReadOnly
 Int Property Sexlab_Animation_Pattern = 0 Auto
 Int Property Sexlab_Animation_Pattern_Default = 0 AutoReadOnly
 Int Property Sexlab_Animation_Linear_Strength = 80 Auto
@@ -94,7 +95,7 @@ Bool Property Sexlab_Animation
             RegisterForModEvent("HookAnimationStart", "OnSexlabAnimationStart")
             RegisterForModEvent("HookAnimationEnd", "OnSexlabAnimationEnd")
         Else
-            _InSexScene = False
+            _InSexlabScene = False
             UnregisterForModEvent("HookAnimationStart")
             UnregisterForModEvent("HookAnimationEnd")
         EndIf
@@ -315,14 +316,14 @@ Bool Property Toys_Denial
     EndFunction
 EndProperty
 
-String Property Chainbeasts_Vibrate_Funscript = "30_Sawtooth" Auto
-String Property Chainbeasts_Vibrate_Funscript_Default = "30_Sawtooth" Auto
 Int Property Chainbeasts_Vibrate_DeviceSelector = 0 Auto
 Int Property Chainbeasts_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
 String Property Chainbeasts_Vibrate_Event = "Vaginal" Auto
 String Property Chainbeasts_Vibrate_Event_Default = "Vaginal" AutoReadOnly
-Int Property Chainbeasts_Vibrate_Pattern = 0 Auto
-Int Property Chainbeasts_Vibrate_Pattern_Default = 0 AutoReadOnly
+Int Property Chainbeasts_Vibrate_Pattern = 1 Auto
+Int Property Chainbeasts_Vibrate_Pattern_Default = 1 AutoReadOnly
+String Property Chainbeasts_Vibrate_Funscript = "03_Wub-Wub-Wub" Auto
+String Property Chainbeasts_Vibrate_Funscript_Default = "03_Wub-Wub-Wub" Auto
 Int Property Chainbeasts_Vibrate_Linear_Strength = 80 Auto
 Int Property Chainbeasts_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
 Bool Property Chainbeasts_Vibrate_Default = true AutoReadOnly
@@ -343,7 +344,6 @@ Bool Property Chainbeasts_Vibrate
 EndProperty
 
 Event OnInit()
-    RegisterForUpdate(5)
     InitDefaultOnEventHandlers()
 EndEvent
 
@@ -359,7 +359,6 @@ EndEvent
 
 ; Devious Devices Events
 
-Float _NumVibratorsMult
 Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationStrength, Form sender)
     Actor player = Game.GetPlayer()
     If player.GetLeveledActorBase().GetName() != actorName
@@ -369,22 +368,32 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
         return ; Should not happen
     EndIf
 
-    String[] events = GetDDTags(player)
-    String[] all = new String[1]
-    If DeviousDevices_Vibrate_DeviceSelector == 1
-        all = events
+    ; Reverse DD multi device calculation to get the actual strength
+    String[] events = new String[3]
+    Float numVibratorsMult = 0
+    If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
+        numVibratorsMult += 0.7
+        events[0] = DeviousDevices_Vibrate_Event_Vaginal
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
+        numVibratorsMult += 0.3
+        events[1] = DeviousDevices_Vibrate_Event_Anal
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
+        numVibratorsMult += 0.25
+        events[2] = DeviousDevices_Vibrate_Event_Nipple
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
+        numVibratorsMult += 0.5
+        events[0] = DeviousDevices_Vibrate_Event_Vaginal
+    EndIf
+    If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
+        numVibratorsMult /= 1.15
     EndIf
 
     ; TODO Also use strength for patterns, once pattern strength is supported
-    Int strength = Math.Floor((vibrationStrength / _NumVibratorsMult) * 20)
-
-    If DeviousDevices_Vibrate_Pattern == 2
-        _DeviousDevicesVibrateHandle = TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), -1, all)
-    ElseIf DeviousDevices_Vibrate_Pattern == 1
-        _DeviousDevicesVibrateHandle = TeleDevices.VibratePattern(DeviousDevices_Vibrate_Funscript, -1, all)
-    Else
-        _DeviousDevicesVibrateHandle = TeleDevices.VibrateEvents(strength, -1, all)
-    EndIf
+    Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
+    _DeviousDevicesVibrateHandle = HandleVibration( DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events )
 	TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 
@@ -399,32 +408,6 @@ Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form
     TeleDevices.StopHandle(_DeviousDevicesVibrateHandle)
 EndEvent
 
-String[] Function GetDDTags(Actor player)
-    ; Reverse DD multi device calculation to get the actual strength
-    String[] events = new String[3]
-    _NumVibratorsMult = 0
-    If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
-        _NumVibratorsMult += 0.7
-        events[0] = DeviousDevices_Vibrate_Event_Vaginal
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
-        _NumVibratorsMult += 0.3
-        events[1] = DeviousDevices_Vibrate_Event_Anal
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
-        _NumVibratorsMult += 0.25
-        events[2] = DeviousDevices_Vibrate_Event_Nipple
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
-        _NumVibratorsMult += 0.5
-        events[0] = DeviousDevices_Vibrate_Event_Vaginal
-    EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
-        _NumVibratorsMult /= 1.15
-    EndIf
-    return events
-EndFunction
-
 ; Sexlab Events
 
 Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
@@ -434,16 +417,13 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	EndIf
     sslThreadController Controller = Sexlab.GetController(threadID)
     sslBaseAnimation animation = Controller.Animation
+    _SceneTags = animation.GetTags()
 
-    String[] events = animation.GetTags()
-    If Sexlab_Animation_Pattern == 2
-        _SexlabSceneVibrationHandle = TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), -1, events)
-    ElseIf Sexlab_Animation_Pattern == 1
-        _SexlabSceneVibrationHandle = TeleDevices.VibratePattern(Sexlab_Animation_Funscript, -1, events)
+    If Sexlab_Animation_Rousing
+        _InSexlabScene = True
+        UpdateRousingControlledSexScene()
     Else 
-        _InSexScene = True
-        _SceneTags = events
-        UpdateSexScene()
+        HandleVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, _SceneTags)
     EndIf
 EndEvent
 
@@ -452,7 +432,7 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
         TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
-	_InSexScene = False
+	_InSexlabScene = False
     TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
 EndEvent
 
@@ -472,16 +452,8 @@ Event OnToysPulsate(string eventName, string argString, float argNum, form sende
     ; Duration is random lasting from approx. 12 to 35 seconds
     Int duration = Utility.RandomInt(12,35)
     String[] events = new String[1]
-    If Toys_Vibrate_DeviceSelector == 1
-        events[0] = Toys_Vibrate_Event
-    EndIf
-    If Toys_Vibrate_Pattern == 2
-        TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), duration, events)
-    ElseIf Toys_Vibrate_Pattern == 1
-        TeleDevices.VibratePattern(Toys_Vibrate_Funscript, duration, events)
-    Else
-        TeleDevices.VibrateEvents(Toys_Vibrate_Linear_Strength, duration, events)
-    EndIf
+    events[0] = Toys_Vibrate_Event
+    HandleVibration(Toys_Vibrate_DeviceSelector, duration, Toys_Vibrate_Pattern, Toys_Vibrate_Funscript, Toys_Vibrate_Linear_Strength, events)
 	TeleDevices.LogDebug("ToysPulsate")
 EndEvent
 
@@ -514,15 +486,15 @@ Event OnToysLoveSceneInfo(string LoveName, Bool PlayerInScene, int NumStages, Bo
 EndEvent 
 
 Event OnToysSceneStart(string eventName, string argString, float argNum, form sender)
-    _InToysScene = true
-    Int speed = Toys_Animation_Linear_Strength
-    Int patternType = Toys_Animation_Pattern
     If Toys_Animation_Rousing
-        speed = Toys.GetRousing()
-        patternType = 0
+        _InToysScene = true
+        UpdateRousingControlledSexScene()
+    Else
+        String[] events = new String[1]
+        events[0] = Toys_Animation_Event
+        _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, Toys_Animation_Pattern, Toys_Animation_Funscript, Toys_Animation_Linear_Strength, events)
     EndIf
-    _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, patternType, Toys_Animation_Funscript, speed)
-	TeleDevices.LogDebug("ToysSceneStart")
+    TeleDevices.LogDebug("ToysSceneStart")
 EndEvent
 
 Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
@@ -571,17 +543,9 @@ EndEvent
 ; Skyrim Chain Beasts Events
 
 Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
-    String[] events = new String[1]
-    If Chainbeasts_Vibrate_DeviceSelector == 1
-        events[0] = Chainbeasts_Vibrate_Event
-    EndIf
-    If Chainbeasts_Vibrate_Pattern == 2
-        TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), 3, events)
-    ElseIf Chainbeasts_Vibrate_Pattern == 1
-        TeleDevices.VibratePattern(Chainbeasts_Vibrate_Funscript, 3, events)
-    Else
-        TeleDevices.VibrateEvents(Chainbeasts_Vibrate_Linear_Strength, 3, events)
-    EndIf
+    String[] evts = new String[1]
+    evts[0] = Chainbeasts_Vibrate_Event
+    HandleVibration(Chainbeasts_Vibrate_DeviceSelector, 3, Chainbeasts_Vibrate_Pattern, Chainbeasts_Vibrate_Funscript, Chainbeasts_Vibrate_Linear_Strength, evts)
 	TeleDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent
 
@@ -592,6 +556,10 @@ Function InitDefaultOnEventHandlers()
     DeviousDevices_Vibrate = true
     Toys_Vibrate = true
     Chainbeasts_Vibrate = true
+EndFunction
+
+Function UnregisterLegacyUpdate()
+    UnregisterForUpdate()
 EndFunction
 
 Function ResetIntegrationSettings()
@@ -605,7 +573,6 @@ Function ResetIntegrationSettings()
     DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
     Sexlab_Animation = Sexlab_Animation_Default
     Sexlab_Animation_DeviceSelector = Sexlab_Animation_DeviceSelector_Default
-    Sexlab_Animation_Event = Sexlab_Animation_Event_Default
     Sexlab_Animation_Funscript = Sexlab_Animation_Funscript_Default
     Sexlab_Animation_Pattern = Sexlab_Animation_Pattern_Default
     Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
@@ -644,32 +611,39 @@ EndFunction
 ; Privates
 
 Event OnUpdate()
-    UpdateSexScene()
+    UpdateRousingControlledSexScene()
 EndEvent
 
-Function UpdateSexScene()
-    If _InToysScene && Toys_Animation_Rousing
+Function UpdateRousingControlledSexScene()
+    If _InToysScene
         Int rousing = Toys.GetRousing()
+
+        String[] evts = new String[1]
+        evts[0] = Toys_Animation_Event
+
         Int oldHandle = _ToysSceneVibrationHandle
-        _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, 0, Toys_Animation_Funscript, rousing)
+        _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, 0, Toys_Animation_Funscript, rousing, evts)
         TeleDevices.StopHandle(oldHandle)
         TeleDevices.LogDebug("UpdatingToysScene Rousing=" + rousing)
-    EndIf
-    If _InSexScene
-        String[] events = new String[1]
-        If Sexlab_Animation_DeviceSelector == 1
-            events = _SceneTags
+        RegisterForSingleUpdate(2)
+    ElseIf _InSexlabScene
+        Int arousal = SexLabAroused.GetActorArousal(Game.GetPlayer())
+        If arousal >= 0
+            Sexlab_Animation_Linear_Strength
         EndIf
-        If Sexlab_Animation_Pattern == 0
-            _SexlabSceneVibrationHandle = TeleDevices.VibrateEvents(Utility.RandomInt(0, 100), 5, events)
-        EndIf
+
+        Int oldHandle = _SexlabSceneVibrationHandle
+        _SexlabSceneVibrationHandle = HandleVibration(Sexlab_Animation_DeviceSelector, -1 , 0, Sexlab_Animation_Funscript, arousal, _SceneTags)
+        TeleDevices.StopHandle(oldHandle)
+        TeleDevices.LogDebug("UpdatingSexlabScene Arousal=" + arousal)
+        RegisterForSingleUpdate(2)
 	EndIf
 EndFunction
 
-Int Function HandleVibration(Int deviceSelector, Int duration, Int patternType, String funscript, Int linearStrength)
+Int Function HandleVibration(Int deviceSelector, Int duration, Int patternType, String funscript, Int linearStrength, String[] evts)
     String[] events = new String[1]
     If deviceSelector == 1
-        events[0] = Toys_Animation_Event
+        events[0] = evts
     EndIf
     If patternType == 2
         return TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), duration, events)
