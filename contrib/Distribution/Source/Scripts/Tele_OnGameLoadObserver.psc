@@ -32,6 +32,12 @@ Function LoadTelekinesis()
     Else
         TeleIntegration.Toys = None
     EndIf
+
+    If Game.GetModByName("SexLabAroused.esm") != 255
+        TeleIntegration.SexLabAroused = (Quest.GetQuest("sla_Framework") As SlaFrameworkScr)
+    Else
+        TeleIntegration.SexLabAroused = None
+    EndIf
     
     TeleDevices.ConnectAndScanForDevices()
 EndFunction
