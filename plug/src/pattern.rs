@@ -12,7 +12,7 @@ use tokio::{
     time::{sleep, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, debug};
 
 use crate::{commands::TkDeviceAction, event::TkEvent, inputs::Speed, TkDuration, TkPattern};
 
@@ -117,24 +117,18 @@ impl TkPatternPlayer {
     fn do_update(&self, speed: Speed) {
         trace!("do_update {}", speed);
         for device in self.devices.iter() {
-             let a = self.action_sender
-                .send(TkDeviceAction::Update(device.clone(), speed));
-            match a {
-                Ok(_) => info!("ok"),
-                Err(err) => error!("Update error {:?}", err),
-            };
+            self.action_sender
+                .send(TkDeviceAction::Update(device.clone(), speed))
+                .unwrap_or_else(|_| error!("queue full"));
         }
     }
 
     fn do_vibrate(&self, speed: Speed, priority: bool, handle: i32) {
         trace!("do_vibrate {}", speed);
         for device in self.devices.iter() {
-            let a = self.action_sender
-                .send(TkDeviceAction::Start(device.clone(), speed, priority, handle));
-            match a {
-                Ok(_ok) => info!("ok"),
-                Err(err) => error!("Vibrate error {:?}", err),
-            };
+            self.action_sender
+                .send(TkDeviceAction::Start(device.clone(), speed, priority, handle))
+                .unwrap_or_else(|_| error!("queue full"));
         }
         self.event_sender
             .send(TkEvent::DeviceVibrated(self.devices.len() as i32, speed))
@@ -157,11 +151,9 @@ impl TkPatternPlayer {
 async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> bool {
     tokio::select! {
         _ = cancel.cancelled() => {
-            info!("Action cancelled");
             return false;
         }
         _ = sleep(duration) => {
-            info!("Sleep done");
             return true;
         }
     };
@@ -204,7 +196,7 @@ fn read_pattern_name(
         .ok_or_else(|| anyhow!("Pattern '{}' not found", pattern_name))?;
 
     let fs = funscript::load_funscript(pattern.path.to_str().unwrap())?;
-    info!("Read pattern {} in {:?}", pattern_name, now.elapsed());
+    debug!("Read pattern {} in {:?}", pattern_name, now.elapsed());
     Ok(fs)
 }
 
