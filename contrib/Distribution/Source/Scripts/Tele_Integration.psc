@@ -259,8 +259,16 @@ String Property Toys_Animation_Funscript = "" Auto
 String Property Toys_Animation_Funscript_Default = "" Auto
 Int Property Toys_Animation_DeviceSelector = 0 Auto
 Int Property Toys_Animation_DeviceSelector_Default = 0 AutoReadOnly
-String Property Toys_Animation_Event = "Vaginal" Auto
-String Property Toys_Animation_Event_Default = "Vaginal" AutoReadOnly
+Bool Property Toys_Animation_Match_Tags = false Auto
+Bool Property Toys_Animation_Match_Tags_Default = false AutoReadOnly
+String Property Toys_Animation_Event_Vaginal = "Vaginal" Auto
+String Property Toys_Animation_Event_Vaginal_Default = "Vaginal" AutoReadOnly
+String Property Toys_Animation_Event_Oral = "Oral" Auto
+String Property Toys_Animation_Event_Oral_Default = "Oral" AutoReadOnly
+String Property Toys_Animation_Event_Anal = "Anal" Auto
+String Property Toys_Animation_Event_Anal_Default = "Anal" AutoReadOnly
+String Property Toys_Animation_Event_Nipple = "Nipple" Auto
+String Property Toys_Animation_Event_Nipple_Default = "Nipple" AutoReadOnly
 Bool Property Toys_Animation_Rousing = true Auto
 Bool Property Toys_Animation_Rousing_Default = true AutoReadOnly
 Int Property Toys_Animation_Pattern = 0 Auto
@@ -476,24 +484,50 @@ Event OnToysSquirt(string eventName, string argString, float argNum, form sender
 	TeleDevices.LogDebug("ToysSquirt")
 EndEvent
 
-Event OnToysLoveSceneInfo(string LoveName, Bool PlayerInScene, int NumStages, Bool PlayerConsent, Form ActInPos1, Form ActInPos2, Form ActInPos3, Form ActInPos4, Form ActInPos5)
+String _LoveName
+Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bool playerConsent, Form actInPos1, Form actInPos2, Form actInPos3, Form actInPos4, Form actInPos5)
     ; - ToysLoveSceneInfo - Dual purpose event: 1) Get Scene Info. 2) Event indicates start of animating. It's the moment actors are in place and the first animation has started. Scene Info includes:
     ; 	- LoveName, PlayerInScene, NumStages, PlayerConsent, ActInPos1.. Pos2.. Pos3.. Pos4.. Pos5
     ; 	- Actors as Form, given in scene position. The Player will always be in Position 1 or 2
     ; 	- event is sent for Player-less scenes. The param PlayerInScene will be false
     ; 	**Custom Parameters** Event <callbackName>(string LoveName, Bool PlayerInScene, int NumStages, Bool PlayerConsent, Form ActInPos1, Form ActInPos2, Form ActInPos3, Form ActInPos4, Form ActInPos5)
-    TeleDevices.LogDebug("OnToysLoveSceneInfo LoveName=" + LoveName + " PlayerInScene + " + PlayerInScene + " Stages: " + NumStages + " PlayerConsent: " + PlayerConsent)
-EndEvent 
+    If ! playerInScene
+        TeleDevices.LogDebug("Not the player")
+        return
+    EndIf
 
-Event OnToysSceneStart(string eventName, string argString, float argNum, form sender)
+    _LoveName = loveName
     If Toys_Animation_Rousing
         _InToysScene = true
         UpdateRousingControlledSexScene()
     Else
-        String[] events = new String[1]
-        events[0] = Toys_Animation_Event
+
+        String[] events = GetLoveTags(loveName)
         _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, Toys_Animation_Pattern, Toys_Animation_Funscript, Toys_Animation_Linear_Strength, events)
     EndIf
+
+    TeleDevices.LogDebug("OnToysLoveSceneInfo LoveName=" + LoveName + " PlayerInScene + " + PlayerInScene + " Stages: " + NumStages + " PlayerConsent: " + PlayerConsent)
+EndEvent
+
+String[] Function GetLoveTags(String loveName)
+    String[] events = new String[4]
+    If Toys.SceneHasTag( loveName, "Vaginal") ; || Toys.SceneHasTag( loveName, "Pussy") || Toys.SceneHasTag( loveName, "Fisting") 
+        events[0] = Toys_Animation_Event_Vaginal
+    EndIf
+    If Toys.SceneHasTag( loveName, "Anal") ;|| Toys.SceneHasTag( loveName, "Fisting")
+        events[1] = Toys_Animation_Event_Anal
+    EndIf
+    If Toys.SceneHasTag( loveName, "Oral") ;|| Toys.SceneHasTag( loveName, "Blowjob")
+        events[2] = Toys_Animation_Event_Oral
+    EndIf
+    If Toys.SceneHasTag( loveName, "Nipple") || Toys.SceneHasTag( loveName, "Breast"); || Toys.SceneHasTag( loveName, "Breast")
+        events[3] = Toys_Animation_Event_Nipple
+    EndIf
+    return events
+EndFunction
+
+Event OnToysSceneStart(string eventName, string argString, float argNum, form sender)
+    ; TODO Remove 
     TeleDevices.LogDebug("ToysSceneStart")
 EndEvent
 
@@ -581,7 +615,11 @@ Function ResetIntegrationSettings()
     Toys_Animation = Toys_Animation_Default
     Toys_Animation_DeviceSelector = Toys_Animation_DeviceSelector_Default
     Toys_Animation_Rousing = Toys_Animation_Rousing_Default
-    Toys_Animation_Event = Toys_Animation_Event_Default
+    Toys_Animation_Match_Tags = Toys_Animation_Match_Tags_Default
+    Toys_Animation_Event_Vaginal = Toys_Animation_Event_Vaginal_Default
+    Toys_Animation_Event_Oral = Toys_Animation_Event_Oral_Default
+    Toys_Animation_Event_Anal = Toys_Animation_Event_Anal_Default
+    Toys_Animation_Event_Nipple = Toys_Animation_Event_Nipple_Default
     Toys_Animation_Funscript = Toys_Animation_Funscript_Default
     Toys_Animation_Pattern = Toys_Animation_Pattern_Default
     Toys_Animation_Linear_Strength = Toys_Animation_Linear_Strength_Default
@@ -618,8 +656,7 @@ Function UpdateRousingControlledSexScene()
     If _InToysScene
         Int rousing = Toys.GetRousing()
 
-        String[] evts = new String[1]
-        evts[0] = Toys_Animation_Event
+        String[] evts = GetLoveTags(_LoveName)
 
         Int oldHandle = _ToysSceneVibrationHandle
         _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, 0, Toys_Animation_Funscript, rousing, evts)
@@ -643,7 +680,7 @@ EndFunction
 Int Function HandleVibration(Int deviceSelector, Int duration, Int patternType, String funscript, Int linearStrength, String[] evts)
     String[] events = new String[1]
     If deviceSelector == 1
-        events[0] = evts
+        events = evts
     EndIf
     If patternType == 2
         return TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), duration, events)

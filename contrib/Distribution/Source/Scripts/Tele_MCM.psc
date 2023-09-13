@@ -281,7 +281,10 @@ Event OnPageReset(String page)
             If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_DeviceSelector == 1
                 toys_animation_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT", "Match Event", TeleIntegration.Toys_Animation_Event, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.Toys_Animation_Event_Vaginal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.Toys_Animation_Event_Anal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ORAL", "Event on 'Oral'", TeleIntegration.Toys_Animation_Event_Oral, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.Toys_Animation_Event_Nipple, toys_animation_event_flag)
 
             AddHeaderOption("Actions")
             Int toys_animation_rousing = OPTION_FLAG_DISABLED
@@ -940,18 +943,63 @@ State MENU_TOYS_ANIMATION_DEVICE_SELECTOR
     EndEvent
 EndState
 
-State INPUT_TOYS_ANIMATION_EVENT
+State INPUT_TOYS_ANIMATION_EVENT_VAGINAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event)
+		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_Vaginal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Toys_Animation_Event = value
+		TeleIntegration.Toys_Animation_Event_Vaginal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Select only devices matching the input event")
+        SetInfoText("Vibrate devices matching this event when animation contains 'Pussy' or 'Vaginal' tags")
+    EndEvent
+EndState
+
+State INPUT_TOYS_ANIMATION_EVENT_ORAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_ORAL)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Toys_Animation_Event_ORAL = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibrate devices matching this event when animation contains 'Oral' or 'Blowjob' tags")
+    EndEvent
+EndState
+
+State INPUT_TOYS_ANIMATION_EVENT_ANAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_Anal)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Toys_Animation_Event_Anal = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibrate devices matching this event when animation contains 'Anal' tags")
+    EndEvent
+EndState
+
+State INPUT_TOYS_ANIMATION_EVENT_NIPPLE
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_Nipple)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Toys_Animation_Event_Nipple = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibrate devices matching this event when animation contains 'Nipple' or 'Breast' tags")
     EndEvent
 EndState
 
