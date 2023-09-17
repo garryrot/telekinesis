@@ -454,7 +454,7 @@ State CONNECTION_STATUS
     Event OnHighlightST()
         String errorDetails = ""
         If TeleDevices.ConnectionStatus == 2
-            errorDetails = "\nConnection failed, double check parameters and check 'My Games/Skyrim Special Edition/SKSE/Telekinesis.log' \nError: " + TeleDevices.ConnectionErrorDetails
+            errorDetails = "\nConnection failed, double check parameters or check 'My Games/Skyrim Special Edition/SKSE/Telekinesis.log' \nError: " + TeleDevices.ConnectionErrorDetails
         EndIf
         SetInfoText("Connection Status: " + TeleDevices.ConnectionStatusText + errorDetails)
     EndEvent
