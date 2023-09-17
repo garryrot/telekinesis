@@ -35,7 +35,6 @@ Event OnVersionUpdate(int aVersion)
     If CurrentVersion > 0 && CurrentVersion < 9 ; 1.0.0 Beta
         InitLocals()
         TeleIntegration.ResetIntegrationSettings()
-        TeleIntegration.UnregisterLegacyUpdate()
     EndIf
 EndEvent
 
@@ -52,7 +51,7 @@ Function InitLocals()
     Pages[8] = "Troubleshooting"
 
     _ConnectionMenuOptions = new String[3]
-    _ConnectionMenuOptions[0] = "In-Process (Default)"
+    _ConnectionMenuOptions[0] = "In-Process"
     _ConnectionMenuOptions[1] = "Intiface (WebSocket)"
     _ConnectionMenuOptions[2] = "Disable"
 
@@ -95,15 +94,23 @@ Event OnPageReset(String page)
         If (TeleDevices.ConnectionType == 1)
             connection_ws_flags = OPTION_FLAG_NONE
         EndIf
+
+        String status = TeleDevices.ConnectionStatusText
+        If TeleDevices.ConnectionStatus == 2
+            status = "<font color='#fc0303'>" + TeleDevices.ConnectionStatusText + "</font>" 
+        EndIf
+        AddTextOptionST("CONNECTION_STATUS", "Status", status)
         AddInputOptionST("CONNECTION_HOST", "Intiface Host", TeleDevices.WsHost, connection_ws_flags)
         AddInputOptionST("CONNECTION_PORT", "Intiface Port", TeleDevices.WsPort, connection_ws_flags)
-        AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "")
+        AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "Click me")
 
         AddHeaderOption("Emergency")
         AddTextOptionST("EMERGENCY_STOP", "Stop all devices", "Click me")
         AddKeyMapOptionST("EMERGENCY_HOTKEY", "'Stop all' hotkey",  TeleIntegration.EmergencyHotkey)
-    EndIf
 
+        SetCursorPosition(1)
+        AddEmptyOption()
+    EndIf
     If page == "Devices"
         SetCursorFillMode(TOP_TO_BOTTOM)
         If ! TeleDevices.Connects()
@@ -410,9 +417,7 @@ Event OnPageReset(String page)
     EndIf
 EndEvent
 
-
 ; General
-
 State CONNECTION_MENU
     Event OnMenuOpenST()
         SetMenuDialogStartIndex(TeleDevices.ConnectionType)
@@ -434,10 +439,24 @@ State CONNECTION_MENU
 
     Event OnHighlightST()
         String t = "Specify how Telekinesis performs its device control\n"
-        t += "- In-Process: The devices are controlled directly by Telekinesis native plugin (recommended)\n"
+        t += "NOTE: Usually you don't need to change this\n"
+        t += "- In-Process: The devices are controlled directly by Telekinesis native plugin (Recommended)\n"
         t += "- Intiface (WebSocket): devices are controlled by Intiface, which requires that the app (and\n"
         t += "           its server) are running and listening on the 'WebSocket Host' and 'WebSocket Port'"
         SetInfoText(t)
+    EndEvent
+EndState
+
+State CONNECTION_STATUS
+    Event OnSelectST()
+    EndEvent
+
+    Event OnHighlightST()
+        String errorDetails = ""
+        If TeleDevices.ConnectionStatus == 2
+            errorDetails = "\nConnection failed, double check parameters and check 'My Games/Skyrim Special Edition/SKSE/Telekinesis.log' \nError: " + TeleDevices.ConnectionErrorDetails
+        EndIf
+        SetInfoText("Connection Status: " + TeleDevices.ConnectionStatusText + errorDetails)
     EndEvent
 EndState
 

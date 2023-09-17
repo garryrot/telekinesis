@@ -592,12 +592,8 @@ Function InitDefaultOnEventHandlers()
     Chainbeasts_Vibrate = true
 EndFunction
 
-Function UnregisterLegacyUpdate()
-    UnregisterForUpdate()
-EndFunction
-
 Function ResetIntegrationSettings()
-    TeleDevices.Notify("Resetting integration settings")
+    TeleDevices.Notify("All settings reset to default")
     DeviousDevices_Vibrate = DeviousDevices_Vibrate_Default
     DeviousDevices_Vibrate_DeviceSelector = DeviousDevices_Vibrate_DeviceSelector_Default
     DeviousDevices_Vibrate_Event_Anal = DeviousDevices_Vibrate_Event_Anal_Default

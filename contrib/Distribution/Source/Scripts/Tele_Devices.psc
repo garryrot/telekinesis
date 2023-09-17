@@ -26,6 +26,36 @@ Bool Property LogDebugEvents = false Auto
 
 Bool Property ScanningForDevices = false Auto
 Int Property ConnectionType = 0 Auto ; In-Process
+
+Int _ConnectionStatus = 0 ; 0 = Disconnected, 1 = Connected, 2 = Error
+Int Property ConnectionStatus
+    Int Function Get()
+        return _ConnectionStatus
+    EndFunction
+EndProperty  
+
+String Property ConnectionStatusText
+    String Function Get()
+        If _ConnectionStatus == 0
+            return "Disconnected"
+        ElseIf _ConnectionStatus == 1
+            return "Connected"
+        Else
+            return "Connection Failed"
+        EndIf
+    EndFunction
+EndProperty
+
+String _ErrorText
+String Property ConnectionErrorDetails
+    String Function Get()
+        If _ConnectionStatus == 2
+            return _ErrorText
+        EndIf
+        return ""
+    EndFunction
+EndProperty
+
 String Property WsPort = "12345" Auto
 String Property WsHost = "127.0.0.1" Auto
 
@@ -39,10 +69,10 @@ Event OnUpdate()
         Int i = 0
         While (i < evts.Length)
             String evt = evts[i]
-            If StringUtil.Find(evt, "connected") != -1
+            If StringUtil.Find(evt, "' connected") != -1
                 LogConnection(evt)
                 ; Event Connected
-            ElseIf StringUtil.Find(evt, "removed") != -1
+            ElseIf StringUtil.Find(evt, "' removed") != -1
                 LogConnection(evt)
                 ; Event Removed
             ElseIf StringUtil.Find( evt, "Vibrated") != -1
@@ -50,6 +80,13 @@ Event OnUpdate()
                 LogEvent(evt)
             ElseIf StringUtil.Find( evt, "Stopped") != -1
                 ; Ignore
+            ElseIf StringUtil.Find(evt, "Started scanning") != -1
+                _ConnectionStatus = 1
+                LogDebug(evt)
+            ElseIf StringUtil.Find(evt, "Scan failed") != -1
+                _ConnectionStatus = 2
+                _ErrorText = evt
+                LogError(evt)
             Else
                 ; Other Event
                 LogDebug(evt)
@@ -75,6 +112,7 @@ Function Disconnect()
     If Connects()
         Tele_Api.Close()
         ScanningForDevices = false
+        _ConnectionStatus = 0
     EndIf
 EndFunction
 

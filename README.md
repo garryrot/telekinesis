@@ -148,23 +148,28 @@ This if free software. If you want to change this, redistribute it, or integrate
     (see DD Integration)
 
 - Integration:
+  * Introduced a lot of new generic vibration options that are available for almost all of the vibration events
+    * Strength can be linear (static strength setting)
+    * Strength can be controlled by a funscript pattern or by a random funscript pattern
+
   * Devious Devices
-    * Use DD vibration strength (device vibrated strongly, very strongly etc.)
-      instead of a random speed value.
-    * Tag/Event support to match equipped dd stimulation devices with body
-      parts (Nipple, Anal, Vaginal)
+    * Uses actual DD vibration strength (device vibrated strongly, very strongly etc.) instead of a random speed value.
+    * Tag/Event support to match equipped dd stimulation devices with body parts (Nipple, Anal, Vaginal)
+
+  * Sexlab
+    * Add option to vibration only devices that have events matching the sexlab animation tags
+    * Strength can be controlled by current SLA Arousal Rating
+    * Support stopping on denial and various other fine-grained events
+
+  * Toys&Love
+    * Strength can be controlled by Toys Rousal Rating
+    * Add fine grained control for various T&L events
+    * Add option to vibration only devices that have events matching the animation tags
 
   * Skyrim Chain Beast
     * Support Gemmed Beast Vibrations (`SCB_VibeEvent`)
     * Disclaimer: Seems to not work with Chainbeasts v7.0.0, unless SCB_VibeEffect.psc is recompiled
       from source and the psx was replaced in Script folder
-
-  * Sexlab
-    * Add option to vibration only devices that have events matching the sexlab animation tags
-
-  * Toys&Love
-    * Add fine grained control for various T&L events
-    * TBD
 
 - Technical Improvements
   * Add support for simultaneous and overlapping vibration events and patterns. 
