@@ -54,6 +54,9 @@ Bool function StopAll() global native
 ; When multiple Mods consume this, they will steal each others events
 String[] function PollEvents() global native
 
+; Generic string settings
+Bool function SettingsSet(String key, String value) global native
+ 
 ; Enable device by `name` in settings
 ; This settings is permanently stored
 Bool function GetEnabled(String device_name) global native

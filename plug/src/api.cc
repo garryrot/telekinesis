@@ -46,8 +46,11 @@ namespace Tk
         return tk_stop_all(); 
     }
     DllExport std::vector<std::string> PollEvents(void*) {
-        auto events = tk_poll_events();
+        auto events = tk_process_events();
         return std::vector<std::string>(events.begin(), events.end());
+    }
+    DllExport bool SettingsSet(void*, std::string key, std::string value) {
+        return tk_settings_set(key, value);
     }
     DllExport bool GetEnabled(void*, std::string device_name) {
         return tk_settings_get_enabled(device_name);

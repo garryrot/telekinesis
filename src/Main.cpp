@@ -32,6 +32,7 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Stop", PapyrusClass, (bool (*)(SFT, int))Tk::Stop);
     vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(SFT))Tk::StopAll);
     vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::PollEvents);
+    vm->RegisterFunction("SettingsSet", PapyrusClass, (bool (*)(SFT, std::string, std::string))Tk::SettingsSet);
     vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetEnabled);
     vm->RegisterFunction("SetEnabled", PapyrusClass, (void (*)(SFT, std::string, bool))Tk::SetEnabled);
     vm->RegisterFunction("GetEvents", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetEvents);

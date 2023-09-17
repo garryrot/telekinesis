@@ -14,7 +14,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, trace, debug};
 
-use crate::{commands::TkDeviceAction, event::TkEvent, inputs::Speed, TkDuration, TkPattern};
+use crate::{commands::TkDeviceAction, event::TkEvent, Speed, TkDuration, TkPattern};
 
 pub struct TkPatternPlayer {
     pub devices: Vec<Arc<ButtplugClientDevice>>,

@@ -3,12 +3,7 @@ use funscript::FSPoint;
 use std::fmt::{self, Display};
 use util::Narrow;
 
-use crate::util;
-
-#[derive(Debug, Clone, Copy)]
-pub struct Speed {
-    pub value: u16,
-}
+use crate::{util, Speed};
 
 impl Speed {
     pub fn new(percentage: i64) -> Speed {

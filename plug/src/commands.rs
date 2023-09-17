@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand};
+use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand, ButtplugClientError};
 use tokio::{runtime::Handle, sync::mpsc::unbounded_channel};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, span, trace, warn, Level};
@@ -102,12 +102,12 @@ pub enum TkDeviceAction {
     StopAll, // global but required for resetting device state
 }
 
-pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> bool {
+pub async fn cmd_scan_for_devices(client: &ButtplugClient) -> Result<(), ButtplugClientError> {
     if let Err(err) = client.start_scanning().await {
         error!(error = err.to_string(), "Failed scanning for devices.");
-        return false;
+        return Err(err);
     }
-    true
+    Ok(())
 }
 
 pub async fn cmd_stop_scan(client: &ButtplugClient) -> bool {
@@ -255,16 +255,22 @@ pub fn create_cmd_thread(
                             if priority {
                                 device_access.record_start(&device, handle, speed);
                             }
-                            device
+                            let result = device
                                 .vibrate(&ScalarValueCommand::ScalarValue(
                                     device_access
                                         .calculate_actual_speed(&device, speed)
                                         .as_float(),
                                 ))
-                                .await
-                                .unwrap_or_else(|_| {
-                                    error!("Failed to set device vibration speed.")
-                                });
+                                .await;
+
+                            match result {
+                                Err(err) => {
+                                    // TODO: Send device error event 
+                                    // TODO: Implement better connected/disconnected handling for devices
+                                    error!("Failed to set device vibration speed {:?}", err)
+                                },
+                                _ => {}
+                            }
                         }
                         TkDeviceAction::Update(device, speed) => device
                             .vibrate(&ScalarValueCommand::ScalarValue(
@@ -316,10 +322,15 @@ pub fn create_cmd_thread(
                 info!("Executing command {:?}", cmd);
                 match cmd {
                     TkAction::Scan => {
-                        cmd_scan_for_devices(&client).await;
-                        event_sender
-                            .send(TkEvent::ScanStarted)
-                            .unwrap_or_else(|_| error!(queue_full_err));
+                        match cmd_scan_for_devices(&client).await {
+                            Ok(()) => event_sender
+                                        .send(TkEvent::ScanStarted)
+                                        .unwrap_or_else(|_| error!(queue_full_err)),
+                            Err(err) => event_sender
+                                        .send(TkEvent::ScanFailed(err))
+                                        .unwrap_or_else(|_| error!(queue_full_err))
+                        }
+                       
                     }
                     TkAction::StopScan => {
                         cmd_stop_scan(&client).await;

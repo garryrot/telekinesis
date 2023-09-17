@@ -1,8 +1,11 @@
+use anyhow::Error;
 use buttplug::client::ButtplugClientDevice;
+use commands::TkAction;
 use event::TkEvent;
 use lazy_static::lazy_static;
 use pattern::get_pattern_names;
 use settings::PATTERN_PATH;
+use tokio::runtime::Runtime;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -10,10 +13,10 @@ use std::{
 use tracing::{error, info, instrument};
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::{in_process_connector, Telekinesis, ERROR_HANDLE};
+use telekinesis::ERROR_HANDLE;
 
 use crate::{
-    inputs::{read_input_string, Speed},
+    inputs::read_input_string,
     settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
 
@@ -50,7 +53,8 @@ mod ffi {
         fn tk_stop(handle: i32) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
-        fn tk_poll_events() -> Vec<String>;
+        fn tk_process_events() -> Vec<String>;
+        fn tk_settings_set(key: &str, value: &str) -> bool;
         fn tk_settings_set_enabled(device_name: &str, enabled: bool);
         fn tk_settings_get_enabled(device_name: &str) -> bool;
         fn tk_settings_get_events(device_name: &str) -> Vec<String>;
@@ -61,6 +65,7 @@ mod ffi {
 
 /// access to Telekinesis struct from within foreign rust modules and tests
 pub trait Tk {
+    fn connect(settings: TkSettings) -> Result<Telekinesis, Error>;
     fn scan_for_devices(&self) -> bool;
     fn stop_scan(&self) -> bool;
     fn disconnect(&mut self);
@@ -74,11 +79,32 @@ pub trait Tk {
     fn stop_all(&self) -> bool;
     fn vibrate_all(&mut self, speed: Speed, duration: TkDuration) -> i32; // obsolete
     fn get_next_event(&mut self) -> Option<TkEvent>;
-    fn get_next_events(&mut self) -> Vec<TkEvent>;
+    fn process_next_events(&mut self) -> Vec<TkEvent>;
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
     fn settings_set_events(&mut self, device_name: &str, events: Vec<String>);
     fn settings_get_events(&self, device_name: &str) -> Vec<String>;
     fn settings_get_enabled(&self, device_name: &str) -> bool;
+}
+
+pub enum TkConnectionStatus {
+    NotConnected,
+    Connected,
+    Failed(String)
+}
+
+pub struct Telekinesis {
+    pub settings: TkSettings,
+    pub event_receiver: tokio::sync::mpsc::UnboundedReceiver<TkEvent>,
+    pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
+    pub devices: Arc<Mutex<Vec<Arc<ButtplugClientDevice>>>>,
+    pub thread: Runtime,
+    pub connection_status: TkConnectionStatus,
+    last_handle: i32
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Speed {
+    pub value: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -110,10 +136,6 @@ pub enum TkPattern {
     Funscript(TkDuration, String)
 }
 
-pub fn new_with_default_settings() -> impl Tk {
-    Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap()
-}
-
 lazy_static! {
     static ref TK: Mutex<Option<Telekinesis>> = Mutex::new(None);
 }
@@ -137,15 +159,15 @@ where
 
 #[instrument]
 pub fn tk_connect() -> bool {
-    tk_connect_with_settings(Some(TkSettings::try_read_or_default(
+    tk_connect_with_settings(TkSettings::try_read_or_default(
         SETTINGS_PATH,
         SETTINGS_FILE,
-    )))
+    ))
 }
 
-pub fn tk_connect_with_settings(settings: Option<TkSettings>) -> bool {
-    info!("Creating new connection");
-    match Telekinesis::connect_with(|| async move { in_process_connector() }, settings) {
+#[instrument]
+pub fn tk_connect_with_settings(settings: TkSettings) -> bool {
+    match Telekinesis::connect(settings) {
         Ok(tk) => {
             match TK.try_lock() {
                 Ok(mut guard) => {
@@ -217,7 +239,7 @@ pub fn tk_stop(handle: i32) -> bool {
 }
 
 #[instrument]
-pub fn tk_get_devices() -> Vec<String> {
+pub fn tk_get_devices() -> Vec<String> { // 4
     if let Some(value) = access_mutex(|tk| tk.get_device_names()) {
         return value;
     }
@@ -233,7 +255,7 @@ pub fn tk_get_device_connected(name: &str) -> bool {
 }
 
 #[instrument]
-pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
+pub fn tk_get_device_capabilities(name: &str) -> Vec<String> { // 3
     if let Some(value) = access_mutex(|tk| tk.get_device_capabilities(name)) {
         return value;
     }
@@ -241,7 +263,7 @@ pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
 }
 
 #[instrument]
-pub fn tk_get_pattern_names(vibration_patterns: bool) -> Vec<String> {
+pub fn tk_get_pattern_names(vibration_patterns: bool) -> Vec<String> { // 2
     get_pattern_names(PATTERN_PATH, vibration_patterns)
 }
 
@@ -251,10 +273,10 @@ pub fn tk_stop_all() -> bool {
 }
 
 #[instrument]
-pub fn tk_poll_events() -> Vec<String> {
+pub fn tk_process_events() -> Vec<String> {
     match access_mutex(|tk| {
         let events = tk
-            .get_next_events()
+            .process_next_events()
             .iter()
             .map(|evt| evt.to_string())
             .collect::<Vec<String>>();
@@ -266,12 +288,23 @@ pub fn tk_poll_events() -> Vec<String> {
 }
 
 #[instrument]
+pub fn tk_settings_set(key: &str, value: &str) -> bool {
+    info!("setting");
+    access_mutex(|tk| { 
+        let mut settings = tk.settings.clone();
+        let success = settings.set_string(key, value);
+        tk.settings = settings;
+        success
+    }).is_some()
+}
+
+#[instrument]
 pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
     access_mutex(|tk| tk.settings_set_enabled(device_name, enabled));
 }
 
 #[instrument]
-pub fn tk_settings_get_events(device_name: &str) -> Vec<String> {
+pub fn tk_settings_get_events(device_name: &str) -> Vec<String> { // 1
     match access_mutex(|tk| tk.settings_get_events(device_name)) {
         Some(events) => events,
         None => vec![],

@@ -1,11 +1,12 @@
 use std::{sync::Arc, fmt::Display, fmt};
-use buttplug::{client::{ButtplugClientDevice, ButtplugClientEvent}, core::errors::ButtplugError};
+use buttplug::{client::{ButtplugClientDevice, ButtplugClientEvent, ButtplugClientError}, core::errors::ButtplugError};
 
 use crate::Speed;
 
 #[derive(Debug)]
 pub enum TkEvent {
     ScanStarted,
+    ScanFailed(ButtplugClientError),
     ScanStopped,
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
@@ -28,6 +29,7 @@ impl Display for TkEvent {
             TkEvent::ScanStarted => write!(f, "Started scanning for devices"),
             TkEvent::ScanStopped => write!(f, "Stopped scanning for devices"),
             TkEvent::StopAll() => write!(f, "Stopping all devices."),
+            TkEvent::ScanFailed(err) => write!(f, "Scan failed {:?}", err),
         };
         Ok(())
     }

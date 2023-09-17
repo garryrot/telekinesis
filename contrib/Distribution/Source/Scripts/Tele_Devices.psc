@@ -4,15 +4,15 @@ ScriptName Tele_Devices extends Quest
     ~ Use this API to control devices ~
 }
 
-Spell Property Tele_VibrateSpellStrong auto
-Spell Property Tele_VibrateSpellMedium auto
-Spell Property Tele_VibrateSpellWeak auto
-Spell Property Tele_Stop auto
+Spell Property Tele_VibrateSpellStrong Auto
+Spell Property Tele_VibrateSpellMedium Auto
+Spell Property Tele_VibrateSpellWeak Auto
+Spell Property Tele_Stop Auto
 
-Int Property MajorVersion = 1 autoReadOnly
-Int Property MinorVersion = 1 autoReadOnly
-Int Property PatchVersion = 0 autoReadOnly
-String Property Revision = "" autoReadOnly
+Int Property MajorVersion = 1 AutoReadOnly
+Int Property MinorVersion = 1 AutoReadOnly
+Int Property PatchVersion = 0 AutoReadOnly
+String Property Revision = "" AutoReadOnly
 
 String Property Version
     String Function Get()
@@ -20,12 +20,14 @@ String Property Version
     EndFunction
 EndProperty
 
-Bool Property LogDeviceConnects = true auto
-Bool Property LogDeviceEvents = false auto
-Bool Property LogDebugEvents = false auto
+Bool Property LogDeviceConnects = true Auto
+Bool Property LogDeviceEvents = false Auto
+Bool Property LogDebugEvents = false Auto
 
-Bool Property ScanningForDevices = false auto
-Int Property ConnectionType = 0 auto ; In-Process
+Bool Property ScanningForDevices = false Auto
+Int Property ConnectionType = 0 Auto ; In-Process
+String Property WsPort = "12345" Auto
+String Property WsHost = "127.0.0.1" Auto
 
 Event OnInit()
     RegisterForUpdate(5)
@@ -133,6 +135,23 @@ Function EmergencyStop()
         Tele_Api.StopAll()
     EndIf
     Trace("(Stop) emergency stop")
+EndFunction
+
+Function Reconnect()
+    { Stops the current connection, resets the entire backend state and 
+      restarts with the configured connection settings.
+      
+      NOTE: Handles will lose validity }
+    If ConnectionType == 1
+        Tele_Api.SettingsSet("connection.websocket", WsHost + ":" + WsPort)
+    Else
+        Tele_Api.SettingsSet("connection.inprocess", "")
+    EndIf
+    Tele_Api.SettingsStore()
+    Utility.Wait(0.5)
+    Disconnect()
+    Utility.Wait(3)
+    ConnectAndScanForDevices()
 EndFunction
 
 Bool Function Connects()

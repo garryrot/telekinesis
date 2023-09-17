@@ -53,7 +53,7 @@ Function InitLocals()
 
     _ConnectionMenuOptions = new String[3]
     _ConnectionMenuOptions[0] = "In-Process (Default)"
-    _ConnectionMenuOptions[1] = "Intiface (WebSocket)" ; Not supported right now
+    _ConnectionMenuOptions[1] = "Intiface (WebSocket)"
     _ConnectionMenuOptions[2] = "Disable"
 
     _DeviceSelectorOptions = new String[2]
@@ -91,6 +91,12 @@ Event OnPageReset(String page)
 
         AddHeaderOption("Connection")
         AddMenuOptionST("CONNECTION_MENU", "Connection", _ConnectionMenuOptions[TeleDevices.ConnectionType])
+        Int connection_ws_flags = OPTION_FLAG_DISABLED
+        If (TeleDevices.ConnectionType == 1)
+            connection_ws_flags = OPTION_FLAG_NONE
+        EndIf
+        AddInputOptionST("CONNECTION_HOST", "Intiface Host", TeleDevices.WsHost, connection_ws_flags)
+        AddInputOptionST("CONNECTION_PORT", "Intiface Port", TeleDevices.WsPort, connection_ws_flags)
         AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "")
 
         AddHeaderOption("Emergency")
@@ -414,11 +420,11 @@ State CONNECTION_MENU
         SetMenuDialogOptions(_ConnectionMenuOptions)
     EndEvent
 
-    event OnMenuAcceptST(int index)
+    Event OnMenuAcceptST(int index)
         TeleDevices.ConnectionType = index
         SetMenuOptionValueST(_ConnectionMenuOptions[index])
-        Debug.MessageBox("Reconnecting now")
-        ActionReconnect()
+        Debug.MessageBox("Please reconnect now!")
+        ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
@@ -427,27 +433,55 @@ State CONNECTION_MENU
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Specify how Telekinesis connects to Buttplug.io")
+        String t = "Specify how Telekinesis performs its device control\n"
+        t += "- In-Process: The devices are controlled directly by Telekinesis native plugin (recommended)\n"
+        t += "- Intiface (WebSocket): devices are controlled by Intiface, which requires that the app (and\n"
+        t += "           its server) are running and listening on the 'WebSocket Host' and 'WebSocket Port'"
+        SetInfoText(t)
+    EndEvent
+EndState
+
+State CONNECTION_HOST
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleDevices.WsHost)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleDevices.WsHost = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The host-name of your Intiface Web-Socket Endpoint (check Intiface App). Default: 127.0.0.1")
+    EndEvent
+EndState
+
+State CONNECTION_PORT
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleDevices.WsPort)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleDevices.WsPort = value
+        Tele_Api.SettingsSet("connection.websocket", "127.0.0.1:12345")
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The port your Intiface Web-Socket Endpoint (check Intiface App) Default: 12345")
     EndEvent
 EndState
 
 State ACTION_RECONNECT
     Event OnSelectST()
         SetTextOptionValueST("Reconnecting now...")
-        ActionReconnect()
-        SetTextOptionValueST("Done!")
+        TeleDevices.Reconnect()
     EndEvent
 
     Event OnHighlightST()
         SetInfoText("Disconnect and re-connect all device connections")
     EndEvent
 EndState
-
-Function ActionReconnect()
-    TeleDevices.Disconnect()
-    Utility.Wait(3)
-    TeleDevices.ConnectAndScanForDevices()
-EndFunction
 
 State EMERGENCY_STOP
     Event OnSelectST()
