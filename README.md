@@ -1,37 +1,37 @@
-# Telekinesis (Bluetooth Toy Control for Skyrim) 1.0.0 Beta
+# Telekinesis (Bluetooth Toy Control for Skyrim) 1.1.0
 
-**Control Bluetooth toys directly from within Skyrim**
+Telekinesis is a mod that brings native support for naughty devices (bluetooth or others) to Skyrim SE, AE.
 
-I know that there was already an amazing solution with **G.I.F.T**, but sunk cost fallacy (and the prospect of TES 6 being released something like 2030) drove me to continue with my own little approach, and I think I managed to create a really fast and easy to use solution.
+## Features
 
-Watch the video:
+- Sync real toys with in-game toy events from `Devious Devices`, `Toys & Love` and more
+- Control toys during `Sexlab` or `Toys & Love` animations
+- Associate toys with certain body parts for a more immersive experience
+- Written as a native SKSE plugin for minimal latency and low setup effort (works natively, no background processes required)
+- Re-usable API for mod authors
+
+Watch the demo video:
 
 <a href="https://youtu.be/XrXUIUjuSRQ?t=119" title="Video Tutorial">
   <img src="doc/prev.png" width=350 />
 </a>
 
-## Features
-
-- Sync real toys with events from `Devious Devices` or `Toys & Love`
-- Control toys with `Sexlab` or `Toys & Love` scenes
-- Re-usable API for mod authors
-- Written as a native SKSE plugin for
-  - Minimal latency
-  - Minimal setup effort (no background processes required)
-
-## Installation
+## 1. Installation
 
 1. Install `Telekinesis.7z` with a mod manager
+2. Install dependencies `SKSE64`, `Skyrim SE`, `SkyUI`, `Address Library for SKSE Plugins`
+3. Install optional dependencies `Sexlab`, `Sexlab Arousal`, `Toys & Love`
 
-**Depdendencies**: `SKSE64`, `Skyrim SE`, `SkyUI`, `Address Library for SKSE Plugins`
 **Conflicts**: Applications that access the same bluetooth devices at the same time
 
-## Usage
+## 2. Quickstart
 
 1. Connect a bluetooth toy in your operating system
-2. Available toys will show up in your in-game notifications (and in MCM)
-3. Open the MCM Page `Devices` and **enable** it for usage
-4. There is an emergency stop hotkey (default `DEL`) in case anything goes wrong
+2. Once connected, toys will show up in your in-game notifications (and in the MCM device page)
+3. Open the MCM Page `Devices` and **enable** the connected device for usage (See [Manual: 2. Device Setup](./docs/Manual.md#Device_Setup))
+4. Configure the emergency stop hotkey (default `DEL`)
+5. Open the MCM and enable functionalities of your choice
+6. [PLEASE READ THE MANUAL](./docs/Manual.md#Integration)
 
 **Video guide**
 
@@ -39,105 +39,62 @@ Watch the video:
   <img src="doc/prev1.png" width="400"/>
 </a>
 
-## Caveats & Known Issues
 
- * Only supports vibrating devices (for now), see [list of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
- * Only tested on Skyrim SE (v1.5.97.0) and AE (1.6.640.0)
+## 3. FAQ
 
-## Manual
+### Limitations & Support
 
-### General
+ * Only supports vibrating devices (for now)
+ * See [list of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
+ * Tested on Skyrim SE (v1.5.97.0) and AE (1.6.640.0)
+ * VR should work but is untested (if it works for you, message me)
 
-- **Connection**: Specifies the connection method that is used to communicate with buttplug.io
+### LE Support
 
-    - **In-Process**: Uses an internal buttplug.io instance to control bluetooth devices. You usually want to keep it at this.
-    - **Disable**: Backend is turned off entirely
-    - **Intiface/WebSocket**: Use a websocket connection to connect to an intiface/buttplug.io server - *this is not supported yet and does nothing*
-
-- **Reconnect**: Restarts the backend and uses the curreently selected connection type to reconnect. This can be helpful if a device is bugged and does not receive commands despite being connected.
-
-<img src="doc/scr1.png" width="800"/>
-
-### Integration
-
-Controls integration with various mods and events. I have many ideas for making it more interactive, right now the integration is very basic.
-
-- **Devious Devices**: Sync In-Game vibrators (the player wears) with with enabled devices. Starts vibrating on `VibrateEffectStart` and stops on `VibrateEffectStop`
-
-- **Sexlab**: Move devices during sexlab animations. Currently this will choose a random vibration pattern until the animation ends. `Actors Orgasm` and `Actor Edge` trigger individual patterns on those events.
-
-- **Toys & Love**:
-  - **In-Game Toys** Sync in-game vibrators with enabled devices. This uses uses Toys `Pulsate` event for starting and stopping the vibration.
-  - **Love Animations** Similar to sexlab animations, plays a random pattern during animation.
-  - **Actor Denial** Denial events will cause vibration to stop.
-  - **Actor Tease or Orgasm** Triggers a timed vibration event whenever one of those events occur.
-
-<img src="doc/scr3.png" width="800"/>
-
-### Devices
-
-Lists all known devices, the connection status and their capabilities.
-
-- **Discovery**: Enables/Disabled device scan. There is not really a reason to disable device discovery, unless you want to prevent new devices from automatically being connected. I added this for debugging purposes.
-
-- **Enabled**: To prevent this plugin from arbitrarily moving arbitrary devices in range, you need to opt-in each device for usage. Don't worry, this selection is permanently stored and transfers between savegames.
-
-- **Actions**: The capabilities of the device (Vibrate, Stroke, Scalar, etc.)
-
-<img src="doc/scr2.png" width="800"/>
-
-### Debug
-
-- **Spells**: The player character learns a set of useful debug spells to test the device vibration, or stop vibrations. The spells will vibrate the toy at various strength (low=1, mid=10, full=100). Don't worry, these spells will disappear from the player if you unselect it.
-
-- **Logging**: This controls which types of message are shown as an in-game notification (top left). 
-  - **Devices connects**: 'Device XY has connected' etc. events are shown
-  - **Device events**: 'N Device(s) have vibrated at M%' events are shown
-  - **Other messages**: For debugging
-
-<img src="doc/scr4.png" width="800"/>
-<img src="doc/scr5.png" width="800"/>
-
-
-## Help / FAQ
-
-### Compatibility with G.I.F.T
-
-This mod is compatible with G.I.F.T unless you let both apps control the very same device.
-
-When you disable this mod (page `General -> Connection Type -> Disable`), all mod events are still logged to Papyrus.0.log, this allows you consume any vibration event send to this MOD with G.I.F.T.
+ * No
 
 ### Migrating from old versions
 
+- If you come from 1.0.0 (Beta), your settings will be dropped
 - Uninstall `TelekinesisTest.esp` and delete it forever (it won't be needed again)
-- Migrating from the early alpha versions while staying on the same save is supported, start a new game, or try to fix on your own.
+- Migrating from the early alpha versions while staying on the same save is unsupported, start a new game, or try to fix on your own.
 
 ### Devices don't connect
 
-Please check that:
+Check that:
 
-1. First, make sure that your device is couple correctly
+1. Your device is coupled correctly (bluetooth settings)
 2. Your device has enough battery
 3. Your device is supported by buttplug.io, see [List of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
 4. Test it with [Intiface Central Desktop App](https://intiface.com/central), if a vibrator works in that app, and not in this plugin, its an issue with the mod.
+5. The device is Bluetooth. Devices that use serial port, lovesense connect, or other exocit connection mechanisms can work with Intiface App if your enable those connection methods (Server Settings) and select Intiface-Webapp as the connection method in Telekinesis MCM.
 
 ### Devices don't vibrate
 
 1. Make sure that your device is enabled in Page `Devices`
 2. Make sure it has full battery (with low battery it might still be able to connect but not move)
 
+### Why?
+
+I know that there was already an amazing solution with **G.I.F.T**, but sunk cost fallacy (and the prospect of TES 6 being released something like 2030) drove me to continue with my own little approach, and I think I managed to create a really fast and easy to use solution.
+
 ### Bug Reports
 
-If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyprus.0.log` and the Logs of this plugin (`%USERPROFILE%/My Games/Sykrim Special Edition/SKSE/Telekinesis.lo`)
+If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyprus.0.log` and the Logs of this plugin (`%USERPROFILE%/My Games/Sykrim Special Edition/SKSE/Telekinesis.log`)
 * If you can reproduce the issue, adapt the debug level by changing `Telekinesis.json` and set everything to `Trace`.
 
 ## License
 
-This if free software. If you want to change this, redistribute it, or integrate it into your mod, you are free to whatever you like, as long as it is permitted by the [Apache License](LICENSE)
+This mod is free software and can be used under the terms of the [Apache License V2](LICENSE) 
 
-# Changelog
+## Changelog
 
 ## 1.1.0
+
+- Migrating from Beta will reset your MCM settings
+
+- WebSocket (Intiface) connection now works
+  * This allows to use Intiface App as backend control instead of the default in-process backend
 
 - Add support for funscript patterns
   * Only works with vibrator files `vibration.funscript` files for now
