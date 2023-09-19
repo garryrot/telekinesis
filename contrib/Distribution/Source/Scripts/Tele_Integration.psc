@@ -659,6 +659,9 @@ Function UpdateRousingControlledSexScene()
         TeleDevices.StopHandle(oldHandle)
         TeleDevices.LogDebug("UpdatingToysScene Rousing=" + rousing)
         RegisterForSingleUpdate(2)
+        If ! _InToysScene ; Prevent lingering vibrations if scene finishes during handler
+            TeleDevices.StopHandle(_ToysSceneVibrationHandle)
+        EndIf
     ElseIf _InSexlabScene
         Int arousal = SexLabAroused.GetActorArousal(Game.GetPlayer())
         If arousal >= 0
@@ -670,6 +673,9 @@ Function UpdateRousingControlledSexScene()
         TeleDevices.StopHandle(oldHandle)
         TeleDevices.LogDebug("UpdatingSexlabScene Arousal=" + arousal)
         RegisterForSingleUpdate(2)
+        If ! _InSexlabScene ; Prevent lingering vibrations if scene finishes during handler
+            TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
+        EndIf
 	EndIf
 EndFunction
 
