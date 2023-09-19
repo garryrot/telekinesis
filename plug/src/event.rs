@@ -20,6 +20,7 @@ pub enum TkEvent {
 impl Display for TkEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _ = match self {
+            // TODO: absolutely disgusting
             TkEvent::DeviceAdded(device) => write!(f, "Device '{}' connected.", device.name()),
             TkEvent::DeviceRemoved(device) => write!(f, "Device '{}' removed.", device.name()),
             TkEvent::DeviceVibrated(count, speed) => write!(f, "Vibrated {} device(s) {}%.", count, speed),

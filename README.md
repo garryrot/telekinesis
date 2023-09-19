@@ -93,35 +93,32 @@ This mod is free software and can be used under the terms of the [Apache License
 
 - Migrating from Beta will reset your MCM settings
 
-- WebSocket (Intiface) connection now works
-  * This allows to use Intiface App as backend control instead of the default in-process backend
-
 - Add support for funscript patterns
   * Only works with vibrator files `vibration.funscript` files for now
   * Other patterns are still being displayed
 
 - Add support for events (device tags)
-  * This allows associating devices with certain events that correlate to body parts
-    (see DD Integration)
+  * This allows associating devices with certain events that correlate to body parts (see manual)
 
-- Integration:
+- Improve integration for Sexlab, Devious Devices, Toys & Love:
   * Introduced a lot of new generic vibration options that are available for almost all of the vibration events
-    * Strength can be linear (static strength setting)
-    * Strength can be controlled by a funscript pattern or by a random funscript pattern
+    * Strength can be regulated linearly or with a funscript pattern
+    * Use random patterns
+    * Support matching devices with events (body parts)
 
   * Devious Devices
     * Uses actual DD vibration strength (device vibrated strongly, very strongly etc.) instead of a random speed value.
     * Tag/Event support to match equipped dd stimulation devices with body parts (Nipple, Anal, Vaginal)
 
   * Sexlab
-    * Add option to vibration only devices that have events matching the sexlab animation tags
-    * Strength can be controlled by current SLA Arousal Rating
-    * Support stopping on denial and various other fine-grained events
+    * Match devices with animation tags
+    * Control Strength through sexlab arousal
+    * Support for denial
 
   * Toys&Love
-    * Strength can be controlled by Toys Rousal Rating
-    * Add fine grained control for various T&L events
-    * Add option to vibration only devices that have events matching the animation tags
+    * Match with animation tags
+    * Control strength through rousing
+    * Support Denial, Body Part Penetration and Fondling events
 
   * Skyrim Chain Beast
     * Support Gemmed Beast Vibrations (`SCB_VibeEvent`)
@@ -134,8 +131,8 @@ This mod is free software and can be used under the terms of the [Apache License
     * Technical requirement for long running patterns and to assure a seamless
       experience with mods that do a lof of different things at the same time.
     * Papyrus API had to be reworked to use task handles
-  *  Reduce dll size by about 30%
-
+  * WebSocket (Intiface) connection now works
+    * This allows to use Intiface App as backend control instead of the default in-process backend
 
 ## 1.0.0
 
