@@ -19,7 +19,7 @@ String[] _DeviceNames
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 9
+    return 10
 EndFunction
 
 Event OnConfigInit()
@@ -32,7 +32,8 @@ Event OnVersionUpdate(int aVersion)
         TeleDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + aVersion)
     EndIf
 
-    If CurrentVersion > 0 && CurrentVersion < 9 ; 1.0.0 Beta
+    If CurrentVersion > 0 && CurrentVersion < 10
+        ; Update from 1.0.0 Beta
         InitLocals()
         TeleIntegration.ResetIntegrationSettings()
     EndIf
@@ -176,9 +177,9 @@ Event OnPageReset(String page)
             If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_DeviceSelector == 1
                 devious_devices_vibrate_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.DeviousDevices_Vibrate_Event_Anal, devious_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event for 'Anal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Anal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event for 'Vaginal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event on 'Nipple Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
         
             AddHeaderOption("Actions")
             Int devious_devices_vibrate_pattern_flag = OPTION_FLAG_DISABLED
@@ -288,7 +289,7 @@ Event OnPageReset(String page)
             If TeleIntegration.Toys_Animation
                 toys_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_TOYS_ANIMATION_DEVICE_SELECTOR", "Devices", _DeviceSelectorOptions[TeleIntegration.Toys_Animation_DeviceSelector], toys_animation_selector_flag)
+            AddMenuOptionST("MENU_TOYS_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Toys_Animation_DeviceSelector], toys_animation_selector_flag)
 
             Int toys_animation_event_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_DeviceSelector == 1
@@ -439,10 +440,9 @@ State CONNECTION_MENU
 
     Event OnHighlightST()
         String t = "Specify how Telekinesis performs its device control\n"
-        t += "NOTE: Usually you don't need to change this\n"
-        t += "- In-Process: The devices are controlled directly by Telekinesis native plugin (Recommended)\n"
-        t += "- Intiface (WebSocket): devices are controlled by Intiface, which requires that the app (and\n"
-        t += "           its server) are running and listening on the 'WebSocket Host' and 'WebSocket Port'"
+        t += "- In-Process: Control devices directly through Telekinesis (Recommended)\n"
+        t += "- Intiface (WebSocket): Control Devices through a running Intiface App (See docs)\n"
+        t += "NOTE: Don't change this if you don't know what it does\n"
         SetInfoText(t)
     EndEvent
 EndState
@@ -608,7 +608,7 @@ State OPTION_DEVIOUS_EVENT_ANAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Change the event that is triggered for 'Anal' devices. Default: Anal")
+        SetInfoText("Change the event that is triggered for in-game 'Anal' devices (vibrating buttplugs). Default: Anal")
     EndEvent
 EndState
 
@@ -623,7 +623,7 @@ State OPTION_DEVIOUS_EVENT_NIPPLE
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Change the event that is triggered for 'Nipple' devices. Default: Nipple")
+        SetInfoText("Change the event that is triggered for in-game 'Nipple' devices (vibrating piercings). Default: Nipple")
     EndEvent
 EndState
 
@@ -638,7 +638,7 @@ State OPTION_DEVIOUS_EVENT_VAGINAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Change event that is triggered for 'Vaginal' devices. Default: Vaginal")
+        SetInfoText("Change event that is triggered for in-game 'Vaginal' devices, i. clitoral piercings,. Default: Vaginal")
     EndEvent
 EndState
 
