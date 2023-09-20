@@ -112,8 +112,8 @@ Funscript is a file format to control bluetooth strokers and vibrators.
 - All patterns are stored in `Skyrim Special Edition\Data\SKSE\Plugins\Telekinesis\Patterns\*.funscript`
     - Yes, you can add your own if you want.
 - Regular funscript files `.funscript` are for linear movement devices (strokers, fucking machines), basically anything that moves between two positions
-- Vibrator funscript files `vibrator.funscript` are for scalar devices (vibrators)
-- The device endings `.vibrator.funscript` or just `.funscript` will assign them to certain type.
+- Vibrator funscript files `.vibrator.funscript` are for scalar devices (vibrators)
+- The device endings `.vibrator.funscript` or just `.funscript` will control the specific type of pattern.
 
 <img src="scr7.png" width="800"/>
 
