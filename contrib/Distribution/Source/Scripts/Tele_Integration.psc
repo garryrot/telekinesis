@@ -6,10 +6,10 @@ ScriptName Tele_Integration extends Quest
 
 Tele_Devices Property TeleDevices Auto
 
-ZadLibs Property ZadLib Auto
-SexLabFramework Property SexLab Auto
-ToysFramework Property Toys Auto
-SlaFrameworkScr Property SexLabAroused Auto
+Quest Property ZadLib Auto        ; ZadLibs
+Quest Property SexLab Auto        ; SexLabFramework
+Quest Property Toys Auto          ; ToysFramework
+Quest Property SexLabAroused Auto ; SlaFrameworkScr
 
 String[] _SceneTags
 Bool _InSexlabScene = false
@@ -379,23 +379,23 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     ; Reverse DD multi device calculation to get the actual strength
     String[] events = new String[3]
     Float numVibratorsMult = 0
-    If player.WornHasKeyword(ZadLib.zad_DeviousPlugVaginal)
+    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPlugVaginal)
         numVibratorsMult += 0.7
         events[0] = DeviousDevices_Vibrate_Event_Vaginal
     EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPlugAnal)
+    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPlugAnal)
         numVibratorsMult += 0.3
         events[1] = DeviousDevices_Vibrate_Event_Anal
     EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsNipple)
+    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPiercingsNipple)
         numVibratorsMult += 0.25
         events[2] = DeviousDevices_Vibrate_Event_Nipple
     EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousPiercingsVaginal)
+    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPiercingsVaginal)
         numVibratorsMult += 0.5
         events[0] = DeviousDevices_Vibrate_Event_Vaginal
     EndIf
-    If player.WornHasKeyword(ZadLib.zad_DeviousBlindfold) 
+    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousBlindfold) 
         numVibratorsMult /= 1.15
     EndIf
 
@@ -423,7 +423,7 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 		TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
-    sslThreadController Controller = Sexlab.GetController(threadID)
+    sslThreadController Controller = (Sexlab as SexLabFramework).GetController(threadID)
     sslBaseAnimation animation = Controller.Animation
     _SceneTags = animation.GetTags()
 
@@ -511,16 +511,16 @@ EndEvent
 
 String[] Function GetLoveTags(String loveName)
     String[] events = new String[4]
-    If Toys.SceneHasTag( loveName, "Vaginal") ; || Toys.SceneHasTag( loveName, "Pussy") || Toys.SceneHasTag( loveName, "Fisting") 
+    If (Toys as ToysFramework).SceneHasTag( loveName, "Vaginal") ; || Toys.SceneHasTag( loveName, "Pussy") || Toys.SceneHasTag( loveName, "Fisting") 
         events[0] = Toys_Animation_Event_Vaginal
     EndIf
-    If Toys.SceneHasTag( loveName, "Anal") ;|| Toys.SceneHasTag( loveName, "Fisting")
+    If (Toys as ToysFramework).SceneHasTag( loveName, "Anal") ;|| Toys.SceneHasTag( loveName, "Fisting")
         events[1] = Toys_Animation_Event_Anal
     EndIf
-    If Toys.SceneHasTag( loveName, "Oral") ;|| Toys.SceneHasTag( loveName, "Blowjob")
+    If (Toys as ToysFramework).SceneHasTag( loveName, "Oral") ;|| Toys.SceneHasTag( loveName, "Blowjob")
         events[2] = Toys_Animation_Event_Oral
     EndIf
-    If Toys.SceneHasTag( loveName, "Nipple") || Toys.SceneHasTag( loveName, "Breast"); || Toys.SceneHasTag( loveName, "Breast")
+    If (Toys as ToysFramework).SceneHasTag( loveName, "Nipple") || (Toys as ToysFramework).SceneHasTag( loveName, "Breast"); || Toys.SceneHasTag( loveName, "Breast")
         events[3] = Toys_Animation_Event_Nipple
     EndIf
     return events
@@ -650,7 +650,7 @@ EndEvent
 
 Function UpdateRousingControlledSexScene()
     If _InToysScene
-        Int rousing = Toys.GetRousing()
+        Int rousing = (Toys as ToysFramework).GetRousing()
 
         String[] evts = GetLoveTags(_LoveName)
 
@@ -663,7 +663,7 @@ Function UpdateRousingControlledSexScene()
             TeleDevices.StopHandle(_ToysSceneVibrationHandle)
         EndIf
     ElseIf _InSexlabScene
-        Int arousal = SexLabAroused.GetActorArousal(Game.GetPlayer())
+        Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(Game.GetPlayer())
         If arousal >= 0
             Sexlab_Animation_Linear_Strength
         EndIf
