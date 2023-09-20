@@ -19,7 +19,7 @@ Watch the demo video:
 ## 1. Installation
 
 1. Install `Telekinesis.7z` with a mod manager
-2. Install dependencies `SKSE64`, `Skyrim SE`, `SkyUI`, `Address Library for SKSE Plugins`
+2. Install dependencies `SKSE64`, `SkyUI`, `Address Library for SKSE Plugins`
 3. Install optional dependencies `Sexlab`, `Sexlab Arousal`, `Toys & Love`
 
 **Conflicts**: Applications that access the same bluetooth devices at the same time
@@ -44,10 +44,10 @@ Watch the demo video:
 
 ### Limitations & Support
 
- * Only supports vibrating devices (for now)
- * See [list of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
  * Tested on Skyrim SE (v1.5.97.0) and AE (1.6.640.0)
  * VR should work but is untested (if it works for you, message me)
+ * Only supports vibrating devices (for now)
+ * See [list of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
 
 ### LE Support
 
