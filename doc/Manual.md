@@ -131,7 +131,7 @@ Varius tools and Settings for debugging issues or just toying around...
 <img src="scr4.png" width="800"/>
 <img src="scr5.png" width="800"/>
 
-## 5. Advanced Features
+## 6. Advanced Topics
 
 tbd
 

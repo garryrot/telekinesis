@@ -28,10 +28,10 @@ Watch the demo video:
 
 1. Connect a bluetooth toy in your operating system
 2. Once connected, toys will show up in your in-game notifications (and in the MCM device page)
-3. Open the MCM Page `Devices` and **enable** the connected device for usage (See [Manual: 2. Device Setup](./docs/Manual.md#Device_Setup))
+3. Open the MCM Page `Devices` and **enable** the connected device for usage (See [Manual: 2. Device Setup](./doc/Manual.md#Device_Setup))
 4. Configure the emergency stop hotkey (default `DEL`)
 5. Open the MCM and enable functionalities of your choice
-6. [PLEASE READ THE MANUAL](./docs/Manual.md#Integration)
+6. [PLEASE READ THE MANUAL](./doc/Manual.md#Integration)
 
 **Video guide**
 
