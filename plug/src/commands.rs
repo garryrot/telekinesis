@@ -1,13 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use buttplug::client::{ButtplugClient, ButtplugClientDevice, ScalarValueCommand, ButtplugClientError};
+use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientError};
 use tokio::runtime::Handle;
-use tokio_util::sync::CancellationToken;
-use tracing::{error, info, span, trace, warn, Level};
+use tracing::{error, info, span, Level};
 
 use crate::{
-    event::{TkEvent, self},
-    pattern::{TkButtplugScheduler, TkPlayerSettings},
+    event::TkEvent,
     settings::{TkDeviceSettings, TkSettings},
     Speed, TkPattern,
 };
@@ -18,8 +16,6 @@ type DeviceNameList = Box<Vec<String>>;
 pub enum TkAction {
     Scan,
     StopScan,
-    Control(i32, TkParams),
-    Stop(i32),
     StopAll,
     Disconect,
 }
@@ -47,7 +43,6 @@ impl TkParams {
 
 #[derive(Clone, Debug)]
 pub enum TkDeviceSelector {
-    All,
     ByNames(DeviceNameList),
 }
 
@@ -59,7 +54,6 @@ impl TkDeviceSelector {
         devices
             .iter()
             .filter(|d| match self {
-                TkDeviceSelector::All => true,
                 TkDeviceSelector::ByNames(names) => {
                     let matches = names.iter().any(|x| x == d.name());
                     matches
@@ -122,22 +116,15 @@ pub async fn cmd_stop_scan(client: &ButtplugClient) -> bool {
 }
 
 pub fn create_cmd_thread(
-    client: ButtplugClient,
     event_sender: tokio::sync::mpsc::UnboundedSender<TkEvent>,
     mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>,
-    pattern_path: String,
+    client: ButtplugClient
 ) {
     Handle::current().spawn(async move {
         info!("Comand handling thread started");
         let _ = span!(Level::INFO, "cmd_handling_thread").entered();
 
-        let scheduler = TkButtplugScheduler::start_worker_thread( 
-            event_sender.clone(), 
-            TkPlayerSettings { player_resolution_ms: 100, pattern_path }
-        );
-
         // global operations and long running pattern execution
-        let mut cancellation_tokens: HashMap<i32, CancellationToken> = HashMap::new(); // TODO do cleanup of cancelled
         loop {
             let next_cmd = command_receiver.recv().await;
             if let Some(cmd) = next_cmd {
@@ -153,7 +140,7 @@ pub fn create_cmd_thread(
                                         .send(TkEvent::ScanFailed(err))
                                         .unwrap_or_else(|_| error!(queue_full_err))
                         }
-                       
+
                     }
                     TkAction::StopScan => {
                         cmd_stop_scan(&client).await;
@@ -169,38 +156,10 @@ pub fn create_cmd_thread(
                         break;
                     }
                     TkAction::StopAll => {
-                        for entry in cancellation_tokens.drain() {
-                            entry.1.cancel();
-                        }
                         client
                             .stop_all_devices()
                             .await
                             .unwrap_or_else(|_| error!("Failed to stop all devices."));
-                        scheduler.stop_all();
-                    }
-                    TkAction::Control(handle, params) => {
-                        let devices = client.devices().clone();
-                        let selection = params.filter_devices(devices);
-                        let cancel_token = CancellationToken::new();
-                        if let Some(_old) = cancellation_tokens.insert(handle, cancel_token.clone())
-                        {
-                            error!("Handle {} already existed", handle);
-                        }
-
-                        let player = scheduler.create_player(selection);
-                        Handle::current().spawn(async move {
-                            player.play(params.pattern, cancel_token, handle).await;
-                        });
-                    }
-                    TkAction::Stop(handle) => {
-                        if cancellation_tokens.contains_key(&handle) {
-                            cancellation_tokens.remove(&handle).unwrap().cancel();
-                            event_sender
-                                .send(TkEvent::DeviceStopped())
-                                .unwrap_or_else(|_| error!(queue_full_err));
-                        } else {
-                            error!("Unknown handle {}", handle);
-                        }
                     }
                 }
             } else {

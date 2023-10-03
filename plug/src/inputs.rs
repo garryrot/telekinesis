@@ -31,7 +31,7 @@ impl Display for Speed {
     }
 }
 
-pub fn sanitize_input_string(list: Vec<String>) -> Vec<String> {
+pub fn sanitize_input_string(list: &Vec<String>) -> Vec<String> {
     list.iter()
         .map(|e| String::from(e.to_lowercase().trim()))
         .collect()

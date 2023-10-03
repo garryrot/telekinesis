@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use buttplug::client::{ButtplugClientDevice, ScalarValueCommand};
 use funscript::FScript;
+use std::collections::HashMap;
 use std::{
     fs::{self},
     path::PathBuf,
@@ -8,12 +9,11 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    sync::mpsc::{UnboundedSender, unbounded_channel},
-    time::{sleep, Instant}, runtime::Handle,
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    time::{sleep, Instant},
 };
-use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, trace, debug, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{commands::TkDeviceAction, event::TkEvent, Speed, TkDuration, TkPattern};
 
@@ -128,104 +128,134 @@ impl DeviceAccess {
 
 pub struct TkPlayerSettings {
     pub player_resolution_ms: i32,
-    pub pattern_path: String
+    pub pattern_path: String,
 }
 
 pub struct TkButtplugScheduler {
     device_action_sender: UnboundedSender<TkDeviceAction>,
     event_sender: UnboundedSender<TkEvent>,
-    settings: TkPlayerSettings
+    settings: TkPlayerSettings,
+    cancellation_tokens: HashMap<i32, CancellationToken>,
+    last_handle: i32,
 }
 
 impl TkButtplugScheduler {
-    pub fn start_worker_thread(event_sender: UnboundedSender<TkEvent>, settings: TkPlayerSettings) -> TkButtplugScheduler {
-        let (device_action_sender, mut device_action_receiver) = unbounded_channel::<TkDeviceAction>();
+    fn get_next_handle(&mut self) -> i32 {
+        self.last_handle += 1;
+        self.last_handle
+    }
 
-        Handle::current().spawn(async move {
-            let mut device_counter = ReferenceCounter::new();
-            let mut device_access = DeviceAccess::new();
-            loop {
-                if let Some(next_action) = device_action_receiver.recv().await {
-                    trace!("Exec device action {:?}", next_action);
-                    match next_action {
-                        TkDeviceAction::Start(device, speed, priority, handle) => {
-                            device_counter.reserve(&device);
-                            if priority {
-                                device_access.record_start(&device, handle, speed);
-                            }
-                            let result = device
-                                .vibrate(&ScalarValueCommand::ScalarValue(
-                                    device_access
-                                        .calculate_actual_speed(&device, speed)
-                                        .as_float(),
-                                ))
-                                .await;
+    pub fn create(
+        event_sender: UnboundedSender<TkEvent>,
+        settings: TkPlayerSettings,
+    ) -> (TkButtplugScheduler, UnboundedReceiver<TkDeviceAction>) {
+        let (device_action_sender, device_action_receiver) = unbounded_channel::<TkDeviceAction>();
+        (
+            TkButtplugScheduler {
+                device_action_sender,
+                event_sender,
+                settings,
+                cancellation_tokens: HashMap::new(),
+                last_handle: 0,
+            },
+            device_action_receiver,
+        )
+    }
 
-                            match result {
-                                Err(err) => {
-                                    // TODO: Send device error event 
-                                    // TODO: Implement better connected/disconnected handling for devices
-                                    error!("Failed to set device vibration speed {:?}", err)
-                                },
-                                _ => {}
-                            }
+    pub async fn run_worker_thread(mut device_action_receiver: UnboundedReceiver<TkDeviceAction>) {
+        // TODO do cleanup of cancelled
+        let mut device_counter = ReferenceCounter::new();
+        let mut device_access = DeviceAccess::new();
+        loop {
+            if let Some(next_action) = device_action_receiver.recv().await {
+                trace!("Exec device action {:?}", next_action);
+                match next_action {
+                    TkDeviceAction::Start(device, speed, priority, handle) => {
+                        device_counter.reserve(&device);
+                        if priority {
+                            device_access.record_start(&device, handle, speed);
                         }
-                        TkDeviceAction::Update(device, speed) => device
+                        let result = device
                             .vibrate(&ScalarValueCommand::ScalarValue(
                                 device_access
                                     .calculate_actual_speed(&device, speed)
                                     .as_float(),
                             ))
-                            .await
-                            .unwrap_or_else(|_| error!("Failed to set device vibration speed.")),
-                        TkDeviceAction::End(device, priority, handle) => {
-                            device_counter.release(&device);
-                            if priority {
-                                device_access.record_stop(&device, handle);
+                            .await;
+                        match result {
+                            Err(err) => {
+                                // TODO: Send device error event
+                                // TODO: Implement better connected/disconnected handling for devices
+                                error!("Failed to set device vibration speed {:?}", err)
                             }
-                            if device_counter.needs_to_stop(&device) {
-                                // nothing else is controlling the device, stop it
-                                device
-                                    .vibrate(&ScalarValueCommand::ScalarValue(0.0))
-                                    .await
-                                    .unwrap_or_else(|_| error!("Failed to stop vibration"));
-                                info!("Device stopped {}", device.name())
-                            } else if let Some(remaining_speed) =
-                                device_access.get_remaining_speed(&device)
-                            {
-                                // see if we have a lower priority vibration still running
-                                device
-                                    .vibrate(&ScalarValueCommand::ScalarValue(
-                                        remaining_speed.as_float(),
-                                    ))
-                                    .await
-                                    .unwrap_or_else(|_| error!("Failed to reset vibration"))
-                            }
+                            _ => {}
                         }
-                        TkDeviceAction::StopAll => {
-                            device_counter.clear();
-                            info!("Stop all action");
+                    }
+                    TkDeviceAction::Update(device, speed) => device
+                        .vibrate(&ScalarValueCommand::ScalarValue(
+                            device_access
+                                .calculate_actual_speed(&device, speed)
+                                .as_float(),
+                        ))
+                        .await
+                        .unwrap_or_else(|_| error!("Failed to set device vibration speed.")),
+                    TkDeviceAction::End(device, priority, handle) => {
+                        device_counter.release(&device);
+                        if priority {
+                            device_access.record_stop(&device, handle);
                         }
+                        if device_counter.needs_to_stop(&device) {
+                            // nothing else is controlling the device, stop it
+                            device
+                                .vibrate(&ScalarValueCommand::ScalarValue(0.0))
+                                .await
+                                .unwrap_or_else(|_| error!("Failed to stop vibration"));
+                            info!("Device stopped {}", device.name())
+                        } else if let Some(remaining_speed) =
+                            device_access.get_remaining_speed(&device)
+                        {
+                            // see if we have a lower priority vibration still running
+                            device
+                                .vibrate(&ScalarValueCommand::ScalarValue(
+                                    remaining_speed.as_float(),
+                                ))
+                                .await
+                                .unwrap_or_else(|_| error!("Failed to reset vibration"))
+                        }
+                    }
+                    TkDeviceAction::StopAll => {
+                        device_counter.clear();
+                        info!("Stop all action");
                     }
                 }
             }
-        });
-
-        TkButtplugScheduler { device_action_sender, event_sender, settings }
-
+        }
     }
 
-    pub fn create_player(&self, devices: Vec<Arc<ButtplugClientDevice>>) -> TkPatternPlayer {
+    pub fn stop_task(&mut self, handle: i32) {
+        if self.cancellation_tokens.contains_key(&handle) {
+            self.cancellation_tokens.remove(&handle).unwrap().cancel();
+        } else {
+            error!("Unknown handle {}", handle);
+        }
+    }
+
+    pub fn create_player(&mut self, devices: Vec<Arc<ButtplugClientDevice>>) -> TkPatternPlayer {
+        let token = CancellationToken::new();
+        let handle = self.get_next_handle();
+        self.cancellation_tokens.insert(handle, token.clone());
         TkPatternPlayer {
             devices: devices,
             action_sender: self.device_action_sender.clone(),
             event_sender: self.event_sender.clone(),
             resolution_ms: 100,
             pattern_path: self.settings.pattern_path.clone(),
+            handle: handle,
+            cancellation_token: token,
         }
     }
 
-    pub fn stop_all(&self) {
+    pub fn stop_all(&mut self) {
         let queue_full_err = "Event sender full";
         self.device_action_sender
             .send(TkDeviceAction::StopAll)
@@ -233,8 +263,11 @@ impl TkButtplugScheduler {
         self.event_sender
             .send(TkEvent::StopAll())
             .unwrap_or_else(|_| error!(queue_full_err));
-    }
 
+        for entry in self.cancellation_tokens.drain() {
+            entry.1.cancel();
+        }
+    }
 }
 
 pub struct TkPatternPlayer {
@@ -243,23 +276,25 @@ pub struct TkPatternPlayer {
     pub event_sender: UnboundedSender<TkEvent>,
     pub resolution_ms: i32,
     pub pattern_path: String,
+    pub handle: i32,
+    pub cancellation_token: CancellationToken,
 }
 
 impl TkPatternPlayer {
-    pub async fn play(self, pattern: TkPattern, cancel: CancellationToken, handle: i32) {
+    pub async fn play(self, pattern: TkPattern) {
         info!("Playing pattern {:?}", pattern);
         match pattern {
             TkPattern::Linear(duration, speed) => match duration {
                 TkDuration::Infinite => {
-                    self.do_vibrate(speed, true, handle);
-                    cancel.cancelled().await;
-                    self.do_stop(true, handle);
+                    self.do_vibrate(speed, true, self.handle);
+                    self.cancellation_token.cancelled().await;
+                    self.do_stop(true, self.handle);
                     info!("Infinite stopped")
                 }
                 TkDuration::Timed(duration) => {
-                    self.do_vibrate(speed, true, handle);
-                    cancellable_wait(duration, &cancel).await;
-                    self.do_stop(true, handle);
+                    self.do_vibrate(speed, true, self.handle);
+                    cancellable_wait(duration, &self.cancellation_token).await;
+                    self.do_stop(true, self.handle);
                     info!("Linear finished");
                 }
             },
@@ -280,7 +315,7 @@ impl TkPatternPlayer {
                         let now = Instant::now();
 
                         let first_speed = Speed::from_fs(&actions[0]);
-                        self.do_vibrate(first_speed, false, handle);
+                        self.do_vibrate(first_speed, false, self.handle);
 
                         let mut i = 1;
                         let mut last_speed = first_speed.value as i32;
@@ -303,7 +338,7 @@ impl TkPatternPlayer {
                                 if false
                                     == cancellable_wait(
                                         Duration::from_micros(next_timer_us - elapsed_us),
-                                        &cancel,
+                                        &self.cancellation_token,
                                     )
                                     .await
                                 {
@@ -318,7 +353,7 @@ impl TkPatternPlayer {
                             }
                             i += 1;
                         }
-                        self.do_stop(false, handle);
+                        self.do_stop(false, self.handle);
                         info!(
                             "Pattern finished in {:?} dropped={} ignored={}",
                             now.elapsed(),
@@ -336,8 +371,8 @@ impl TkPatternPlayer {
     }
 
     fn do_update(&self, speed: Speed) {
-        trace!("do_update {}", speed);
         for device in self.devices.iter() {
+            trace!("do_update {} {:?}", speed, device);
             self.action_sender
                 .send(TkDeviceAction::Update(device.clone(), speed))
                 .unwrap_or_else(|_| error!("queue full"));
@@ -345,12 +380,18 @@ impl TkPatternPlayer {
     }
 
     fn do_vibrate(&self, speed: Speed, priority: bool, handle: i32) {
-        trace!("do_vibrate {}", speed);
         for device in self.devices.iter() {
+            trace!("do_vibrate {} {:?}", speed, device);
             self.action_sender
-                .send(TkDeviceAction::Start(device.clone(), speed, priority, handle))
+                .send(TkDeviceAction::Start(
+                    device.clone(),
+                    speed,
+                    priority,
+                    handle,
+                ))
                 .unwrap_or_else(|_| error!("queue full"));
         }
+
         self.event_sender
             .send(TkEvent::DeviceVibrated(self.devices.len() as i32, speed))
             .unwrap_or_else(|_| error!("queue full"));

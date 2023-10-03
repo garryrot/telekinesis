@@ -3,7 +3,7 @@ use buttplug::client::ButtplugClientDevice;
 use commands::TkAction;
 use event::TkEvent;
 use lazy_static::lazy_static;
-use pattern::get_pattern_names;
+use pattern::{get_pattern_names, TkButtplugScheduler};
 use settings::PATTERN_PATH;
 use tokio::runtime::Runtime;
 use std::{
@@ -75,9 +75,8 @@ pub trait Tk {
     fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
     fn vibrate(&mut self, speed: Speed, duration: TkDuration, events: Vec<String>) -> i32;
     fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32;
-    fn stop(&self, handle: i32) -> bool;
-    fn stop_all(&self) -> bool;
-    fn vibrate_all(&mut self, speed: Speed, duration: TkDuration) -> i32; // obsolete
+    fn stop(&mut self, handle: i32) -> bool;
+    fn stop_all(&mut self) -> bool;
     fn get_next_event(&mut self) -> Option<TkEvent>;
     fn process_next_events(&mut self) -> Vec<TkEvent>;
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
@@ -97,9 +96,9 @@ pub struct Telekinesis {
     pub event_receiver: tokio::sync::mpsc::UnboundedReceiver<TkEvent>,
     pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
     pub devices: Arc<Mutex<Vec<Arc<ButtplugClientDevice>>>>,
-    pub thread: Runtime,
+    pub runtime: Runtime,
     pub connection_status: TkConnectionStatus,
-    last_handle: i32
+    scheduler: TkButtplugScheduler
 }
 
 #[derive(Debug, Clone, Copy)]
