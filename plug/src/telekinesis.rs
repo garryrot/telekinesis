@@ -27,8 +27,8 @@ use tracing::{debug, error, info, warn};
 use itertools::Itertools;
 
 use crate::{
-    commands::{create_cmd_thread, TkAction, TkDeviceSelector, TkParams},
-    inputs::sanitize_input_string,
+    commands::{create_cmd_thread, TkAction},
+    inputs::TkParams,
     pattern::{TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
     Speed, Telekinesis, Tk, TkConnectionStatus, TkDuration, TkEvent, TkPattern,
@@ -215,13 +215,7 @@ impl Tk for Telekinesis {
 
     fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32 {
         info!("Received: Vibrate/Vibrate Pattern");
-        let params = TkParams {
-            selector: TkDeviceSelector::from_events(
-                sanitize_input_string(&events),
-                &self.settings.devices,
-            ),
-            pattern: pattern,
-        };
+        let params = TkParams::from_input(events, pattern, &self.settings.devices);
         let player = self
             .scheduler
             .create_player(params.filter_devices(self.get_devices()));
@@ -338,7 +332,7 @@ mod tests {
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
 
-    use crate::util::{enable_log, enable_trace};
+    use crate::util::enable_log;
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,

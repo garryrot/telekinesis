@@ -1,9 +1,13 @@
+use buttplug::client::ButtplugClientDevice;
 use cxx::{CxxString, CxxVector};
 use funscript::FSPoint;
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    sync::Arc,
+};
 use util::Narrow;
 
-use crate::{util, Speed};
+use crate::{settings::TkDeviceSettings, util, Speed, TkPattern};
 
 impl Speed {
     pub fn new(percentage: i64) -> Speed {
@@ -13,7 +17,7 @@ impl Speed {
     }
     pub fn from_fs(point: &FSPoint) -> Speed {
         Speed::new(point.pos.into())
-    } 
+    }
     pub fn min() -> Speed {
         Speed { value: 0 }
     }
@@ -31,7 +35,7 @@ impl Display for Speed {
     }
 }
 
-pub fn sanitize_input_string(list: &Vec<String>) -> Vec<String> {
+pub fn sanitize_name_list(list: &Vec<String>) -> Vec<String> {
     list.iter()
         .map(|e| String::from(e.to_lowercase().trim()))
         .collect()
@@ -44,4 +48,46 @@ pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {
         .filter(|d| d.len() > 0)
         .map(|d| d.to_string_lossy().into_owned())
         .collect()
+}
+
+#[derive(Clone, Debug)]
+pub struct TkParams {
+    pub selector: Vec<String>,
+    pub pattern: TkPattern,
+}
+
+impl TkParams {
+    pub fn filter_devices(
+        &self,
+        devices: Vec<Arc<ButtplugClientDevice>>,
+    ) -> Vec<Arc<ButtplugClientDevice>> {
+        devices
+            .iter()
+            .filter(|d| {
+                self.selector.iter().any(|x| x == d.name())
+                    && d.message_attributes().scalar_cmd().is_some()
+            })
+            .map(|d| d.clone())
+            .collect()
+    }
+
+    pub fn from_input(
+        events: Vec<String>,
+        pattern: TkPattern,
+        devices: &Vec<TkDeviceSettings>,
+    ) -> Self {
+        let event_names = sanitize_name_list(&events);
+        let device_names = devices
+            .iter()
+            .filter(|d| {
+                d.enabled
+                    && (event_names.len() == 0 || d.events.iter().any(|e| event_names.contains(e)))
+            })
+            .map(|d| d.name.clone())
+            .collect();
+        TkParams {
+            selector: device_names,
+            pattern: pattern,
+        }
+    }
 }
