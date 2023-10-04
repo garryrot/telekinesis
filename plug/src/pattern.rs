@@ -17,7 +17,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::{commands::TkDeviceAction, event::TkEvent, Speed, TkDuration, TkPattern};
 
-pub struct ReferenceCounter {
+struct ReferenceCounter {
     access_list: HashMap<u32, u32>,
 }
 
@@ -72,7 +72,7 @@ impl ReferenceCounter {
     }
 }
 
-pub struct DeviceAccess {
+struct DeviceAccess {
     device_actions: HashMap<u32, Vec<(i32, Speed)>>,
 }
 
