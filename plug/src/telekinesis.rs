@@ -1,6 +1,6 @@
 use anyhow::Error;
 use buttplug::{
-    client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent},
+    client::{ButtplugClient, ButtplugClientDevice},
     core::{
         connector::{
             new_json_ws_client_connector, ButtplugConnector,
@@ -15,23 +15,23 @@ use buttplug::{
         ButtplugServerBuilder,
     },
 };
-use futures::{Future, StreamExt};
+use futures::Future;
 
 use std::{
     fmt::{self},
     sync::{Arc, Mutex},
 };
 use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use itertools::Itertools;
 
 use crate::{
-    commands::{create_cmd_thread, TkAction},
-    inputs::TkParams,
+    connection::{handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus},
+    input::TkParams,
     pattern::{TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
-    Speed, Telekinesis, Tk, TkConnectionStatus, TkDuration, TkEvent, TkPattern,
+    Speed, Telekinesis, Tk, TkStatus, TkDuration, TkPattern,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -43,7 +43,7 @@ pub fn in_process_connector(
             ButtplugServerBuilder::default()
                 .comm_manager(BtlePlugCommunicationManagerBuilder::default())
                 .finish()
-                .expect("Could not create in-process-server."),
+                .expect("Could not create in-process-server."), // TODO log error instead of panic
         )
         .finish()
 }
@@ -59,46 +59,23 @@ impl Telekinesis {
         T: ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage>
             + 'static,
     {
+        let runtime = Runtime::new()?;
+
         let (event_sender, event_receiver) = unbounded_channel();
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
-        let event_sender_clone = event_sender.clone();
-
-        let devices = Arc::new(Mutex::new(vec![]));
-        let devices_clone = devices.clone();
 
         let settings = provided_settings.or(Some(TkSettings::default())).unwrap();
         let pattern_path = settings.pattern_path.clone();
 
-        let runtime = Runtime::new()?;
+        let connection_status = Arc::new(Mutex::new(TkStatus::new())); // ugly
+        let status_clone = connection_status.clone();
         runtime.spawn(async move {
-            info!("Main thread started");
-            let buttplug = with_connector(connector_factory().await).await;
-            let mut events = buttplug.event_stream();
-            create_cmd_thread(event_sender.clone(), command_receiver, buttplug);
-            while let Some(event) = events.next().await {
-                match event.clone() {
-                    ButtplugClientEvent::DeviceAdded(device) => {
-                        let mut device_list = devices_clone.lock().unwrap();
-                        if !device_list
-                            .iter()
-                            .any(|d: &Arc<ButtplugClientDevice>| d.index() == device.index())
-                        {
-                            device_list.push(device);
-                        }
-                    }
-                    ButtplugClientEvent::Error(err) => {
-                        error!("Server error {:?}", err);
-                    }
-                    _ => {}
-                };
-                event_sender
-                    .send(TkEvent::from_event(event))
-                    .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
-            }
+            info!("Starting connection");
+            let client = with_connector(connector_factory().await).await;
+            handle_connection(event_sender, command_receiver, client, connection_status).await;
         });
 
         let (scheduler, receiver) = TkButtplugScheduler::create(
-            event_sender_clone,
             TkPlayerSettings {
                 player_resolution_ms: 100,
                 pattern_path,
@@ -108,13 +85,13 @@ impl Telekinesis {
             TkButtplugScheduler::run_worker_thread(receiver).await;
             info!("Worker closed")
         });
+
         Ok(Telekinesis {
             command_sender: command_sender,
-            event_receiver: event_receiver,
-            devices: devices,
+            connection_events: event_receiver,
             runtime: runtime,
             settings: settings,
-            connection_status: TkConnectionStatus::NotConnected,
+            connection_status: status_clone,
             scheduler: scheduler,
         })
     }
@@ -164,14 +141,17 @@ impl Tk for Telekinesis {
     }
 
     fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>> {
-        // TODO: Error handling
-        self.devices
-            .as_ref()
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|d| d.clone())
-            .collect()
+        if let Ok(connection_status) = self.connection_status.try_lock() {
+            let devices: Vec<Arc<ButtplugClientDevice>> = connection_status.device_status
+                .values()
+                .into_iter()
+                .map(|value| value.1.clone())
+                .collect();
+            return devices;
+        } else {
+            error!("Error accessing device map");
+        }
+        vec![]
     }
 
     fn get_device_names(&self) -> Vec<String> {
@@ -249,24 +229,15 @@ impl Tk for Telekinesis {
         }
     }
 
-    fn get_next_event(&mut self) -> Option<TkEvent> {
-        if let Ok(msg) = self.event_receiver.try_recv() {
-            debug!("Got event {}", msg.to_string());
-            match &msg {
-                TkEvent::ScanFailed(err) => {
-                    self.connection_status = TkConnectionStatus::Failed(err.to_string());
-                }
-                TkEvent::ScanStarted => {
-                    self.connection_status = TkConnectionStatus::Connected;
-                }
-                _ => {}
-            }
+    fn get_next_event(&mut self) -> Option<TkConnectionEvent> {
+        if let Ok(msg) = self.connection_events.try_recv() {
+            debug!("Get event {:?}", msg);
             return Some(msg);
         }
         None
     }
 
-    fn process_next_events(&mut self) -> Vec<TkEvent> {
+    fn process_next_events(&mut self) -> Vec<TkConnectionEvent> {
         debug!("Polling all events");
         let mut events = vec![];
         while let Some(event) = self.get_next_event() {
@@ -307,6 +278,13 @@ impl Tk for Telekinesis {
         debug!("Getting setting '{}'.enabled={}", device_name, enabled);
         enabled
     }
+
+    fn get_connection_status(&self) -> Option<TkConnectionStatus> {
+        if let Ok(status) = self.connection_status.try_lock() {
+            return Some(status.connection_status.clone())
+        }
+        None
+    }
 }
 
 async fn with_connector<T>(connector: T) -> ButtplugClient
@@ -332,13 +310,13 @@ mod tests {
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
 
+    use crate::connection::TkConnectionStatus;
     use crate::util::enable_log;
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
         util::assert_timeout,
     };
     use buttplug::core::message::{ActuatorType, DeviceAdded};
-    use lazy_static::__Deref;
 
     use super::*;
 
@@ -346,7 +324,7 @@ mod tests {
         /// should only be used by tests or fake backends
         pub fn await_connect(&self, devices: usize) {
             assert_timeout!(
-                self.devices.deref().lock().unwrap().deref().len() == devices,
+                self.connection_status.lock().unwrap().device_status.len() == devices,
                 "Awaiting connect"
             );
         }
@@ -362,7 +340,7 @@ mod tests {
 
         // assert
         assert_timeout!(
-            tk.devices.deref().lock().unwrap().deref().len() == 2,
+            tk.connection_status.lock().unwrap().device_status.len() == 2,
             "Enough devices connected"
         );
         assert!(
@@ -393,7 +371,7 @@ mod tests {
 
         // act
         let mut tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
-        tk.await_connect(count);   
+        tk.await_connect(count);
         for device_name in tk.get_device_names() {
             tk.settings_set_enabled(&device_name, true);
         }
@@ -811,7 +789,7 @@ mod tests {
         thread::sleep(Duration::from_secs(2));
         let _ = tk.process_next_events();
         assert!(matches!(
-            tk.connection_status,
+            tk.connection_status.lock().unwrap().connection_status,
             TkConnectionStatus::Connected
         ));
 
@@ -840,7 +818,7 @@ mod tests {
         thread::sleep(Duration::from_secs(5));
         let _ = tk.process_next_events();
         assert!(matches!(
-            tk.connection_status,
+            tk.connection_status.lock().unwrap().connection_status,
             TkConnectionStatus::Connected
         ));
 
@@ -861,12 +839,12 @@ mod tests {
         thread::sleep(Duration::from_secs(5));
         let _ = tk.process_next_events();
 
-        match tk.connection_status {
+        match &tk.connection_status.lock().unwrap().connection_status {
             TkConnectionStatus::Failed(err) => {
                 assert!(err.len() > 0);
             }
             _ => todo!(),
-        }
+        };
     }
 
     fn print_device_calls(

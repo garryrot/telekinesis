@@ -1,14 +1,16 @@
 use anyhow::Error;
 use buttplug::client::ButtplugClientDevice;
-use commands::TkAction;
-use event::TkEvent;
+use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkStatus};
 use lazy_static::lazy_static;
 use pattern::{get_pattern_names, TkButtplugScheduler};
 use settings::PATTERN_PATH;
-use tokio::runtime::Runtime;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
+};
+use tokio::{
+    runtime::Runtime,
+    sync::mpsc::{Sender, UnboundedReceiver},
 };
 use tracing::{error, info, instrument};
 
@@ -16,14 +18,13 @@ use cxx::{CxxString, CxxVector};
 use telekinesis::ERROR_HANDLE;
 
 use crate::{
-    inputs::read_input_string,
+    input::read_input_string,
     settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
 
-mod commands;
-mod event;
+mod connection;
 mod fakes;
-mod inputs;
+mod input;
 mod logging;
 mod pattern;
 mod settings;
@@ -44,21 +45,24 @@ mod ffi {
         fn tk_connect() -> bool;
         fn tk_scan_for_devices() -> bool;
         fn tk_stop_scan() -> bool;
-        fn tk_get_devices() -> Vec<String>;
-        fn tk_get_device_connected(device_name: &str) -> bool;
-        fn tk_get_device_capabilities(device_name: &str) -> Vec<String>;
-        fn tk_get_pattern_names(vibration_devices: bool) -> Vec<String>;
+
+        fn tk_get(key: &str) -> String;
+        fn tk_get_devices() -> Vec<String>; // GetValues("devices")   Query                 -> String[]
+        fn tk_get_device_connected(device_name: &str) -> bool; // GetValue ("device.status.WeVibe Bond")       -> String
+        fn tk_get_device_capabilities(device_name: &str) -> Vec<String>; // GetValues("device.capabilities.WeVibe Bond") -> String[]
+        fn tk_get_pattern_names(vibration_devices: bool) -> Vec<String>; // GetValues("patterns")                        -> String[]
+
         fn tk_vibrate(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> i32;
         fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> i32;
         fn tk_stop(handle: i32) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_process_events() -> Vec<String>;
-        fn tk_settings_set(key: &str, value: &str) -> bool;
-        fn tk_settings_set_enabled(device_name: &str, enabled: bool);
-        fn tk_settings_get_enabled(device_name: &str) -> bool;
-        fn tk_settings_get_events(device_name: &str) -> Vec<String>;
-        fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>);
+        fn tk_settings_set(key: &str, value: &str) -> bool; // SetText  ( "devices.settings", "" ) -> Bool
+        fn tk_settings_set_enabled(device_name: &str, enabled: bool); // SetOption( "WeVibeBond", "devices.enabled", true/false)
+        fn tk_settings_get_enabled(device_name: &str) -> bool; // GetOption( , "devices.enabled.WeVibe Bond")
+        fn tk_settings_get_events(device_name: &str) -> Vec<String>; // SetOption
+        fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>); //
         fn tk_settings_store() -> bool;
     }
 }
@@ -69,6 +73,7 @@ pub trait Tk {
     fn scan_for_devices(&self) -> bool;
     fn stop_scan(&self) -> bool;
     fn disconnect(&mut self);
+    fn get_connection_status(&self) -> Option<TkConnectionStatus>;
     fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>>;
     fn get_device_names(&self) -> Vec<String>;
     fn get_device_connected(&self, device_name: &str) -> bool;
@@ -77,28 +82,21 @@ pub trait Tk {
     fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32;
     fn stop(&mut self, handle: i32) -> bool;
     fn stop_all(&mut self) -> bool;
-    fn get_next_event(&mut self) -> Option<TkEvent>;
-    fn process_next_events(&mut self) -> Vec<TkEvent>;
+    fn get_next_event(&mut self) -> Option<TkConnectionEvent>;
+    fn process_next_events(&mut self) -> Vec<TkConnectionEvent>;
     fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
     fn settings_set_events(&mut self, device_name: &str, events: Vec<String>);
     fn settings_get_events(&self, device_name: &str) -> Vec<String>;
     fn settings_get_enabled(&self, device_name: &str) -> bool;
 }
 
-pub enum TkConnectionStatus {
-    NotConnected,
-    Connected,
-    Failed(String)
-}
-
 pub struct Telekinesis {
-    pub settings: TkSettings,
-    pub event_receiver: tokio::sync::mpsc::UnboundedReceiver<TkEvent>,
-    pub command_sender: tokio::sync::mpsc::Sender<TkAction>,
-    pub devices: Arc<Mutex<Vec<Arc<ButtplugClientDevice>>>>,
-    pub runtime: Runtime,
-    pub connection_status: TkConnectionStatus,
-    scheduler: TkButtplugScheduler
+    pub connection_status: Arc<Mutex<TkStatus>>,
+    settings: TkSettings,
+    runtime: Runtime,
+    command_sender: Sender<TkAction>,
+    scheduler: TkButtplugScheduler,
+    connection_events: UnboundedReceiver<TkConnectionEvent>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -109,15 +107,14 @@ pub struct Speed {
 #[derive(Clone, Debug)]
 pub enum TkDuration {
     Infinite,
-    Timed(Duration)
+    Timed(Duration),
 }
 
 impl TkDuration {
     pub fn from_input_float(secs: f32) -> TkDuration {
         if secs > 0.0 {
             return TkDuration::Timed(Duration::from_millis((secs * 1000.0) as u64));
-        }
-        else {
+        } else {
             return TkDuration::Infinite;
         }
     }
@@ -132,7 +129,7 @@ impl TkDuration {
 #[derive(Clone, Debug)]
 pub enum TkPattern {
     Linear(TkDuration, Speed),
-    Funscript(TkDuration, String)
+    Funscript(TkDuration, String),
 }
 
 lazy_static! {
@@ -216,33 +213,53 @@ pub fn tk_vibrate(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> i32 {
             TkDuration::from_input_float(secs),
             read_input_string(&events),
         )
-    }).unwrap_or(ERROR_HANDLE)
+    })
+    .unwrap_or(ERROR_HANDLE)
 }
 
 #[instrument]
 pub fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> i32 {
     access_mutex(|tk| {
         tk.vibrate_pattern(
-            TkPattern::Funscript(TkDuration::from_input_float(secs), String::from(pattern_name)),
+            TkPattern::Funscript(
+                TkDuration::from_input_float(secs),
+                String::from(pattern_name),
+            ),
             read_input_string(&events),
         )
-    }).unwrap_or(ERROR_HANDLE)
+    })
+    .unwrap_or(ERROR_HANDLE)
 }
 
 #[instrument]
 pub fn tk_stop(handle: i32) -> bool {
-    access_mutex(|tk| {
-        tk.stop(handle)
-    })
-    .is_some()
+    access_mutex(|tk| tk.stop(handle)).is_some()
 }
 
 #[instrument]
-pub fn tk_get_devices() -> Vec<String> { // 4
+pub fn tk_get_devices() -> Vec<String> {
     if let Some(value) = access_mutex(|tk| tk.get_device_names()) {
         return value;
     }
     vec![]
+}
+
+#[instrument]
+pub fn tk_get(key: &str) -> String {
+    if let Some(value) = access_mutex(|tk| match key {
+        "connection.status" => tk
+            .get_connection_status()
+            .or(Some(TkConnectionStatus::NotConnected))
+            .unwrap()
+            .serialize_papyrus(),
+        _ => {
+            error!("Unknown key {}", key);
+            String::from("")
+        }
+    }) {
+        return value;
+    }
+    String::from("")
 }
 
 #[instrument]
@@ -254,7 +271,8 @@ pub fn tk_get_device_connected(name: &str) -> bool {
 }
 
 #[instrument]
-pub fn tk_get_device_capabilities(name: &str) -> Vec<String> { // 3
+pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
+    // 3
     if let Some(value) = access_mutex(|tk| tk.get_device_capabilities(name)) {
         return value;
     }
@@ -262,7 +280,8 @@ pub fn tk_get_device_capabilities(name: &str) -> Vec<String> { // 3
 }
 
 #[instrument]
-pub fn tk_get_pattern_names(vibration_patterns: bool) -> Vec<String> { // 2
+pub fn tk_get_pattern_names(vibration_patterns: bool) -> Vec<String> {
+    // 2
     get_pattern_names(PATTERN_PATH, vibration_patterns)
 }
 
@@ -277,7 +296,7 @@ pub fn tk_process_events() -> Vec<String> {
         let events = tk
             .process_next_events()
             .iter()
-            .map(|evt| evt.to_string())
+            .map(|evt| evt.serialize_papyrus())
             .collect::<Vec<String>>();
         return events;
     }) {
@@ -289,12 +308,13 @@ pub fn tk_process_events() -> Vec<String> {
 #[instrument]
 pub fn tk_settings_set(key: &str, value: &str) -> bool {
     info!("setting");
-    access_mutex(|tk| { 
+    access_mutex(|tk| {
         let mut settings = tk.settings.clone();
         let success = settings.set_string(key, value);
         tk.settings = settings;
         success
-    }).is_some()
+    })
+    .is_some()
 }
 
 #[instrument]
@@ -303,7 +323,8 @@ pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
 }
 
 #[instrument]
-pub fn tk_settings_get_events(device_name: &str) -> Vec<String> { // 1
+pub fn tk_settings_get_events(device_name: &str) -> Vec<String> {
+    // 1
     match access_mutex(|tk| tk.settings_get_events(device_name)) {
         Some(events) => events,
         None => vec![],

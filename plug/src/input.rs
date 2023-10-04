@@ -1,4 +1,4 @@
-use buttplug::client::ButtplugClientDevice;
+use buttplug::client::{ButtplugClientDevice, ButtplugClientEvent};
 use cxx::{CxxString, CxxVector};
 use funscript::FSPoint;
 use std::{
@@ -7,7 +7,7 @@ use std::{
 };
 use util::Narrow;
 
-use crate::{settings::TkDeviceSettings, util, Speed, TkPattern};
+use crate::{settings::TkDeviceSettings, util, Speed, TkPattern, connection::{TkConnectionEvent, TkConnectionStatus}};
 
 impl Speed {
     pub fn new(percentage: i64) -> Speed {
@@ -88,6 +88,32 @@ impl TkParams {
         TkParams {
             selector: device_names,
             pattern: pattern,
+        }
+    }
+}
+
+impl TkConnectionEvent {
+    pub fn serialize_papyrus(&self) -> String {
+        match self {
+            TkConnectionEvent::ButtplugClientEvent(event) => {
+                match event {
+                    ButtplugClientEvent::DeviceAdded(device) => format!("DeviceAdded|{}", device.name()),
+                    ButtplugClientEvent::DeviceRemoved(device) => format!("DeviceRemoved|{}", device.name()),
+                    _ => format!("{:?}", event)
+                }
+            },
+            TkConnectionEvent::ScanFailed(error) => format!("ScanFailed|{:?}", error),
+            _ => format!("{:?}", self)
+        }
+    }
+}
+
+impl TkConnectionStatus {
+    pub fn serialize_papyrus(&self) -> String {
+        match &self {
+            TkConnectionStatus::NotConnected => String::from("NotConnected"),
+            TkConnectionStatus::Connected => String::from("Connected"),
+            TkConnectionStatus::Failed(_) => String::from("Failed"),
         }
     }
 }

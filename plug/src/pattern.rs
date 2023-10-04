@@ -15,7 +15,15 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{commands::TkDeviceAction, event::TkEvent, Speed, TkDuration, TkPattern};
+use crate::{Speed, TkDuration, TkPattern};
+
+#[derive(Clone, Debug)]
+pub enum TkDeviceAction {
+    Start(Arc<ButtplugClientDevice>, Speed, bool, i32),
+    Update(Arc<ButtplugClientDevice>, Speed),
+    End(Arc<ButtplugClientDevice>, bool, i32),
+    StopAll, // global but required for resetting device state
+}
 
 struct ReferenceCounter {
     access_list: HashMap<u32, u32>,
@@ -133,7 +141,6 @@ pub struct TkPlayerSettings {
 
 pub struct TkButtplugScheduler {
     device_action_sender: UnboundedSender<TkDeviceAction>,
-    event_sender: UnboundedSender<TkEvent>,
     settings: TkPlayerSettings,
     cancellation_tokens: HashMap<i32, CancellationToken>,
     last_handle: i32,
@@ -145,15 +152,11 @@ impl TkButtplugScheduler {
         self.last_handle
     }
 
-    pub fn create(
-        event_sender: UnboundedSender<TkEvent>,
-        settings: TkPlayerSettings,
-    ) -> (TkButtplugScheduler, UnboundedReceiver<TkDeviceAction>) {
+    pub fn create(settings: TkPlayerSettings) -> (TkButtplugScheduler, UnboundedReceiver<TkDeviceAction>) {
         let (device_action_sender, device_action_receiver) = unbounded_channel::<TkDeviceAction>();
         (
             TkButtplugScheduler {
                 device_action_sender,
-                event_sender,
                 settings,
                 cancellation_tokens: HashMap::new(),
                 last_handle: 0,
@@ -247,7 +250,6 @@ impl TkButtplugScheduler {
         TkPatternPlayer {
             devices: devices,
             action_sender: self.device_action_sender.clone(),
-            event_sender: self.event_sender.clone(),
             resolution_ms: 100,
             pattern_path: self.settings.pattern_path.clone(),
             handle: handle,
@@ -260,10 +262,6 @@ impl TkButtplugScheduler {
         self.device_action_sender
             .send(TkDeviceAction::StopAll)
             .unwrap_or_else(|_| error!(queue_full_err));
-        self.event_sender
-            .send(TkEvent::StopAll())
-            .unwrap_or_else(|_| error!(queue_full_err));
-
         for entry in self.cancellation_tokens.drain() {
             entry.1.cancel();
         }
@@ -273,7 +271,6 @@ impl TkButtplugScheduler {
 pub struct TkPatternPlayer {
     pub devices: Vec<Arc<ButtplugClientDevice>>,
     pub action_sender: UnboundedSender<TkDeviceAction>,
-    pub event_sender: UnboundedSender<TkEvent>,
     pub resolution_ms: i32,
     pub pattern_path: String,
     pub handle: i32,
@@ -391,10 +388,6 @@ impl TkPatternPlayer {
                 ))
                 .unwrap_or_else(|_| error!("queue full"));
         }
-
-        self.event_sender
-            .send(TkEvent::DeviceVibrated(self.devices.len() as i32, speed))
-            .unwrap_or_else(|_| error!("queue full"));
     }
 
     fn do_stop(&self, priority: bool, handle: i32) {
@@ -404,9 +397,6 @@ impl TkPatternPlayer {
                 .send(TkDeviceAction::End(device.clone(), priority, handle))
                 .unwrap_or_else(|_| error!("queue full"));
         }
-        self.event_sender
-            .send(TkEvent::DeviceStopped())
-            .unwrap_or_else(|_| error!("queue full"));
     }
 }
 

@@ -6,7 +6,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tracing::{error, event, info, Level, instrument};
 
-use crate::inputs::sanitize_name_list;
+use crate::input::sanitize_name_list;
 
 pub static PATTERN_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis\\Patterns";
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
@@ -83,7 +83,7 @@ impl TkSettings {
                 TkSettings::default()
             }
         }
-    }
+    }  
     pub fn try_write(&self, settings_path: &str, settings_file: &str) {
         let json = serde_json::to_string_pretty(self).expect("Always serializable");
         let _ = fs::create_dir_all(settings_path);
