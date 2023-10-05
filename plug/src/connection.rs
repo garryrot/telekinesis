@@ -1,10 +1,12 @@
 
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::{Arc, Mutex}, time::Duration};
 
-use buttplug::client::{ButtplugClient, ButtplugClientEvent, ButtplugClientError, ButtplugClientDevice};
+use buttplug::client::{ButtplugClient, ButtplugClientEvent, ButtplugClientDevice};
 use futures::StreamExt;
 use tokio::runtime::Handle;
-use tracing::{error, info, span, Level, warn};
+use tracing::{error, info, span, Level};
+
+use crate::{input::sanitize_name_list, DeviceList};
 
 #[derive(Debug, Clone)]
 pub enum TkConnectionStatus {
@@ -26,17 +28,29 @@ impl TkStatus {
 }
 
 #[derive(Debug)]
-pub enum TkConnectionEvent {
-    ButtplugClientEvent(ButtplugClientEvent),
-    ScanFailed(ButtplugClientError),
-    ScanStarted,
-    ScanStopped
+pub struct TkDeviceEvent {
+    pub duration_sec: f32,
+    pub events: Vec<String>,
+    pub devices: DeviceList
 }
 
-impl TkConnectionEvent {
-    pub fn from_event(event: ButtplugClientEvent) -> TkConnectionEvent {
-        TkConnectionEvent::ButtplugClientEvent(event)
+impl TkDeviceEvent {
+    pub fn new(elapsed: Duration, events: &Vec<String>, devices: &DeviceList) -> Self {
+        TkDeviceEvent {
+            duration_sec: elapsed.as_secs_f32(),
+            events: sanitize_name_list(events),
+            devices: devices.clone()
+        }
     }
+}
+
+#[derive(Debug)]
+pub enum TkConnectionEvent {
+    Connected,
+    ConnectionFailure,
+    DeviceAdded(Arc<ButtplugClientDevice>),
+    DeviceRemoved(Arc<ButtplugClientDevice>),
+    DeviceEvent(TkDeviceEvent)
 }
 
 #[derive(Clone, Debug)]
@@ -71,12 +85,12 @@ pub async fn handle_connection(
                             let error = err.to_string();
                             error!(error, "Failed scanning for devices.");
                             event_sender_clone
-                                .send(TkConnectionEvent::ScanFailed(err))
+                                .send(TkConnectionEvent::ConnectionFailure)
                                 .unwrap_or_else(|_| error!(queue_full_err));
                                 connection_status_clone.lock().expect("mutex healthy").connection_status = TkConnectionStatus::Failed(error);
                         } else {
                             event_sender_clone
-                                .send(TkConnectionEvent::ScanStarted)
+                                .send(TkConnectionEvent::Connected)
                                 .unwrap_or_else(|_| error!(queue_full_err));
                             connection_status_clone.lock().expect("mutex healthy").connection_status = TkConnectionStatus::Connected;
                         }
@@ -86,10 +100,6 @@ pub async fn handle_connection(
                             let error = err.to_string();
                             error!(error, "Failed to stop scanning for devices.");
                             connection_status_clone.lock().expect("mutex healthy").connection_status = TkConnectionStatus::Failed(error);
-                        } else {
-                            event_sender_clone
-                                .send(TkConnectionEvent::ScanStopped)
-                                .unwrap_or_else(|_| error!(queue_full_err));
                         }
                     }
                     TkAction::Disconect => {
@@ -125,6 +135,7 @@ pub async fn handle_connection(
                 } else {
                     error!("mutex poisoned")
                 }
+                event_sender.send(TkConnectionEvent::DeviceAdded(device)).expect("queue full");
             }
             ButtplugClientEvent::DeviceRemoved(device) => {
                 if let Ok(mut connection_status) = connection_status.lock() {
@@ -135,15 +146,12 @@ pub async fn handle_connection(
                 } else {
                     error!("mutex poisoned")
                 }
+                event_sender.send(TkConnectionEvent::DeviceRemoved(device)).expect("queue full");
             }
             ButtplugClientEvent::Error(err) => {
                 error!("Server error {:?}", err);
             }
             _ => {}
         };
-
-        event_sender
-            .send(TkConnectionEvent::from_event(event))
-            .unwrap_or_else(|_| warn!("Dropped event cause queue is full."));
     }
 }

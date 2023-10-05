@@ -1,6 +1,6 @@
 use anyhow::Error;
 use buttplug::{
-    client::{ButtplugClient, ButtplugClientDevice},
+    client::ButtplugClient,
     core::{
         connector::{
             new_json_ws_client_connector, ButtplugConnector,
@@ -20,6 +20,7 @@ use futures::Future;
 use std::{
     fmt::{self},
     sync::{Arc, Mutex},
+    time::Instant,
 };
 use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
 use tracing::{debug, error, info};
@@ -27,11 +28,13 @@ use tracing::{debug, error, info};
 use itertools::Itertools;
 
 use crate::{
-    connection::{handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus},
+    connection::{
+        handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent,
+    },
     input::TkParams,
     pattern::{TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
-    Speed, Telekinesis, Tk, TkStatus, TkDuration, TkPattern,
+    Speed, Telekinesis, Tk, TkDuration, TkPattern, TkStatus, DeviceList,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -63,6 +66,7 @@ impl Telekinesis {
 
         let (event_sender, event_receiver) = unbounded_channel();
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
+        let event_sender_clone = event_sender.clone();
 
         let settings = provided_settings.or(Some(TkSettings::default())).unwrap();
         let pattern_path = settings.pattern_path.clone();
@@ -75,14 +79,13 @@ impl Telekinesis {
             handle_connection(event_sender, command_receiver, client, connection_status).await;
         });
 
-        let (scheduler, receiver) = TkButtplugScheduler::create(
-            TkPlayerSettings {
-                player_resolution_ms: 100,
-                pattern_path,
-            },
-        );
+        let (scheduler, action_receiver) = TkButtplugScheduler::create(TkPlayerSettings {
+            player_resolution_ms: 100,
+            pattern_path,
+        });
+
         runtime.spawn(async move {
-            TkButtplugScheduler::run_worker_thread(receiver).await;
+            TkButtplugScheduler::run_worker_thread(action_receiver).await;
             info!("Worker closed")
         });
 
@@ -93,6 +96,7 @@ impl Telekinesis {
             settings: settings,
             connection_status: status_clone,
             scheduler: scheduler,
+            event_sender: event_sender_clone,
         })
     }
 }
@@ -140,9 +144,10 @@ impl Tk for Telekinesis {
         true
     }
 
-    fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>> {
+    fn get_devices(&self) -> DeviceList {
         if let Ok(connection_status) = self.connection_status.try_lock() {
-            let devices: Vec<Arc<ButtplugClientDevice>> = connection_status.device_status
+            let devices: DeviceList = connection_status
+                .device_status
                 .values()
                 .into_iter()
                 .map(|value| value.1.clone())
@@ -195,13 +200,24 @@ impl Tk for Telekinesis {
 
     fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32 {
         info!("Received: Vibrate/Vibrate Pattern");
-        let params = TkParams::from_input(events, pattern, &self.settings.devices);
-        let player = self
+        let params = TkParams::from_input(events.clone(), pattern, &self.settings.devices);
+
+        let mut player = self
             .scheduler
             .create_player(params.filter_devices(self.get_devices()));
         let handle = player.handle;
+
+        let sender_clone = self.event_sender.clone();
         self.runtime.spawn(async move {
+            let now = Instant::now();
             player.play(params.pattern).await;
+            sender_clone
+                .send(TkConnectionEvent::DeviceEvent(TkDeviceEvent::new(
+                    now.elapsed(),
+                    &events,
+                    &player.devices,
+                )))
+                .expect("queue full");
         });
         handle
     }
@@ -281,7 +297,7 @@ impl Tk for Telekinesis {
 
     fn get_connection_status(&self) -> Option<TkConnectionStatus> {
         if let Ok(status) = self.connection_status.try_lock() {
-            return Some(status.connection_status.clone())
+            return Some(status.connection_status.clone());
         }
         None
     }

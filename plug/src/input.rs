@@ -1,4 +1,4 @@
-use buttplug::client::{ButtplugClientDevice, ButtplugClientEvent};
+use buttplug::client::ButtplugClientDevice;
 use cxx::{CxxString, CxxVector};
 use funscript::FSPoint;
 use std::{
@@ -7,7 +7,7 @@ use std::{
 };
 use util::Narrow;
 
-use crate::{settings::TkDeviceSettings, util, Speed, TkPattern, connection::{TkConnectionEvent, TkConnectionStatus}};
+use crate::{settings::TkDeviceSettings, util, Speed, TkPattern, connection::{TkConnectionEvent, TkConnectionStatus, TkDeviceEvent}, DeviceList};
 
 impl Speed {
     pub fn new(percentage: i64) -> Speed {
@@ -59,8 +59,8 @@ pub struct TkParams {
 impl TkParams {
     pub fn filter_devices(
         &self,
-        devices: Vec<Arc<ButtplugClientDevice>>,
-    ) -> Vec<Arc<ButtplugClientDevice>> {
+        devices: DeviceList,
+    ) -> DeviceList {
         devices
             .iter()
             .filter(|d| {
@@ -92,17 +92,20 @@ impl TkParams {
     }
 }
 
+impl TkDeviceEvent {
+    pub fn serialize_papyrus(&self) -> String {
+        let device_list = self.devices.iter().map(|d| d.name().clone()).collect::<Vec<String>>().join(",");
+        let event_list = self.events.join(",");
+        format!("DeviceEvent|Vibrate|{:.1}s|{}|{}", self.duration_sec, device_list, event_list)
+    }
+}
+
 impl TkConnectionEvent {
     pub fn serialize_papyrus(&self) -> String {
         match self {
-            TkConnectionEvent::ButtplugClientEvent(event) => {
-                match event {
-                    ButtplugClientEvent::DeviceAdded(device) => format!("DeviceAdded|{}", device.name()),
-                    ButtplugClientEvent::DeviceRemoved(device) => format!("DeviceRemoved|{}", device.name()),
-                    _ => format!("{:?}", event)
-                }
-            },
-            TkConnectionEvent::ScanFailed(error) => format!("ScanFailed|{:?}", error),
+            TkConnectionEvent::DeviceAdded(device) => format!("DeviceAdded|{}", device.name()),
+            TkConnectionEvent::DeviceRemoved(device) => format!("DeviceRemoved|{}", device.name()),
+            TkConnectionEvent::DeviceEvent(event) => event.serialize_papyrus(),
             _ => format!("{:?}", self)
         }
     }
@@ -111,9 +114,8 @@ impl TkConnectionEvent {
 impl TkConnectionStatus {
     pub fn serialize_papyrus(&self) -> String {
         match &self {
-            TkConnectionStatus::NotConnected => String::from("NotConnected"),
-            TkConnectionStatus::Connected => String::from("Connected"),
             TkConnectionStatus::Failed(_) => String::from("Failed"),
+            _ => format!("{:?}", self)
         }
     }
 }

@@ -278,7 +278,7 @@ pub struct TkPatternPlayer {
 }
 
 impl TkPatternPlayer {
-    pub async fn play(self, pattern: TkPattern) {
+    pub async fn play(&mut self, pattern: TkPattern) {
         info!("Playing pattern {:?}", pattern);
         match pattern {
             TkPattern::Linear(duration, speed) => match duration {

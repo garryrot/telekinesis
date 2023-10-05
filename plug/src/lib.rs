@@ -10,7 +10,7 @@ use std::{
 };
 use tokio::{
     runtime::Runtime,
-    sync::mpsc::{Sender, UnboundedReceiver},
+    sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender},
 };
 use tracing::{error, info, instrument};
 
@@ -45,7 +45,7 @@ mod ffi {
         fn tk_connect() -> bool;
         fn tk_scan_for_devices() -> bool;
         fn tk_stop_scan() -> bool;
-
+        
         fn tk_get(key: &str) -> String;
         fn tk_get_devices() -> Vec<String>; // GetValues("devices")   Query                 -> String[]
         fn tk_get_device_connected(device_name: &str) -> bool; // GetValue ("device.status.WeVibe Bond")       -> String
@@ -67,6 +67,8 @@ mod ffi {
     }
 }
 
+type DeviceList = Vec<Arc<ButtplugClientDevice>>;
+
 /// access to Telekinesis struct from within foreign rust modules and tests
 pub trait Tk {
     fn connect(settings: TkSettings) -> Result<Telekinesis, Error>;
@@ -74,7 +76,7 @@ pub trait Tk {
     fn stop_scan(&self) -> bool;
     fn disconnect(&mut self);
     fn get_connection_status(&self) -> Option<TkConnectionStatus>;
-    fn get_devices(&self) -> Vec<Arc<ButtplugClientDevice>>;
+    fn get_devices(&self) -> DeviceList;
     fn get_device_names(&self) -> Vec<String>;
     fn get_device_connected(&self, device_name: &str) -> bool;
     fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
@@ -97,6 +99,7 @@ pub struct Telekinesis {
     command_sender: Sender<TkAction>,
     scheduler: TkButtplugScheduler,
     connection_events: UnboundedReceiver<TkConnectionEvent>,
+    event_sender: UnboundedSender<TkConnectionEvent>
 }
 
 #[derive(Debug, Clone, Copy)]
