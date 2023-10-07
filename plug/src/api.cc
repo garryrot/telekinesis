@@ -16,6 +16,9 @@ namespace Tk
     DllExport bool ScanForDevices(void*) {
         return tk_scan_for_devices();
     }
+    DllExport std::string GetConnectionStatus(void*) {
+        return (std::string) tk_get_connection_status();
+    }
     DllExport bool StopScan(void*) {
         return tk_stop_scan();
     }
@@ -30,8 +33,8 @@ namespace Tk
         auto names = tk_get_device_capabilities(device_name);
         return std::vector<std::string>(names.begin(), names.end());
     }
-    DllExport bool GetDeviceConnected(void*, std::string device_name) {
-        return tk_get_device_connected(device_name);
+    DllExport std::string GetDeviceConnectionStatus(void*, std::string device_name) {
+        return (std::string) tk_get_device_connection_status(device_name);
     }
     DllExport int Vibrate(void*, int speed, float time_sec, std::vector<std::string> events) {
         return tk_vibrate(speed, time_sec, events);

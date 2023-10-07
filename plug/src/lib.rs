@@ -1,6 +1,6 @@
 use anyhow::Error;
 use buttplug::client::ButtplugClientDevice;
-use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkStatus};
+use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus, TkStatus};
 use lazy_static::lazy_static;
 use pattern::{get_pattern_names, TkButtplugScheduler};
 use settings::PATTERN_PATH;
@@ -22,13 +22,14 @@ use crate::{
     settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
 
+pub mod telekinesis;
 mod connection;
+mod papyrus;
 mod fakes;
 mod input;
 mod logging;
 mod pattern;
 mod settings;
-mod telekinesis;
 mod tests;
 mod util;
 
@@ -46,23 +47,22 @@ mod ffi {
         fn tk_scan_for_devices() -> bool;
         fn tk_stop_scan() -> bool;
         
-        fn tk_get(key: &str) -> String;
-        fn tk_get_devices() -> Vec<String>; // GetValues("devices")   Query                 -> String[]
-        fn tk_get_device_connected(device_name: &str) -> bool; // GetValue ("device.status.WeVibe Bond")       -> String
-        fn tk_get_device_capabilities(device_name: &str) -> Vec<String>; // GetValues("device.capabilities.WeVibe Bond") -> String[]
-        fn tk_get_pattern_names(vibration_devices: bool) -> Vec<String>; // GetValues("patterns")                        -> String[]
-
+        fn tk_get_connection_status() -> String;
+        fn tk_get_devices() -> Vec<String>;
+        fn tk_get_device_connection_status(device_name: &str) -> String;
+        fn tk_get_device_capabilities(device_name: &str) -> Vec<String>;
+        fn tk_get_pattern_names(vibration_devices: bool) -> Vec<String>;
         fn tk_vibrate(speed: i64, secs: f32, events: &CxxVector<CxxString>) -> i32;
         fn tk_vibrate_pattern(pattern_name: &str, secs: f32, events: &CxxVector<CxxString>) -> i32;
         fn tk_stop(handle: i32) -> bool;
         fn tk_stop_all() -> bool;
         fn tk_close() -> bool;
         fn tk_process_events() -> Vec<String>;
-        fn tk_settings_set(key: &str, value: &str) -> bool; // SetText  ( "devices.settings", "" ) -> Bool
-        fn tk_settings_set_enabled(device_name: &str, enabled: bool); // SetOption( "WeVibeBond", "devices.enabled", true/false)
-        fn tk_settings_get_enabled(device_name: &str) -> bool; // GetOption( , "devices.enabled.WeVibe Bond")
-        fn tk_settings_get_events(device_name: &str) -> Vec<String>; // SetOption
-        fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>); //
+        fn tk_settings_set(key: &str, value: &str) -> bool;
+        fn tk_settings_set_enabled(device_name: &str, enabled: bool);
+        fn tk_settings_get_enabled(device_name: &str) -> bool;
+        fn tk_settings_get_events(device_name: &str) -> Vec<String>;
+        fn tk_settings_set_events(device_name: &str, events: &CxxVector<CxxString>);
         fn tk_settings_store() -> bool;
     }
 }
@@ -75,10 +75,12 @@ pub trait Tk {
     fn scan_for_devices(&self) -> bool;
     fn stop_scan(&self) -> bool;
     fn disconnect(&mut self);
-    fn get_connection_status(&self) -> Option<TkConnectionStatus>;
+    fn get_connection_status(&self) -> TkConnectionStatus;
     fn get_devices(&self) -> DeviceList;
-    fn get_device_names(&self) -> Vec<String>;
-    fn get_device_connected(&self, device_name: &str) -> bool;
+    fn get_device(&self, device_name: &str) -> Option<Arc<ButtplugClientDevice>>;
+    fn get_device_status(&self, device_name: &str) -> Option<TkDeviceStatus>;
+    fn get_known_device_names(&self) -> Vec<String>;
+    fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus;
     fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
     fn vibrate(&mut self, speed: Speed, duration: TkDuration, events: Vec<String>) -> i32;
     fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32;
@@ -99,7 +101,7 @@ pub struct Telekinesis {
     command_sender: Sender<TkAction>,
     scheduler: TkButtplugScheduler,
     connection_events: UnboundedReceiver<TkConnectionEvent>,
-    event_sender: UnboundedSender<TkConnectionEvent>
+    event_sender: UnboundedSender<TkConnectionEvent>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -241,41 +243,30 @@ pub fn tk_stop(handle: i32) -> bool {
 
 #[instrument]
 pub fn tk_get_devices() -> Vec<String> {
-    if let Some(value) = access_mutex(|tk| tk.get_device_names()) {
+    if let Some(value) = access_mutex(|tk| tk.get_known_device_names()) {
         return value;
     }
     vec![]
 }
 
 #[instrument]
-pub fn tk_get(key: &str) -> String {
-    if let Some(value) = access_mutex(|tk| match key {
-        "connection.status" => tk
-            .get_connection_status()
-            .or(Some(TkConnectionStatus::NotConnected))
-            .unwrap()
-            .serialize_papyrus(),
-        _ => {
-            error!("Unknown key {}", key);
-            String::from("")
-        }
-    }) {
-        return value;
-    }
-    String::from("")
+pub fn tk_get_connection_status() -> String {
+    access_mutex(|tk| tk.get_connection_status())
+        .or(Some(TkConnectionStatus::NotConnected))
+        .unwrap()
+        .serialize_papyrus()
 }
 
 #[instrument]
-pub fn tk_get_device_connected(name: &str) -> bool {
-    if let Some(value) = access_mutex(|tk| tk.get_device_connected(name)) {
-        return value;
-    }
-    false
+pub fn tk_get_device_connection_status(name: &str) -> String {
+    access_mutex(|tk| tk.get_device_connection_status(name))
+        .or(Some(TkConnectionStatus::NotConnected))
+        .unwrap()
+        .serialize_papyrus()
 }
 
 #[instrument]
 pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
-    // 3
     if let Some(value) = access_mutex(|tk| tk.get_device_capabilities(name)) {
         return value;
     }
@@ -284,7 +275,6 @@ pub fn tk_get_device_capabilities(name: &str) -> Vec<String> {
 
 #[instrument]
 pub fn tk_get_pattern_names(vibration_patterns: bool) -> Vec<String> {
-    // 2
     get_pattern_names(PATTERN_PATH, vibration_patterns)
 }
 
@@ -327,7 +317,6 @@ pub fn tk_settings_set_enabled(device_name: &str, enabled: bool) {
 
 #[instrument]
 pub fn tk_settings_get_events(device_name: &str) -> Vec<String> {
-    // 1
     match access_mutex(|tk| tk.settings_get_events(device_name)) {
         Some(events) => events,
         None => vec![],

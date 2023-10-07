@@ -9,6 +9,8 @@ Bool Function Loaded() global native
 ; Sets up a new connection
 Bool function Connect() global native
 
+String Function GetConnectionStatus() global native
+
 ; This will automatically connect to every single bluetooth toy Buttplug.io knows
 ; about. This will find any device that is in-reach and coupled with your PCs
 ; bluetooth adapater. Continues until StopScan is called
@@ -33,7 +35,7 @@ String[] function GetDeviceCapabilities(String device_name) global native
 
 ; Returns whether the device with the given name is connected.
 ; Will also return false when the device does not exist
-Bool function GetDeviceConnected(String device_name) global native
+String function GetDeviceConnectionStatus(String device_name) global native
 
 ; Vibrate devices by pattern name and events
 Int function Vibrate(Int speed, Float duration_sec, String[] events) global native

@@ -22,11 +22,12 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Loaded", PapyrusClass, ApiLoaded);
     vm->RegisterFunction("Connect", PapyrusClass, (bool (*)(SFT))Tk::Connect);
     vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(SFT))Tk::ScanForDevices);
+    vm->RegisterFunction("GetConnectionStatus", PapyrusClass, (std::string (*)(SFT))Tk::GetConnectionStatus);
     vm->RegisterFunction("StopScan", PapyrusClass, (bool (*)(SFT))Tk::StopScan);
     vm->RegisterFunction("Close", PapyrusClass, (bool (*)(SFT))Tk::Close);
     vm->RegisterFunction("GetDevices", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::GetDevices);
     vm->RegisterFunction("GetDeviceCapabilities", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetDeviceCapabilities);
-    vm->RegisterFunction("GetDeviceConnected", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetDeviceConnected);
+    vm->RegisterFunction("GetDeviceConnectionStatus", PapyrusClass, (std::string (*)(SFT, std::string))Tk::GetDeviceConnectionStatus);
     vm->RegisterFunction("Vibrate", PapyrusClass, (int (*)(SFT, int, float, std::vector<std::string>))Tk::Vibrate);
     vm->RegisterFunction("VibratePattern", PapyrusClass, (int (*)(SFT, std::string, float, std::vector<std::string>))Tk::VibratePattern);
     vm->RegisterFunction("Stop", PapyrusClass, (bool (*)(SFT, int))Tk::Stop);

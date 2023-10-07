@@ -1,6 +1,6 @@
 use anyhow::Error;
 use buttplug::{
-    client::ButtplugClient,
+    client::{ButtplugClient, ButtplugClientDevice},
     core::{
         connector::{
             new_json_ws_client_connector, ButtplugConnector,
@@ -29,12 +29,12 @@ use itertools::Itertools;
 
 use crate::{
     connection::{
-        handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent,
+        handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent, TkDeviceStatus,
     },
     input::TkParams,
     pattern::{TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
-    Speed, Telekinesis, Tk, TkDuration, TkPattern, TkStatus, DeviceList,
+    DeviceList, Speed, Telekinesis, Tk, TkDuration, TkPattern, TkStatus,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -108,6 +108,55 @@ impl fmt::Debug for Telekinesis {
 }
 
 impl Tk for Telekinesis {
+    fn get_device(&self, device_name: &str) -> Option<Arc<ButtplugClientDevice>> {
+        if let Some(status) = self.get_device_status(device_name) {
+            return Some(status.device);
+        }
+        None
+    }
+   
+    fn get_devices(&self) -> DeviceList {
+        if let Ok(connection_status) = self.connection_status.try_lock() {
+            let devices: DeviceList = connection_status
+                .device_status
+                .values()
+                .into_iter()
+                .map(|value| value.device.clone() )
+                .collect();
+            return devices;
+        } else {
+            error!("Error accessing device map");
+        }
+        vec![]
+    }
+
+    fn get_device_status(&self, device_name: &str) -> Option<TkDeviceStatus> {
+        if let Ok(status) = self.connection_status.try_lock() {
+            let devices = status
+                .device_status
+                .values()
+                .into_iter()
+                .filter(|d| d.device.name() == device_name )
+                .map(|value| value.clone() )
+                .next();
+            return devices;
+        } else {
+            error!("Error accessing device map");
+        }
+        None
+    }
+    
+    fn get_known_device_names(&self) -> Vec<String> {
+        debug!("Getting devices names");
+        self.get_devices()
+            .iter()
+            .map(|d| d.name().clone())
+            .chain(self.settings.devices.iter().map(|d| d.name.clone()))
+            .into_iter()
+            .unique()
+            .collect()
+    }
+
     fn connect(settings: TkSettings) -> Result<Telekinesis, Error> {
         let settings_clone = settings.clone();
         match settings.connection {
@@ -144,32 +193,6 @@ impl Tk for Telekinesis {
         true
     }
 
-    fn get_devices(&self) -> DeviceList {
-        if let Ok(connection_status) = self.connection_status.try_lock() {
-            let devices: DeviceList = connection_status
-                .device_status
-                .values()
-                .into_iter()
-                .map(|value| value.1.clone())
-                .collect();
-            return devices;
-        } else {
-            error!("Error accessing device map");
-        }
-        vec![]
-    }
-
-    fn get_device_names(&self) -> Vec<String> {
-        debug!("Getting devices names");
-        self.get_devices()
-            .iter()
-            .map(|d| d.name().clone())
-            .chain(self.settings.devices.iter().map(|d| d.name.clone()))
-            .into_iter()
-            .unique()
-            .collect()
-    }
-
     fn get_device_capabilities(&self, name: &str) -> Vec<String> {
         debug!("Getting '{}' capabilities", name);
         // maybe just return all actuator + types + linear + rotate
@@ -193,6 +216,14 @@ impl Tk for Telekinesis {
         }
         vec![]
     }
+    
+    fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus {
+        debug!("Getting '{}' connected", device_name);
+        if let Some(status) = self.get_device_status(device_name) {
+            return status.status
+        }
+        TkConnectionStatus::NotConnected
+    }
 
     fn vibrate(&mut self, speed: Speed, duration: TkDuration, events: Vec<String>) -> i32 {
         self.vibrate_pattern(TkPattern::Linear(duration, speed), events)
@@ -210,12 +241,12 @@ impl Tk for Telekinesis {
         let sender_clone = self.event_sender.clone();
         self.runtime.spawn(async move {
             let now = Instant::now();
-            player.play(params.pattern).await;
+            player.play(params.pattern.clone()).await;
             sender_clone
                 .send(TkConnectionEvent::DeviceEvent(TkDeviceEvent::new(
                     now.elapsed(),
-                    &events,
                     &player.devices,
+                    params,
                 )))
                 .expect("queue full");
         });
@@ -284,22 +315,17 @@ impl Tk for Telekinesis {
         self.settings.get_events(device_name)
     }
 
-    fn get_device_connected(&self, device_name: &str) -> bool {
-        debug!("Getting setting '{}' connected", device_name);
-        self.get_devices().iter().any(|d| d.name() == device_name)
-    }
-
     fn settings_get_enabled(&self, device_name: &str) -> bool {
         let enabled = self.settings.is_enabled(device_name);
         debug!("Getting setting '{}'.enabled={}", device_name, enabled);
         enabled
     }
 
-    fn get_connection_status(&self) -> Option<TkConnectionStatus> {
+    fn get_connection_status(&self) -> TkConnectionStatus {
         if let Ok(status) = self.connection_status.try_lock() {
-            return Some(status.connection_status.clone());
+            return status.connection_status.clone();
         }
-        None
+        TkConnectionStatus::NotConnected
     }
 }
 
@@ -360,11 +386,11 @@ mod tests {
             "Enough devices connected"
         );
         assert!(
-            tk.get_device_names().contains(&String::from("vib1")),
+            tk.get_known_device_names().contains(&String::from("vib1")),
             "Contains name vib1"
         );
         assert!(
-            tk.get_device_names().contains(&String::from("vib2")),
+            tk.get_known_device_names().contains(&String::from("vib2")),
             "Contains name vib2"
         );
     }
@@ -374,7 +400,7 @@ mod tests {
         let (mut tk, _) = wait_for_connection(vec![]);
         tk.settings_set_enabled("foreign", true);
         assert!(
-            tk.get_device_names().contains(&String::from("foreign")),
+            tk.get_known_device_names().contains(&String::from("foreign")),
             "Contains additional device from settings"
         );
     }
@@ -388,7 +414,7 @@ mod tests {
         // act
         let mut tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
         tk.await_connect(count);
-        for device_name in tk.get_device_names() {
+        for device_name in tk.get_known_device_names() {
             tk.settings_set_enabled(&device_name, true);
         }
         tk.vibrate(Speed::new(100), TkDuration::from_millis(1), vec![]);
@@ -701,14 +727,15 @@ mod tests {
     #[test]
     fn get_device_connected() {
         let (tk, _) = wait_for_connection(vec![scalar(1, "existing", ActuatorType::Vibrate)]);
-        assert!(
-            tk.get_device_connected("existing"),
-            "Existing device returns true"
+        assert_eq!(
+            tk.get_device_connection_status("existing"),
+            TkConnectionStatus::Connected,
+            "Existing device returns connected"
         );
         assert_eq!(
-            tk.get_device_connected("not existing"),
-            false,
-            "Non-existing device returns false"
+            tk.get_device_connection_status("not existing"),
+            TkConnectionStatus::NotConnected,
+            "Non-existing device returns not connected"
         );
     }
 
@@ -780,7 +807,7 @@ mod tests {
         tk.await_connect(1);
         thread::sleep(Duration::from_secs(2));
         tk.settings
-            .set_enabled(tk.get_device_names().first().unwrap(), true);
+            .set_enabled(tk.get_known_device_names().first().unwrap(), true);
 
         enable_log();
         let handle = tk.vibrate_pattern(
@@ -810,7 +837,7 @@ mod tests {
         ));
 
         tk.settings
-            .set_enabled(tk.get_device_names().first().unwrap(), true);
+            .set_enabled(tk.get_known_device_names().first().unwrap(), true);
 
         tk.vibrate_pattern(
             TkPattern::Funscript(TkDuration::from_secs(10), String::from("01_Tease")),

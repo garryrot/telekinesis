@@ -96,9 +96,9 @@ Event OnPageReset(String page)
             connection_ws_flags = OPTION_FLAG_NONE
         EndIf
 
-        String status = TeleDevices.ConnectionStatusText
-        If TeleDevices.ConnectionStatus == 2
-            status = "<font color='#fc0303'>" + TeleDevices.ConnectionStatusText + "</font>" 
+        String status = TeleDevices.GetConnectionStatus()
+        If status == "Failed"
+            status = "<font color='#fc0303'>Failed</font>" 
         EndIf
         AddTextOptionST("CONNECTION_STATUS", "Status", status)
         AddInputOptionST("CONNECTION_HOST", "Intiface Host", TeleDevices.WsHost, connection_ws_flags)
@@ -133,19 +133,14 @@ Event OnPageReset(String page)
             String name = _DeviceNames[i]
             
             If name != ""
-                Bool connected = Tele_Api.GetDeviceConnected(name)
-
+                String status = Tele_Api.GetDeviceConnectionStatus(name)
                 AddHeaderOption(name)
-                String status = "Disconnected"
-                If connected
-                    status = "Connected"
-                EndIf
                 AddTextOption(Key(i, "Status"), status, OPTION_FLAG_DISABLED)
                 AddTextOption(Key(i, "Actions"), Tele_Api.GetDeviceCapabilities(name), OPTION_FLAG_DISABLED)
                 _DeviceEventOids[i] = AddInputOption(Key(i, "Events"), Join(Tele_Api.GetEvents(name), ","))
 
                 Int flags = OPTION_FLAG_DISABLED
-                If connected
+                If status == "Connected"
                     flags = OPTION_FLAG_NONE
                 EndIf
                 _UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), TeleDevices.Connects() && Tele_Api.GetEnabled(name), flags)
@@ -453,10 +448,11 @@ State CONNECTION_STATUS
 
     Event OnHighlightST()
         String errorDetails = ""
-        If TeleDevices.ConnectionStatus == 2
+        String status = TeleDevices.GetConnectionStatus()
+        If status == "Failed"
             errorDetails = "\nConnection failed, double check parameters or check 'My Games/Skyrim Special Edition/SKSE/Telekinesis.log' \nError: " + TeleDevices.ConnectionErrorDetails
         EndIf
-        SetInfoText("Connection Status: " + TeleDevices.ConnectionStatusText + errorDetails)
+        SetInfoText("Connection Status: " + status + errorDetails)
     EndEvent
 EndState
 

@@ -10,7 +10,7 @@ Spell Property Tele_VibrateSpellWeak Auto
 Spell Property Tele_Stop Auto
 
 Int Property MajorVersion = 1 AutoReadOnly
-Int Property MinorVersion = 1 AutoReadOnly
+Int Property MinorVersion = 2 AutoReadOnly
 Int Property PatchVersion = 0 AutoReadOnly
 String Property Revision = "" AutoReadOnly
 
@@ -25,31 +25,11 @@ Bool Property LogDeviceEvents = false Auto
 Bool Property LogDebugEvents = false Auto
 
 Bool Property ScanningForDevices = false Auto
-Int Property ConnectionType = 0 Auto ; In-Process
-
-Int _ConnectionStatus = 0 ; 0 = Disconnected, 1 = Connected, 2 = Error
-Int Property ConnectionStatus
-    Int Function Get()
-        return _ConnectionStatus
-    EndFunction
-EndProperty  
-
-String Property ConnectionStatusText
-    String Function Get()
-        If _ConnectionStatus == 0
-            return "Disconnected"
-        ElseIf _ConnectionStatus == 1
-            return "Connected"
-        Else
-            return "Connection Failed"
-        EndIf
-    EndFunction
-EndProperty
-
+Int Property ConnectionType = 0 Auto
 String _ErrorText
 String Property ConnectionErrorDetails
     String Function Get()
-        If _ConnectionStatus == 2
+        If GetConnectionStatus() == "Failed"
             return _ErrorText
         EndIf
         return ""
@@ -68,28 +48,26 @@ Event OnUpdate()
         String[] evts = Tele_Api.PollEvents()
         Int i = 0
         While (i < evts.Length)
-            String evt = evts[i]
-            If StringUtil.Find(evt, "' connected") != -1
-                LogConnection(evt)
-                ; Event Connected
-            ElseIf StringUtil.Find(evt, "' removed") != -1
-                LogConnection(evt)
-                ; Event Removed
-            ElseIf StringUtil.Find( evt, "Vibrated") != -1
-                ; Start vibrate
+            String[] evt = StringUtil.Split(evts[i], "|")
+            String type = evt[0]
+            If type == "DeviceAdded"
+                LogConnection("Device '" + evt[1] + "' connected")
+            ElseIf type == "DeviceRemoved"
+                LogConnection("Device '" + evt[1] + "' disconnected")
+            ElseIf type == "Connected"
+                LogDebug("Connection success")
+            ElseIf type == "ConnectionFailure"
+                If ConnectionType == 0
+                    _ErrorText = "In-Process Failure"
+                ElseIf ConnectionType == 1
+                    _ErrorText = "Intiface Connection Failure. Port: " + WsPort + " Host: " + WsHost
+                Else
+                    _ErrorText = ""
+                EndIf
+                LogError(_ErrorText)
+            ElseIf type == "DeviceEvent"
                 LogEvent(evt)
-            ElseIf StringUtil.Find( evt, "Stopped") != -1
-                ; Ignore
-            ElseIf StringUtil.Find(evt, "Started scanning") != -1
-                _ConnectionStatus = 1
-                LogDebug(evt)
-            ElseIf StringUtil.Find(evt, "Scan failed") != -1
-                _ConnectionStatus = 2
-                _ErrorText = evt
-                LogError(evt)
-            Else
-                ; Other Event
-                LogDebug(evt)
+                ; LogEvent(evt[1] + " for " + evt[2] + "s at " + evt[3] + " (" +  evt[4] + ") on " + evt[5] + " events: " + evt[6])
             EndIf
             i += 1
         EndWhile
@@ -112,7 +90,6 @@ Function Disconnect()
     If Connects()
         Tele_Api.Close()
         ScanningForDevices = false
-        _ConnectionStatus = 0
     EndIf
 EndFunction
 
@@ -180,22 +157,31 @@ Function Reconnect()
       restarts with the configured connection settings.
       
       NOTE: Handles will lose validity }
-    If ConnectionType == 1
-        Tele_Api.SettingsSet("connection.websocket", WsHost + ":" + WsPort)
-    Else
+    If ConnectionType == 0
         Tele_Api.SettingsSet("connection.inprocess", "")
+    ElseIf ConnectionType == 1
+        Tele_Api.SettingsSet("connection.websocket", WsHost + ":" + WsPort)
     EndIf
     Tele_Api.SettingsStore()
     Utility.Wait(0.5)
     Disconnect()
     Utility.Wait(3)
-    ConnectAndScanForDevices()
+    If (ConnectionType != 2)
+        ConnectAndScanForDevices()
+    EndIf
 EndFunction
 
 Bool Function Connects()
     { Returns if the plugin connects to a backend
       (true if dll is loadable AND backen is configure to connect) }
     return Tele_Api.Loaded() && ConnectionType != 2
+EndFunction
+
+String Function GetConnectionStatus()
+    If ! Tele_Api.Loaded()
+        return "Not Connected"
+    EndIf
+    return Tele_Api.GetConnectionStatus()
 EndFunction
 
 String[] Function GetPatternNames(Bool vibrator)

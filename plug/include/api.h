@@ -2,11 +2,12 @@ namespace Tk
 {
     bool Connect(void*);
     bool ScanForDevices(void*);
+    std::string GetConnectionStatus(void*);
     bool StopScan(void*);
     bool Close(void*);
     std::vector<std::string> GetDevices(void*);
     std::vector<std::string> GetDeviceCapabilities(void*, std::string name);
-    bool GetDeviceConnected(void*, std::string name);
+    std::string GetDeviceConnectionStatus(void*, std::string name);
     int Vibrate(void*, int speed, float time_sec, std::vector<std::string> events);
     int VibratePattern(void*, std::string pattern_name, float time_sec, std::vector<std::string> events);
     bool Stop(void*, int handle);

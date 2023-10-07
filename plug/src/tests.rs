@@ -39,8 +39,8 @@ mod tests {
         _sleep();
         _sleep();
         let events = tk.process_next_events();
-        assert!(events[0].serialize_papyrus().starts_with("DeviceEvent|Vibrate|0.1"));
-        assert!(events[1].serialize_papyrus().starts_with("DeviceEvent|Vibrate|0.2"));
+        assert!(events[0].serialize_papyrus().starts_with("DeviceEvent|Vibrator|0.1"));
+        assert!(events[1].serialize_papyrus().starts_with("DeviceEvent|Vibrator|0.2"));
     }
 
     #[test]
