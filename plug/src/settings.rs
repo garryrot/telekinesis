@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use tracing::{error, event, info, Level, instrument};
+use tracing::{error, event, info, Level};
 
 use crate::input::sanitize_name_list;
 
@@ -84,15 +84,17 @@ impl TkSettings {
             }
         }
     }  
-    pub fn try_write(&self, settings_path: &str, settings_file: &str) {
+    pub fn try_write(&self, settings_path: &str, settings_file: &str) -> bool {
         let json = serde_json::to_string_pretty(self).expect("Always serializable");
         let _ = fs::create_dir_all(settings_path);
         let filename = [settings_path, settings_file].iter().collect::<PathBuf>();
 
         event!(Level::INFO, filename=?filename, settings=?self, "Storing settings");
         if let Err(err) = fs::write(filename, json) {
-            error!("Writing to file failed. Error: {}.", err)
+            error!("Writing to file failed. Error: {}.", err);
+            return false
         }
+        true
     }
     pub fn get_enabled_devices(&self) -> Vec<TkDeviceSettings> {
         self.devices
@@ -108,23 +110,6 @@ impl TkSettings {
         self.devices.push(TkDeviceSettings::from_name(device_name))
     }
 
-    #[instrument]
-    pub fn set_string(&mut self, key: &str, value: &str ) -> bool {
-        match key {
-            "connection.inprocess" => {
-                self.connection = TkConnectionType::InProcess;
-                true
-            },
-            "connection.websocket" => {
-                self.connection = TkConnectionType::WebSocket(String::from(value));
-                true
-            },
-            _ => { 
-                error!("Unknown key");
-                false
-            },
-        }
-    }
     pub fn set_events(mut self, device_name: &str, events: Vec<String>) -> Self {
         self.assure_exists(device_name);
         let evts: Vec<String> = sanitize_name_list(&events);
@@ -323,7 +308,7 @@ mod tests {
     fn set_valid_websocket_endpoint() {
         let mut settings = TkSettings::default();
         let endpoint = String::from("3.44.33.6:12345");
-        settings.set_string("connection.websocket", &endpoint);
+        settings.connection = TkConnectionType::WebSocket(endpoint);
         if let TkConnectionType::WebSocket(endpoint) = settings.connection {
             assert_eq!(endpoint, "3.44.33.6:12345")
         } else {
@@ -335,21 +320,13 @@ mod tests {
     fn set_valid_websocket_endpoint_hostname() {
         let mut settings = TkSettings::default();
         let endpoint = String::from("localhost:12345");
-        settings.set_string("connection.websocket", &endpoint);
+        settings.connection = TkConnectionType::WebSocket(endpoint);
         if let TkConnectionType::WebSocket(endpoint) = settings.connection {
             assert_eq!(endpoint, "localhost:12345")
         } else {
             assert!(false)
         }
     }
-
-    // #[test]
-    // fn set_invalid_websocket_endpoint() {
-    //     let mut settings = TkSettings::default();
-    //     let endpoint = String::from("nuffin");
-    //     settings.set_string("connection.websocket", &endpoint);
-    //     assert!(matches!(settings.connection, TkConnectionType::InProcess));
-    // }
 
     fn create_temp_file(name: &str, content: &str) -> (String, TempDir) {
         let tmp_path = tempdir().unwrap();

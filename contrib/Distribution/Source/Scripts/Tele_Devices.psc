@@ -45,7 +45,7 @@ EndEvent
 
 Event OnUpdate()
     If Connects()
-        String[] evts = Tele_Api.PollEvents()
+        String[] evts = Tele_Api.Qry_Lst("events")
         Int i = 0
         While (i < evts.Length)
             String[] evt = StringUtil.Split(evts[i], "|")
@@ -79,8 +79,8 @@ EndEvent
 Function ConnectAndScanForDevices()
     { Starts a new conenction to the backend (if not disabled) }
     If Connects()
-        Tele_Api.Connect()
-        Tele_Api.ScanForDevices()
+        Tele_Api.Cmd("connection.connect")
+        Tele_Api.Cmd("connection.start_scan")
         ScanningForDevices = true
     EndIf
 EndFunction
@@ -88,7 +88,7 @@ EndFunction
 Function Disconnect()
     { Closes the connection to the backend (if not disabled) }
     If Connects()
-        Tele_Api.Close()
+        Tele_Api.Cmd("connection.disconnect")
         ScanningForDevices = false
     EndIf
 EndFunction
@@ -100,7 +100,7 @@ Int Function Vibrate(Int speed, Float duration_sec = -1.0)
       Returns an Int handle to stop the vibration early, see StopHandle(Int) }
     If Connects()
         String[] events = new String[1]
-        return Tele_Api.Vibrate(InRange(speed, 0, 100), duration_sec, events)
+        return Tele_Api.Tele_Control("vibrate", InRange(speed, 0, 100), duration_sec, "", events)
     EndIf
     Trace("(Vibrate) speed='" + speed + "' duration='" + duration_sec + "' all")
     return -1
@@ -111,7 +111,7 @@ Int Function VibrateEvents(Int speed, Float duration_sec = -1.0, String[] events
         - events (Vibrate devices that match the specified events)
       Returns an Int handle to stop the vibration early, see StopHandle(Int) }
     If Connects()
-        return Tele_Api.Vibrate(InRange(speed, 0, 100), duration_sec, events)
+        return Tele_Api.Tele_Control("vibrate", InRange(speed, 0, 100), duration_sec, "", events)
     EndIf
     Trace("(Vibrate) speed='" + speed + " duration=" + duration_sec + " events=" + events)
     return -1
@@ -122,7 +122,7 @@ Int Function VibratePattern(String pattern, Float duration_sec = -1.0, String[] 
         the vibration strength is regulated by the given funscript pattern
       Returns an Int handle to stop the vibration early, see StopHandle(Int) }
     If Connects()
-        return Tele_Api.VibratePattern(pattern, duration_sec, events)
+        return Tele_Api.Tele_Control("vibrate.pattern", 100, duration_sec, pattern, events)
     EndIf
     return -1
     Trace("(Vibrate) pattern='" + pattern + " duration=" + duration_sec + " events=" + events)
@@ -136,7 +136,7 @@ Function StopHandle(Int handle)
       Note: Handles lose validity on each game restart, a call with a
       stale handle has no effect }
     If Connects()
-        Tele_Api.Stop(handle)
+        Tele_Api.Tele_Stop(handle)
     EndIf
     Trace("(Stop) stop handle=" + handle)
 EndFunction
@@ -147,7 +147,7 @@ Function EmergencyStop()
       this call all existing handles are considered stale }
     If Connects()
         LogError("Emergency stop")
-        Tele_Api.StopAll()
+        Tele_Api.Cmd("stop_all")
     EndIf
     Trace("(Stop) emergency stop")
 EndFunction
@@ -158,11 +158,11 @@ Function Reconnect()
       
       NOTE: Handles will lose validity }
     If ConnectionType == 0
-        Tele_Api.SettingsSet("connection.inprocess", "")
+        Tele_Api.Cmd("connection.inprocess")
     ElseIf ConnectionType == 1
-        Tele_Api.SettingsSet("connection.websocket", WsHost + ":" + WsPort)
+        Tele_Api.Cmd_1("connection.websocket", WsHost + ":" + WsPort)
     EndIf
-    Tele_Api.SettingsStore()
+    Tele_Api.Cmd("settings.store")
     Utility.Wait(0.5)
     Disconnect()
     Utility.Wait(3)
@@ -181,12 +181,12 @@ String Function GetConnectionStatus()
     If ! Tele_Api.Loaded()
         return "Not Connected"
     EndIf
-    return Tele_Api.GetConnectionStatus()
+    return Tele_Api.Qry_Str("connection.status")
 EndFunction
 
 String[] Function GetPatternNames(Bool vibrator)
     If Tele_Api.Loaded()
-        return Tele_Api.GetPatternNames(vibrator)
+        return Tele_Api.Qry_Lst("patterns.vibrator")
     EndIf
     
     String[] defaultPatterns = new String[4]

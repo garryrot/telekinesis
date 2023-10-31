@@ -78,8 +78,8 @@ Function InitLocals()
 EndFunction
 
 Event OnPageReset(String page)
-    _VibrateFunscriptNames = TeleDevices.GetPatternNames(true)
-    _StrokeFunscriptNames = Tele_Api.GetPatternNames(false)
+    _VibrateFunscriptNames = Tele_Api.Qry_Lst("patterns.vibrator")
+    _StrokeFunscriptNames = Tele_Api.Qry_Lst("patterns.stroker")
     If page == "General" || page == ""
         SetCursorFillMode(TOP_TO_BOTTOM)
 
@@ -121,7 +121,7 @@ Event OnPageReset(String page)
   
         AddHeaderOption("Discovery")
         AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TeleDevices.ScanningForDevices)
-        _DeviceNames = Tele_Api.GetDevices()
+        _DeviceNames = Tele_Api.Qry_Lst("devices")
         Int len = _DeviceNames.Length
         If len > 20
             TeleDevices.LogError("Too many devices, ignoring some in MCM")
@@ -133,17 +133,22 @@ Event OnPageReset(String page)
             String name = _DeviceNames[i]
             
             If name != ""
-                String status = Tele_Api.GetDeviceConnectionStatus(name)
+                String status = Tele_Api.Qry_Str_1("device.connection.status", name)
                 AddHeaderOption(name)
                 AddTextOption(Key(i, "Status"), status, OPTION_FLAG_DISABLED)
-                AddTextOption(Key(i, "Actions"), Tele_Api.GetDeviceCapabilities(name), OPTION_FLAG_DISABLED)
-                _DeviceEventOids[i] = AddInputOption(Key(i, "Events"), Join(Tele_Api.GetEvents(name), ","))
+                AddTextOption(Key(i, "Actions"), Tele_Api.Qry_Lst_1("device.capabilities", name), OPTION_FLAG_DISABLED)
+                _DeviceEventOids[i] = AddInputOption(Key(i, "Events"), Join(Tele_Api.Qry_Lst_1("device.settings.events", name), ","))
 
                 Int flags = OPTION_FLAG_DISABLED
                 If status == "Connected"
                     flags = OPTION_FLAG_NONE
                 EndIf
-                _UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), TeleDevices.Connects() && Tele_Api.GetEnabled(name), flags)
+
+                bool connects = false
+                If TeleDevices.Connects()
+                    connects = Tele_Api.Qry_Bool_1("device.settings.enabled", name)
+                EndIf
+                _UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), connects, flags)
             EndIf
 
             i += 1
@@ -478,7 +483,7 @@ State CONNECTION_PORT
 	
 	Event OnInputAcceptST(String value)
 		TeleDevices.WsPort = value
-        Tele_Api.SettingsSet("connection.websocket", "127.0.0.1:12345")
+        Tele_Api.Cmd_1("connection.websocket", "127.0.0.1:12345")
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -501,7 +506,7 @@ EndState
 State EMERGENCY_STOP
     Event OnSelectST()
         SetTextOptionValueST("Stopping...")
-        Tele_Api.StopAll()
+        Tele_Api.Cmd("stop_all")
     EndEvent
 
     Event OnHighlightST()
@@ -530,9 +535,9 @@ EndState
 State ACTION_SCAN_FOR_DEVICES
     Event OnSelectST()
         If TeleDevices.ScanningForDevices
-            Tele_Api.StopScan()
+            Tele_Api.Cmd("connection.stop_scan")
         Else
-            Tele_Api.ScanForDevices()
+            Tele_Api.Cmd("connection.start_scan")
         EndIf
         TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
         SetToggleOptionValueST(TeleDevices.ScanningForDevices)
@@ -1490,9 +1495,13 @@ Event OnOptionSelect(int oid)
     While (i < 31 && i < _DeviceNames.Length)
         If (oid == _UseDeviceOids[i])
             String device = _DeviceNames[i]
-            Bool isUsed = ! Tele_Api.GetEnabled(device)
+            Bool isUsed = ! Tele_Api.Qry_Bool_1("device.settings.enabled", device)
             SetToggleOptionValue(oid, isUsed)
-            Tele_Api.SetEnabled(device, isUsed)
+            If isUsed
+                Tele_Api.Cmd_1("device.settings.enable", device)
+            Else
+                Tele_Api.Cmd_1("device.settings.disable", device)
+            EndIf
         EndIf
         i += 1
     EndWhile
@@ -1513,7 +1522,7 @@ Event OnOptionSelect(int oid)
         EndIf
         i += 1
     EndWhile
-    Tele_Api.SettingsStore()
+    Tele_Api.Cmd("settings.store")
 EndEvent
 
 Event OnOptionInputAccept(int oid, string value)
@@ -1521,12 +1530,12 @@ Event OnOptionInputAccept(int oid, string value)
     While (i < 31 && i < _DeviceNames.Length)
         If (oid == _DeviceEventOids[i])
             String name = _DeviceNames[i]
-            Tele_Api.SetEvents(name, StringUtil.Split(value, ","))
+            Tele_Api.Cmd_2("device.settings.events", name, value)
             SetInputOptionValue(oid, value)
         EndIf
         i += 1
     EndWhile
-    Tele_Api.SettingsStore()
+    Tele_Api.Cmd("settings.store")
 EndEvent
 
 Event OnOptionHighlight(int oid)

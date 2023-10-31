@@ -3,7 +3,7 @@ use funscript::FSPoint;
 use std::fmt::{self, Display};
 use util::Narrow;
 
-use crate::{settings::TkDeviceSettings, util, Speed, TkPattern, connection::{TkConnectionEvent, TkConnectionStatus, TkDeviceEvent}, DeviceList};
+use crate::{settings::TkDeviceSettings, util, Speed, TkPattern, DeviceList};
 
 impl Speed {
     pub fn new(percentage: i64) -> Speed {
@@ -35,6 +35,16 @@ pub fn sanitize_name_list(list: &Vec<String>) -> Vec<String> {
     list.iter()
         .map(|e| String::from(e.to_lowercase().trim()))
         .collect()
+}
+
+pub fn parse_list_string(input: &str) -> Vec<String> {
+    let mut list = vec![];
+    for part in input.split(",") {
+        if part.len() > 0 {
+            list.push(String::from(part.trim().to_lowercase()));
+        }
+    }
+    list
 }
 
 pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {

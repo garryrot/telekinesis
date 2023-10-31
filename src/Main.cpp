@@ -1,6 +1,6 @@
 #include <stddef.h>
 
-#include "../plug/include/api.h"
+#include "../plug/target/cxxbridge/plug/src/lib.rs.h"
 #include "../plug/target/cxxbridge/plug/src/logging.rs.h"
 
 using namespace RE;
@@ -16,30 +16,62 @@ using namespace REL;
 
 constexpr std::string_view PapyrusClass = "Tele_Api";
 
-bool ApiLoaded(SFT) { return true; }
+namespace Tele {
+    static ::rust::Box tk = tk_new();
+    bool ApiLoaded(SFT) { 
+        return true;
+    }
+    bool Cmd(SFT, std::string cmd) { 
+        return (*tk).tk_cmd(cmd); 
+    }
+    bool Cmd_1(SFT, std::string cmd, std::string arg0) { 
+        return (*tk).tk_cmd_1(cmd, arg0);
+    }
+    bool Cmd_2(SFT, std::string cmd, std::string arg0, std::string arg1) { 
+        return (*tk).tk_cmd_2(cmd, arg0, arg1);
+    }
+    std::string Qry_Str(SFT, std::string qry) { 
+        return (std::string) (*tk).tk_qry_str(qry);
+    }
+    std::string Qry_Str_1(SFT, std::string qry, std::string arg0) { 
+        return (std::string) (*tk).tk_qry_str_1(qry, arg0); 
+    }
+    std::vector<std::string> Qry_Lst(SFT, std::string qry) {
+        auto list = (*tk).tk_qry_lst(qry);
+        return std::vector<std::string>(list.begin(), list.end());
+    }
+    std::vector<std::string> Qry_Lst_1(SFT, std::string qry, std::string arg0) {
+        auto list = (*tk).tk_qry_lst_1(qry, arg0);
+        return std::vector<std::string>(list.begin(), list.end());
+    }
+    bool Qry_Bool(SFT, std::string qry) { 
+        return (*tk).tk_qry_bool(qry);
+    }
+    bool Qry_Bool_1(SFT, std::string qry, std::string arg0) { 
+        return (*tk).tk_qry_bool_1(qry, arg0); 
+    }
+    int Tele_Control(SFT, std::string actuator, int speed, float time_sec, std::string pattern,
+                     std::vector<std::string> events) {
+        return (*tk).tk_control(actuator, speed, time_sec, pattern, events);
+    }
+    bool Tele_Stop(SFT, int handle) { 
+        return (*tk).tk_stop(handle); 
+    }
+}
 
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
-    vm->RegisterFunction("Loaded", PapyrusClass, ApiLoaded);
-    vm->RegisterFunction("Connect", PapyrusClass, (bool (*)(SFT))Tk::Connect);
-    vm->RegisterFunction("ScanForDevices", PapyrusClass, (bool (*)(SFT))Tk::ScanForDevices);
-    vm->RegisterFunction("GetConnectionStatus", PapyrusClass, (std::string (*)(SFT))Tk::GetConnectionStatus);
-    vm->RegisterFunction("StopScan", PapyrusClass, (bool (*)(SFT))Tk::StopScan);
-    vm->RegisterFunction("Close", PapyrusClass, (bool (*)(SFT))Tk::Close);
-    vm->RegisterFunction("GetDevices", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::GetDevices);
-    vm->RegisterFunction("GetDeviceCapabilities", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetDeviceCapabilities);
-    vm->RegisterFunction("GetDeviceConnectionStatus", PapyrusClass, (std::string (*)(SFT, std::string))Tk::GetDeviceConnectionStatus);
-    vm->RegisterFunction("Vibrate", PapyrusClass, (int (*)(SFT, int, float, std::vector<std::string>))Tk::Vibrate);
-    vm->RegisterFunction("VibratePattern", PapyrusClass, (int (*)(SFT, std::string, float, std::vector<std::string>))Tk::VibratePattern);
-    vm->RegisterFunction("Stop", PapyrusClass, (bool (*)(SFT, int))Tk::Stop);
-    vm->RegisterFunction("StopAll", PapyrusClass, (bool (*)(SFT))Tk::StopAll);
-    vm->RegisterFunction("PollEvents", PapyrusClass, (std::vector<std::string>(*)(SFT))Tk::PollEvents);
-    vm->RegisterFunction("SettingsSet", PapyrusClass, (bool (*)(SFT, std::string, std::string))Tk::SettingsSet);
-    vm->RegisterFunction("GetEnabled", PapyrusClass, (bool (*)(SFT, std::string))Tk::GetEnabled);
-    vm->RegisterFunction("SetEnabled", PapyrusClass, (void (*)(SFT, std::string, bool))Tk::SetEnabled);
-    vm->RegisterFunction("GetEvents", PapyrusClass, (std::vector<std::string>(*)(SFT, std::string))Tk::GetEvents);
-    vm->RegisterFunction("SetEvents", PapyrusClass, (void (*)(SFT, std::string, std::vector<std::string>))Tk::SetEvents);
-    vm->RegisterFunction("SettingsStore", PapyrusClass, (bool (*)(SFT))Tk::SettingsStore);
-    vm->RegisterFunction("GetPatternNames", PapyrusClass, (std::vector<std::string>(*)(SFT, bool))Tk::GetPatternNames);
+    vm->RegisterFunction("Loaded", PapyrusClass, Tele::ApiLoaded);
+    vm->RegisterFunction("Cmd", PapyrusClass, Tele::Cmd);
+    vm->RegisterFunction("Cmd_1", PapyrusClass, Tele::Cmd_1);
+    vm->RegisterFunction("Cmd_2", PapyrusClass, Tele::Cmd_2);
+    vm->RegisterFunction("Qry_Str", PapyrusClass, Tele::Qry_Str);
+    vm->RegisterFunction("Qry_Str_1", PapyrusClass, Tele::Qry_Str_1);
+    vm->RegisterFunction("Qry_Lst", PapyrusClass, Tele::Qry_Lst);
+    vm->RegisterFunction("Qry_Lst_1", PapyrusClass, Tele::Qry_Lst_1);
+    vm->RegisterFunction("Qry_Bool", PapyrusClass, Tele::Qry_Bool);
+    vm->RegisterFunction("Qry_Bool_1", PapyrusClass, Tele::Qry_Bool_1);
+    vm->RegisterFunction("Tele_Control", PapyrusClass, Tele::Tele_Control);
+    vm->RegisterFunction("Tele_Stop", PapyrusClass, Tele::Tele_Stop);
     return true;
 }
 
