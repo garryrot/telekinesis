@@ -130,11 +130,6 @@ pub enum TkPattern {
     Funscript(TkDuration, String),
 }
 
-#[derive(Debug)]
-pub struct TkApi {
-    pub state: Arc<Mutex<Option<Telekinesis>>>,
-}
-
 fn tk_new() -> Box<TkApi> {
     Box::new(TkApi {
         state: Arc::new( Mutex::new( None ) )
@@ -204,8 +199,8 @@ impl TkApi {
 
 }
 
-impl Api<Telekinesis> for TkApi {
-    fn init(&self) -> ApiInit<Telekinesis> {
+pub fn build_api() -> ApiBuilder<Telekinesis> {
+    ApiBuilder::new(
         ApiInit {
             name: "connect",
             exec: || {
@@ -213,191 +208,171 @@ impl Api<Telekinesis> for TkApi {
                     SETTINGS_PATH,
                     SETTINGS_FILE,
                 ))
-            },
-        }
-    }
+        },
+    })
+    // connection
+    .def_cmd(ApiCmd0 {
+        name: "connection.inprocess",
+        exec: |tk| {
+            tk.settings.connection = TkConnectionType::InProcess;
+            true
+        },
+    })
+    .def_cmd1(ApiCmd1 {
+        name: "connection.websocket",
+        exec: |tk, value| {
+            tk.settings.connection = TkConnectionType::WebSocket(String::from(value));
+            true
+        },
+    })
+    .def_qry_str(ApiQryStr {
+        name: "connection.status",
+        default: "Not Connected",
+        exec: |tk| {
+            if let Ok(status) = tk.connection_status.try_lock() {
+                return status.connection_status.serialize_papyrus();
+            }
+            TkConnectionStatus::NotConnected.serialize_papyrus()
+        },
+    })
 
-    fn cmd_0(&self) -> Vec<ApiCmd0<Telekinesis>> {
-        vec![
-            ApiCmd0 {
-                name: "stop_all",
-                exec: |tk| tk.stop_all(),
-            },
-            ApiCmd0 {
-                name: "start_scan",
-                exec: |tk| tk.scan_for_devices(),
-            },
-            ApiCmd0 {
-                name: "stop_scan",
-                exec: |tk| tk.stop_scan(),
-            },
-            ApiCmd0 {
-                name: "settings.store",
-                exec: |tk| tk.settings.try_write(SETTINGS_PATH, SETTINGS_FILE),
-            },
-            ApiCmd0 {
-                name: "connection.inprocess",
-                exec: |tk| {
-                    tk.settings.connection = TkConnectionType::InProcess;
-                    true
-                },
-            },
-        ]
-    }
+    // scan
+    .def_cmd(ApiCmd0 {
+        name: "start_scan",
+        exec: |tk| tk.scan_for_devices(),
+    })
+    .def_cmd(ApiCmd0 {
+        name: "stop_scan",
+        exec: |tk| tk.stop_scan(),
+    })
 
-    fn cmd_1(&self) -> Vec<ApiCmd1<Telekinesis>> {
-        vec![
-            ApiCmd1 {
-                name: "connection.websocket",
-                exec: |tk, value| {
-                    tk.settings.connection = TkConnectionType::WebSocket(String::from(value));
-                    true
-                },
-            },
-            ApiCmd1 {
-                name: "device.settings.enable",
-                exec: |tk, device_name| {
-                    tk.settings_set_enabled(device_name, true);
-                    true
-                },
-            },
-            ApiCmd1 {
-                name: "device.settings.disable",
-                exec: |tk, device_name| {
-                    tk.settings_set_enabled(device_name, false);
-                    true
-                },
-            },
-        ]
-    }
+    // status
+    .def_qry_lst(ApiQryList { 
+        name: "events",
+        exec: |tk| {
+            tk.process_next_events()
+                .iter()
+                .map(|evt| evt.serialize_papyrus())
+                .collect::<Vec<String>>()
+        },
+    })
 
-    fn cmd_2(&self) -> Vec<ApiCmd2<Telekinesis>> {
-        vec![ApiCmd2 {
-            name: "device.settings.events",
-            exec: |tk, device_name, events| {
-                tk.settings_set_events(device_name, parse_list_string(events));
-                true
-            },
-        }]
-    }
-
-    fn qry_str(&self) -> Vec<ApiQryStr<Telekinesis>> {
-        vec![ApiQryStr {
-            name: "connection.status",
-            default: "Not Connected",
-            exec: |tk| {
-                if let Ok(status) = tk.connection_status.try_lock() {
-                    return status.connection_status.serialize_papyrus();
-                }
-                TkConnectionStatus::NotConnected.serialize_papyrus()
-            },
-        }]
-    }
-
-    fn qry_str_1(&self) -> Vec<ApiQryStr1<Telekinesis>> {
-        vec![ApiQryStr1 {
-            name: "device.connection.status",
-            default: "Not Connected",
-            exec: |tk, device_name| {
-                if let Some(a) = tk.get_device_status(device_name) {
-                    return a.status.serialize_papyrus();
-                }
-                TkConnectionStatus::NotConnected.serialize_papyrus()
-            },
-        }]
-    }
-
-    fn qry_lst(&self) -> Vec<ApiQryList<Telekinesis>> {
-        vec![
-            ApiQryList {
-                name: "devices",
-                exec: |tk| tk.get_known_device_names(),
-            },
-            ApiQryList {
-                name: "events",
-                exec: |tk| {
-                    tk.process_next_events()
-                        .iter()
-                        .map(|evt| evt.serialize_papyrus())
-                        .collect::<Vec<String>>()
-                },
-            },
-            ApiQryList {
-                name: "patterns.vibrator",
-                exec: |_| get_pattern_names(PATTERN_PATH, true),
-            },
-            ApiQryList {
-                name: "patterns.stroker",
-                exec: |_| get_pattern_names(PATTERN_PATH, false),
-            },
-        ]
-    }
-
-    fn qry_lst_1(&self) -> Vec<ApiQryList1<Telekinesis>> {
-        vec![
-            ApiQryList1 {
-                name: "device.settings.events",
-                exec: |tk, device_name| tk.settings_get_events(device_name),
-            },
-            ApiQryList1 {
-                name: "device.capabilities",
-                exec: |tk, device_name| tk.get_device_capabilities(device_name),
-            },
-        ]
-    }
-
-    fn qry_bool(&self) -> Vec<ApiQryBool<Telekinesis>> {
-        vec![]
-    }
-
-    fn qry_bool_1(&self) -> Vec<ApiQryBool1<Telekinesis>> {
-        vec![ApiQryBool1 {
-            name: "device.settings.enabled",
-            exec: |tk, device_name| tk.settings_get_enabled(device_name),
-        }]
-    }
-
-    fn control(&self) -> Vec<ApiControl<Telekinesis>> {
-        vec![
-            ApiControl {
-                name: "vibrate",
-                exec: |tk, speed, time_sec, _pattern_name, events| {
-                    tk.vibrate(
-                        Speed::new(speed.into()),
-                        TkDuration::from_input_float(time_sec),
-                        read_input_string(&events),
-                    )
-                },
-                default: ERROR_HANDLE,
-            },
-            ApiControl {
-                name: "vibrate.pattern",
-                exec: |tk, _speed, time_sec, pattern_name, events| {
-                    tk.vibrate_pattern(
-                        TkPattern::Funscript(
-                            TkDuration::from_input_float(time_sec),
-                            String::from(pattern_name),
-                        ),
-                        read_input_string(&events),
-                    )
-                },
-                default: ERROR_HANDLE,
-            },
-        ]
-    }
-
-    fn stop(&self) -> ApiStop<Telekinesis> {
+    // controls
+    .def_control(ApiControl {
+        name: "vibrate",
+        exec: |tk, speed, time_sec, _pattern_name, events| {
+            tk.vibrate(
+                Speed::new(speed.into()),
+                TkDuration::from_input_float(time_sec),
+                read_input_string(&events),
+            )
+        },
+        default: ERROR_HANDLE,
+    })
+    .def_control(ApiControl {
+        name: "vibrate.pattern",
+        exec: |tk, _speed, time_sec, pattern_name, events| {
+            tk.vibrate_pattern(
+                TkPattern::Funscript(
+                    TkDuration::from_input_float(time_sec),
+                    String::from(pattern_name),
+                ),
+                read_input_string(&events),
+            )
+        },
+        default: ERROR_HANDLE,
+    })
+    .def_stop(
         ApiStop { exec: |tk: &mut Telekinesis, handle| tk.stop(handle) }
-    }
+    )
+    .def_cmd(ApiCmd0 {
+        name: "stop_all",
+        exec: |tk| tk.stop_all(),
+    })
 
+    // settings
+    .def_cmd(ApiCmd0 {
+        name: "settings.store",
+        exec: |tk| tk.settings.try_write(SETTINGS_PATH, SETTINGS_FILE),
+    })
+
+    // devices settings
+    .def_qry_lst(ApiQryList {
+        name: "devices",
+        exec: |tk| tk.get_known_device_names(),
+    })
+    .def_qry_lst_1(ApiQryList1 {
+        name: "device.capabilities",
+        exec: |tk, device_name| tk.get_device_capabilities(device_name),
+    })
+    .def_cmd1(ApiCmd1 {
+        name: "device.settings.enable",
+        exec: |tk, device_name| {
+            tk.settings_set_enabled(device_name, true);
+            true
+        },
+    })
+    .def_cmd1(ApiCmd1 {
+        name: "device.settings.disable",
+        exec: |tk, device_name| {
+            tk.settings_set_enabled(device_name, false);
+            true
+        },
+    })
+    .def_qry_bool_1(ApiQryBool1 {
+        name: "device.settings.enabled",
+        exec: |tk, device_name| tk.settings_get_enabled(device_name),
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.settings.events",
+        exec: |tk, device_name, events| {
+            tk.settings_set_events(device_name, parse_list_string(events));
+            true
+        },
+    })
+    .def_qry_lst_1(ApiQryList1 {
+        name: "device.settings.events",
+        exec: |tk, device_name| tk.settings_get_events(device_name),
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.connection.status",
+        default: "Not Connected",
+        exec: |tk, device_name| {
+            if let Some(a) = tk.get_device_status(device_name) {
+                return a.status.serialize_papyrus();
+            }
+            TkConnectionStatus::NotConnected.serialize_papyrus()
+        },
+    })
+
+    // patterns
+    .def_qry_lst(ApiQryList {
+        name: "patterns.vibrator",
+        exec: |_| get_pattern_names(PATTERN_PATH, true),
+    })
+    .def_qry_lst(ApiQryList {
+        name: "patterns.stroker",
+        exec: |_| get_pattern_names(PATTERN_PATH, false),
+    })
+}
+
+#[derive(Debug)]
+pub struct TkApi {
+    pub state: Arc<Mutex<Option<Telekinesis>>>,
+}
+
+impl Api<Telekinesis> for TkApi {
     fn state(&mut self) -> Arc<Mutex<Option<Telekinesis>>> {
         self.state.clone()
     }
 
-    fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
-        ApiCmd0 {
-            name: "disconnect",
-            exec: |tk| { tk.disconnect(); true },
-        }
+    fn fns(&self) -> ApiBuilder<Telekinesis> {
+        build_api()
     }
+     fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
+         ApiCmd0 {
+             name: "disconnect",
+             exec: |tk| { tk.disconnect(); true },
+         }
+     }
 }
