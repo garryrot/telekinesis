@@ -79,8 +79,8 @@ EndEvent
 Function ConnectAndScanForDevices()
     { Starts a new conenction to the backend (if not disabled) }
     If Connects()
-        Tele_Api.Cmd("connection.connect")
-        Tele_Api.Cmd("connection.start_scan")
+        Tele_Api.Cmd("connect")
+        Tele_Api.Cmd("start_scan")
         ScanningForDevices = true
     EndIf
 EndFunction
@@ -88,7 +88,7 @@ EndFunction
 Function Disconnect()
     { Closes the connection to the backend (if not disabled) }
     If Connects()
-        Tele_Api.Cmd("connection.disconnect")
+        Tele_Api.Cmd("disconnect")
         ScanningForDevices = false
     EndIf
 EndFunction

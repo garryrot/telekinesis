@@ -29,7 +29,7 @@ configure_file(
         @ONLY)
 
 set(sources
-        src/Main.cpp
+        src/Plugin.cpp
         ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 
 source_group(

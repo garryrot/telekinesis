@@ -207,7 +207,7 @@ impl TkApi {
 impl Api<Telekinesis> for TkApi {
     fn init(&self) -> ApiInit<Telekinesis> {
         ApiInit {
-            name: "connection.connect",
+            name: "connect",
             exec: || {
                 Telekinesis::connect(TkSettings::try_read_or_default(
                     SETTINGS_PATH,
@@ -224,11 +224,11 @@ impl Api<Telekinesis> for TkApi {
                 exec: |tk| tk.stop_all(),
             },
             ApiCmd0 {
-                name: "connection.start_scan",
+                name: "start_scan",
                 exec: |tk| tk.scan_for_devices(),
             },
             ApiCmd0 {
-                name: "connection.stop_scan",
+                name: "stop_scan",
                 exec: |tk| tk.stop_scan(),
             },
             ApiCmd0 {
@@ -396,7 +396,7 @@ impl Api<Telekinesis> for TkApi {
 
     fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
         ApiCmd0 {
-            name: "connection.disconnect",
+            name: "disconnect",
             exec: |tk| { tk.disconnect(); true },
         }
     }

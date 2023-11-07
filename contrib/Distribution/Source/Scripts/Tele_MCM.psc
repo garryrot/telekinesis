@@ -133,7 +133,7 @@ Event OnPageReset(String page)
             String name = _DeviceNames[i]
             
             If name != ""
-                String status = Tele_Api.Qry_Str_1("device.connection.status", name)
+                String status = Tele_Api.Qry_Str_1("device.connection_status", name)
                 AddHeaderOption(name)
                 AddTextOption(Key(i, "Status"), status, OPTION_FLAG_DISABLED)
                 AddTextOption(Key(i, "Actions"), Tele_Api.Qry_Lst_1("device.capabilities", name), OPTION_FLAG_DISABLED)
@@ -535,9 +535,9 @@ EndState
 State ACTION_SCAN_FOR_DEVICES
     Event OnSelectST()
         If TeleDevices.ScanningForDevices
-            Tele_Api.Cmd("connection.stop_scan")
+            Tele_Api.Cmd("stop_scan")
         Else
-            Tele_Api.Cmd("connection.start_scan")
+            Tele_Api.Cmd("start_scan")
         EndIf
         TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
         SetToggleOptionValueST(TeleDevices.ScanningForDevices)

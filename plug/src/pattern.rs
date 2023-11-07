@@ -126,7 +126,6 @@ impl DeviceAccess {
             let mut sorted: Vec<(i32, Speed)> = actions.clone();
             sorted.sort_by_key(|b| b.0);
             if let Some(tuple) = sorted.last() {
-                warn!("Speed {} overrids provided speed {}", tuple.1, new_speed);
                 return tuple.1;
             }
         }
