@@ -10,15 +10,22 @@ Quest Property ZadLib Auto        ; ZadLibs
 Quest Property SexLab Auto        ; SexLabFramework
 Quest Property Toys Auto          ; ToysFramework
 Quest Property SexLabAroused Auto ; SlaFrameworkScr
+Bool  Property OStim Auto         ; OStim
 
-String[] _SceneTags
+String[] _SexlabSceneTags
 Bool _InSexlabScene = false
+
 Bool _InToysScene = false
+
+Bool _InOstimScene = false
+Int _OstimMaxSpeed = 4
+String[] _OstimSceneTags
 
 Bool _DeviousDevices_Vibrate = false
 Bool _Sexlab_Animation = false
 Bool _Sexlab_ActorOrgasm = false
 Bool _Sexlab_ActorEdge = false
+Bool _Ostim_Animation = false
 Bool _Toys_Animation = false
 Bool _Toys_Caressed = false
 Bool _Toys_Climax = false
@@ -35,6 +42,7 @@ Int _EmergencyHotkey = 211
 Int _DeviousDevicesVibrateHandle
 Int _SexlabSceneVibrationHandle
 Int _ToysSceneVibrationHandle
+Int _OstimSceneVibrationHandle = -1
 
 Int Property EmergencyHotkey_Default = 211 AutoReadOnly ; del
 Int Property EmergencyHotkey
@@ -132,6 +140,41 @@ Bool Property Sexlab_ActorEdge
     EndFunction
     Bool Function Get()
         return _Sexlab_ActorEdge
+    EndFunction
+EndProperty
+
+String Property Ostim_Animation_Funscript = "" Auto
+String Property Ostim_Animation_Funscript_Default = "" Auto
+Int Property Ostim_Animation_DeviceSelector = 0 Auto
+Int Property Ostim_Animation_DeviceSelector_Default = 0 AutoReadOnly
+Int Property Ostim_Animation_Speed_Control = 1 Auto
+Int Property Ostim_Animation_Speed_Control_Default = 1 AutoReadOnly
+Int Property Ostim_Animation_Pattern = 0 Auto
+Int Property Ostim_Animation_Pattern_Default = 0 AutoReadOnly  
+String Property Ostim_Animation_Event_Anal = "Anal" Auto
+String Property Ostim_Animation_Event_Anal_Default = "Anal" Auto
+String Property Ostim_Animation_Event_Vaginal = "Vaginal" Auto
+String Property Ostim_Animation_Event_Vaginal_Default = "Vaginal" Auto
+String Property Ostim_Animation_Event_Nipple = "Nipple" Auto
+String Property Ostim_Animation_Event_Nipple_Default = "Nipple" Auto
+String Property Ostim_Animation_Event_Penetration = "Penetration" Auto
+String Property Ostim_Animation_Event_Penetration_Default = "Penetration" Auto
+
+Bool Property Ostim_Animation_Default = true AutoReadOnly
+Bool Property Ostim_Animation
+    Function Set(Bool enable)
+        _Ostim_Animation = enable
+        If enable
+            RegisterForModEvent("Ostim_SceneChanged", "OnOstimSceneChanged")
+            RegisterForModEvent("Ostim_End", "OnOstimEnd")
+        Else
+            UnregisterForModEvent("Ostim_SceneChanged")
+            UnregisterForModEvent("Ostim_End")
+            _InOstimScene = false
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Ostim_Animation
     EndFunction
 EndProperty
 
@@ -280,11 +323,9 @@ Bool Property Toys_Animation
     Function Set(Bool enable)
         _Toys_Animation = enable
         If enable
-            RegisterForModEvent("ToysStartLove", "OnToysSceneStart")
             RegisterForModEvent("ToysLoveSceneEnd", "OnToysSceneEnd")
             RegisterForModEvent("ToysLoveSceneInfo", "OnToysLoveSceneInfo") 
         Else
-            UnregisterForModEvent("ToysStartLove")
             UnregisterForModEvent("ToysLoveSceneEnd")
             UnregisterForModEvent("ToysLoveSceneInfo")
         EndIf
@@ -401,7 +442,7 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
 
     ; TODO Also use strength for patterns, once pattern strength is supported
     Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
-    _DeviousDevicesVibrateHandle = HandleVibration( DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events )
+    _DeviousDevicesVibrateHandle = HandleVibration(DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events)
 	TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 
@@ -425,13 +466,13 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	EndIf
     sslThreadController Controller = (Sexlab as SexLabFramework).GetController(threadID)
     sslBaseAnimation animation = Controller.Animation
-    _SceneTags = animation.GetTags()
+    _SexlabSceneTags = animation.GetTags()
 
     If Sexlab_Animation_Rousing
         _InSexlabScene = True
         UpdateRousingControlledSexScene()
     Else 
-        HandleVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, _SceneTags)
+        HandleVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, _SexlabSceneTags)
     EndIf
 EndEvent
 
@@ -453,6 +494,105 @@ Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sen
 	TeleDevices.Vibrate(Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0))
     TeleDevices.LogDebug("OnDeviceEdgedActor")
 EndEvent
+
+; OStim 
+
+Bool Function OstimPlayerHasVaginalStimulation(String sceneID)
+    String activeActions = "femalemasturbation,tribbing"
+    String passiveActions = "cunnilingus,lickingvagina,rubbingclitoris,vaginalsex,vaginalfisting,vaginalfingering,vaginaltoying"
+    return OMetadata.FindAnyActionCSV( sceneID, activeActions + "," + passiveActions ) != -1
+EndFunction
+
+Bool Function OstimPlayerHasAnalStimulation(String sceneID)
+    String actions = "analfingering,analfisting,analsex,analtoying,anilingus"
+    return OMetadata.FindAnyActionCSV( sceneID, actions ) != -1
+EndFunction
+
+Bool Function OstimPlayerHasNippleStimulation(String sceneID)
+    String actions = "gropingbreast,lickingnipple,boobjob,suckingnipple"
+    return OMetadata.FindAnyActionCSV( sceneID, actions ) != -1
+EndFunction
+
+Bool Function OstimPlayerHasPenetration(String sceneID)
+    String actions = "analsex,analfisting,analfingering,deepthroat,lickingpenis,vaginalfingering,vaginalfisting"
+    return OMetadata.FindAnyActionCSV( sceneID, actions ) != -1
+EndFunction
+
+Event OnOstimSceneChanged(string eventName, string sceneID, float numArg, Form sender)
+    TeleDevices.LogDebug("OnOstimSceneChanged " + eventName + " " + sceneID + " " + numArg)
+    Bool hasVaginal = OstimPlayerHasVaginalStimulation(sceneID)
+    Bool hasAnal = OstimPlayerHasAnalStimulation(sceneID)
+    Bool hasNipple = OstimPlayerHasNippleStimulation(sceneID)
+    Bool hasPenetration = OstimPlayerHasPenetration(sceneID)
+
+    _OstimMaxSpeed = OMetadata.GetMaxSpeed(sceneID)
+
+    String[] evts = new String[4]
+    If hasVaginal
+        evts[0] = Ostim_Animation_Event_Vaginal
+    EndIf
+    If hasNipple
+        evts[1] = Ostim_Animation_Event_Nipple 
+    EndIf
+    If hasAnal
+        evts[2] = Ostim_Animation_Event_Anal
+    EndIf
+    If hasPenetration
+        evts[3] = Ostim_Animation_Event_Penetration
+    EndIf
+    _OstimSceneTags = evts
+
+    Int oldHandle = _OstimSceneVibrationHandle
+    If hasVaginal || hasAnal || hasNipple || hasPenetration
+        _OstimSceneVibrationHandle = HandleVibration(Ostim_Animation_DeviceSelector, -1, Ostim_Animation_Pattern, Ostim_Animation_Funscript, GetOStimSpeed(), _OstimSceneTags)
+        _InOstimScene = true
+    Else
+        _OstimSceneVibrationHandle = -1
+        _InOstimScene = false
+    EndIf
+    If oldHandle != -1
+        TeleDevices.StopHandle(oldHandle)
+    EndIf
+EndEvent
+
+Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
+    TeleDevices.LogDebug("OnOstimEnd")
+    If _OstimSceneVibrationHandle != -1
+        TeleDevices.StopHandle(_OstimSceneVibrationHandle)
+        _OstimSceneVibrationHandle = -1
+    EndIf
+    _InOstimScene = false
+EndEvent
+
+Int Function GetOStimSpeed()
+    TeleDevices.LogDebug("Speed: " + OThread.GetSpeed(0) + " Max: " + _OstimMaxSpeed )
+
+    If Ostim_Animation_Speed_Control == 1
+        Float speed = OThread.GetSpeed(0) as Float
+        If speed == 0.0
+            speed = 0.5
+        EndIf
+        Float factor = speed / _OstimMaxSpeed as Float
+        return (100 * factor) as Int
+    EndIf
+
+    If Ostim_Animation_Speed_Control == 2
+        Float excitement = OActor.GetExcitement(Game.GetPlayer())
+        return (100 * excitement) as Int
+    EndIf
+
+    If Ostim_Animation_Speed_Control == 3
+        Float speed = OThread.GetSpeed(0) as Float
+        If speed == 0.0
+            speed = 0.5
+        EndIf
+        Float speedFactor = speed / _OstimMaxSpeed as Float
+        Float excitement = OActor.GetExcitement(Game.GetPlayer())
+        return (100 * excitement * speedFactor) as Int
+    EndIf
+
+    return 100
+EndFunction
 
 ; Toys & Love Events
 
@@ -501,7 +641,6 @@ Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bo
         _InToysScene = true
         UpdateRousingControlledSexScene()
     Else
-
         String[] events = GetLoveTags(loveName)
         _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, Toys_Animation_Pattern, Toys_Animation_Funscript, Toys_Animation_Linear_Strength, events)
     EndIf
@@ -525,11 +664,6 @@ String[] Function GetLoveTags(String loveName)
     EndIf
     return events
 EndFunction
-
-Event OnToysSceneStart(string eventName, string argString, float argNum, form sender)
-    ; TODO Remove 
-    TeleDevices.LogDebug("ToysSceneStart")
-EndEvent
 
 Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
     _InToysScene = false
@@ -608,6 +742,14 @@ Function ResetIntegrationSettings()
     Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
     Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
     Sexlab_ActorEdge = Sexlab_ActorEdge_Default
+    Ostim_Animation_Funscript = Ostim_Animation_Funscript_Default
+    Ostim_Animation_DeviceSelector = Ostim_Animation_DeviceSelector_Default
+    Ostim_Animation_Pattern = Ostim_Animation_Pattern_Default
+    Ostim_Animation_Event_Anal = Ostim_Animation_Event_Anal_Default
+    Ostim_Animation_Event_Vaginal = Ostim_Animation_Event_Vaginal_Default
+    Ostim_Animation_Event_Nipple = Ostim_Animation_Event_Nipple_Default
+    Ostim_Animation_Event_Penetration = Ostim_Animation_Event_Penetration_Default
+    Ostim_Animation_Speed_Control = Ostim_Animation_Speed_Control_Default
     Toys_Animation = Toys_Animation_Default
     Toys_Animation_DeviceSelector = Toys_Animation_DeviceSelector_Default
     Toys_Animation_Rousing = Toys_Animation_Rousing_Default
@@ -651,32 +793,38 @@ EndEvent
 Function UpdateRousingControlledSexScene()
     If _InToysScene
         Int rousing = (Toys as ToysFramework).GetRousing()
-
         String[] evts = GetLoveTags(_LoveName)
-
         Int oldHandle = _ToysSceneVibrationHandle
         _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, 0, Toys_Animation_Funscript, rousing, evts)
         TeleDevices.StopHandle(oldHandle)
         TeleDevices.LogDebug("UpdatingToysScene Rousing=" + rousing)
         RegisterForSingleUpdate(2)
-        If ! _InToysScene ; Prevent lingering vibrations if scene finishes during handler
+
+        ; Prevent lingering vibrations if scene finishes during handler
+        If ! _InToysScene 
             TeleDevices.StopHandle(_ToysSceneVibrationHandle)
         EndIf
     ElseIf _InSexlabScene
         Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(Game.GetPlayer())
-        If arousal >= 0
-            Sexlab_Animation_Linear_Strength
-        EndIf
-
         Int oldHandle = _SexlabSceneVibrationHandle
-        _SexlabSceneVibrationHandle = HandleVibration(Sexlab_Animation_DeviceSelector, -1 , 0, Sexlab_Animation_Funscript, arousal, _SceneTags)
+        _SexlabSceneVibrationHandle = HandleVibration(Sexlab_Animation_DeviceSelector, -1 , 0, Sexlab_Animation_Funscript, arousal, _SexlabSceneTags)
         TeleDevices.StopHandle(oldHandle)
         TeleDevices.LogDebug("UpdatingSexlabScene Arousal=" + arousal)
         RegisterForSingleUpdate(2)
-        If ! _InSexlabScene ; Prevent lingering vibrations if scene finishes during handler
+
+        If ! _InSexlabScene
             TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
         EndIf
-	EndIf
+	ElseIf _InOstimScene
+        Int oldHandle = _OstimSceneVibrationHandle
+        _OstimSceneVibrationHandle = HandleVibration(Ostim_Animation_DeviceSelector, -1, 0, Ostim_Animation_Funscript, GetOStimSpeed(), _OstimSceneTags)
+        TeleDevices.StopHandle(oldHandle)
+        RegisterForSingleUpdate(2)
+
+        If ! _InOstimScene
+            TeleDevices.StopHandle(_OstimSceneVibrationHandle)
+        EndIf
+    EndIf
 EndFunction
 
 Int Function HandleVibration(Int deviceSelector, Int duration, Int patternType, String funscript, Int linearStrength, String[] evts)

@@ -23,23 +23,26 @@ Function LoadTelekinesis()
 
     If Game.GetModByName("SexLab.esm") != 255
         TeleIntegration.SexLab = Quest.GetQuest("SexLabQuestFramework")
-        TeleDevices.LogDebug(TeleIntegration.SexLab)
     Else
         TeleIntegration.SexLab = None
     EndIf
 
     If Game.GetModByName("Toys.esm") != 255
         TeleIntegration.Toys = Quest.GetQuest("ToysFramework")
-        TeleDevices.LogDebug(TeleIntegration.Toys)
     Else
         TeleIntegration.Toys = None
     EndIf
 
     If Game.GetModByName("SexLabAroused.esm") != 255
         TeleIntegration.SexLabAroused = Quest.GetQuest("sla_Framework")
-        TeleDevices.LogDebug(TeleIntegration.SexLabAroused)
     Else
         TeleIntegration.SexLabAroused = None
+    EndIf
+       
+    If Game.GetModByName("OStim.esp") != 255
+        TeleIntegration.OStim = True
+    Else
+        TeleIntegration.OStim = False
     EndIf
     
     TeleDevices.ConnectAndScanForDevices()

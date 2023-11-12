@@ -6,6 +6,7 @@ Tele_Integration Property TeleIntegration Auto
 String[] _ConnectionMenuOptions
 String[] _DeviceSelectorOptions ; 0 = All, 1 = Match Tags
 String[] _PatternSelectorOptions
+String[] _OstimSpeedOptions
 
 Int[] _UseDeviceOids
 Int[] _DeviceEventOids
@@ -19,7 +20,7 @@ String[] _DeviceNames
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 10
+    return 11
 EndFunction
 
 Event OnConfigInit()
@@ -37,19 +38,25 @@ Event OnVersionUpdate(int aVersion)
         InitLocals()
         TeleIntegration.ResetIntegrationSettings()
     EndIf
+
+    If CurrentVersion == 10
+        InitLocals()
+    EndIf
 EndEvent
 
 Function InitLocals()
-    Pages = new String[9]
+    Pages = new String[10]
     Pages[0] = "General"
     Pages[1] = "Devices"
     Pages[2] = "Funscript Patterns"
     Pages[3] = "Devious Devices"
     Pages[4] = "Sexlab"
     Pages[5] = "Toys & Love"
-    Pages[6] = "Skyrim Chain Beasts"
-    Pages[7] = "Debug"
-    Pages[8] = "Troubleshooting"
+    Pages[6] = " OStim"
+    Pages[7] = "Skyrim Chain Beasts"
+
+    Pages[8] = "Debug"
+    Pages[9] = "Troubleshooting"
 
     _ConnectionMenuOptions = new String[3]
     _ConnectionMenuOptions[0] = "In-Process"
@@ -58,13 +65,19 @@ Function InitLocals()
 
     _DeviceSelectorOptions = new String[2]
     _DeviceSelectorOptions[0] = "All"
-    _DeviceSelectorOptions[1] = "Match Events"
+    _DeviceSelectorOptions[1] = "Match Body Parts"
 
     _PatternSelectorOptions = new String[3]
     _PatternSelectorOptions[0] = "Linear"
     _PatternSelectorOptions[1] = "Funscript"
     _PatternSelectorOptions[2] = "Random Funscript"
-
+    
+    _OstimSpeedOptions = new String[4]
+    _OstimSpeedOptions[0] = "Constant"
+    _OstimSpeedOptions[1] = "Animation Speed"
+    _OstimSpeedOptions[2] = "Excitement"
+    _OstimSpeedOptions[3] = "Speed*Excitement"
+    
     _UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
     _DeviceEventOids = new Int[20]
     
@@ -135,9 +148,9 @@ Event OnPageReset(String page)
             If name != ""
                 String status = Tele_Api.Qry_Str_1("device.connection_status", name)
                 AddHeaderOption(name)
-                AddTextOption(Key(i, "Status"), status, OPTION_FLAG_DISABLED)
+                AddTextOption(Key(i, "State"), status, OPTION_FLAG_DISABLED)
                 AddTextOption(Key(i, "Actions"), Tele_Api.Qry_Lst_1("device.capabilities", name), OPTION_FLAG_DISABLED)
-                _DeviceEventOids[i] = AddInputOption(Key(i, "Events"), Join(Tele_Api.Qry_Lst_1("device.settings.events", name), ","))
+                _DeviceEventOids[i] = AddInputOption(Key(i, " Body Parts"), Join(Tele_Api.Qry_Lst_1("device.settings.events", name), ","))
 
                 Int flags = OPTION_FLAG_DISABLED
                 If status == "Connected"
@@ -164,7 +177,7 @@ Event OnPageReset(String page)
 
         If TeleIntegration.ZadLib != None
             AddHeaderOption("In-Game Vibrators")
-            AddToggleOptionST("OPTION_DEVIOUS_DEVICES_VIBRATE", "Enable", TeleIntegration.DeviousDevices_Vibrate)
+            AddToggleOptionST("OPTION_DEVIOUS_DEVICES_VIBRATE", "Enable Vibrators", TeleIntegration.DeviousDevices_Vibrate)
             Int devious_devices_vibrate_selector_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.DeviousDevices_Vibrate
                 devious_devices_vibrate_selector_flag = OPTION_FLAG_NONE
@@ -203,7 +216,7 @@ Event OnPageReset(String page)
         SetCursorFillMode(TOP_TO_BOTTOM)
         If TeleIntegration.SexLab != None
             AddHeaderOption("Sexlab Animations")
-            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Enable", TeleIntegration.Sexlab_Animation)
+            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Enable Vibrators", TeleIntegration.Sexlab_Animation)
             Int sexlab_animation_selector_flag = OPTION_FLAG_DISABLED
             If TeleIntegration.Sexlab_Animation
                 sexlab_animation_selector_flag = OPTION_FLAG_NONE
@@ -239,6 +252,54 @@ Event OnPageReset(String page)
             AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Strong Vibration on Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
         Else
             AddTextOption("Sexlab", "Mod not found", OPTION_FLAG_DISABLED)
+        EndIf
+    EndIf
+
+    If page == " OStim"
+        SetCursorFillMode(TOP_TO_BOTTOM)
+        If TeleIntegration.OStim
+            AddHeaderOption("Ostim Animations")
+            AddToggleOptionST("OPTION_OSTIM_ANIMATION", "Enable Vibrators", TeleIntegration.Ostim_Animation)
+            Int ostim_animation_selector_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Ostim_Animation
+                ostim_animation_selector_flag = OPTION_FLAG_NONE
+            EndIf
+            
+            AddHeaderOption("Devices")
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
+
+            AddHeaderOption("Actions")
+            Int ostim_animation_speed_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Ostim_Animation
+                ostim_animation_speed_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_SPEED", "Speed", _OstimSpeedOptions[TeleIntegration.Ostim_Animation_Speed_Control], ostim_animation_speed_flag)
+
+            Int ostim_animation_pattern_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_Speed_Control == 0
+                ostim_animation_pattern_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Ostim_Animation_Pattern], ostim_animation_pattern_flag)
+        
+            Int ostim_animation_funscript_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_Speed_Control == 0 && TeleIntegration.Ostim_Animation_Pattern == 1
+                ostim_animation_funscript_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Ostim_Animation_Funscript, ostim_animation_funscript_flag)
+
+            Int ostim_animation_event_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_DeviceSelector == 1
+                ostim_animation_event_flag = OPTION_FLAG_NONE
+            EndIf
+            
+            SetCursorPosition(1)
+            AddHeaderOption("Scene Tags")
+            AddInputOptionST("OSTIM_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.Ostim_Animation_Event_Vaginal, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.Ostim_Animation_Event_Anal, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.Ostim_Animation_Event_Nipple, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_PENETRATION", "Event on 'Penetration'", TeleIntegration.Ostim_Animation_Event_Penetration, ostim_animation_event_flag)
+        Else
+            AddTextOption("OStim", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
     EndIf
 
@@ -295,10 +356,10 @@ Event OnPageReset(String page)
             If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_DeviceSelector == 1
                 toys_animation_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.Toys_Animation_Event_Vaginal, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.Toys_Animation_Event_Anal, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ORAL", "Event on 'Oral'", TeleIntegration.Toys_Animation_Event_Oral, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.Toys_Animation_Event_Nipple, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_VAGINAL", "Event for 'Vaginal'", TeleIntegration.Toys_Animation_Event_Vaginal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ANAL", "Event for 'Anal'", TeleIntegration.Toys_Animation_Event_Anal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ORAL", "Event for 'Oral'", TeleIntegration.Toys_Animation_Event_Oral, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_NIPPLE", "Event for 'Nipple'", TeleIntegration.Toys_Animation_Event_Nipple, toys_animation_event_flag)
 
             AddHeaderOption("Actions")
             Int toys_animation_rousing = OPTION_FLAG_DISABLED
@@ -593,7 +654,7 @@ State MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR
     EndEvent
 
     Event OnHighlightST()
-        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        String text = "Set to 'Match Body Parts' if you only want to vibrate devices that correspond to a matching in-game item\n"
         SetInfoText(text)
     EndEvent
 EndState
@@ -727,7 +788,7 @@ State MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR
     EndEvent
 
     Event OnHighlightST()
-        String txt = "Set to 'Match Events' when you only want to vibrate devices that match any of the sexlab animation tags\n"
+        String txt = "Set to 'Match Body Parts' when you only want to vibrate devices that match any of the sexlab animation tags\n"
         txt += "Note: Will match any tag, but Anal, Boobjob, Vaginal, Masturbation, Oral are probably the events you want to associate with your devices"
         SetInfoText(txt)
     EndEvent
@@ -827,6 +888,182 @@ State OPTION_SEXLAB_ACTOR_EDGE
     EndEvent
 EndState
 
+; OStim
+
+State OPTION_OSTIM_ANIMATION
+    Event OnSelectST()
+        TeleIntegration.Ostim_Animation = !TeleIntegration.Ostim_Animation
+        SetToggleOptionValueST(TeleIntegration.Ostim_Animation)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TeleIntegration.Ostim_Animation = TeleIntegration.Ostim_Animation_Default
+        SetToggleOptionValueST(TeleIntegration.Ostim_Animation)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices during OStim player animation")
+    EndEvent
+EndState
+
+State MENU_OSTIM_ANIMATION_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TeleIntegration.Ostim_Animation_DeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TeleIntegration.Ostim_Animation_DeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TeleIntegration.Ostim_Animation_DeviceSelector = TeleIntegration.Ostim_Animation_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Ostim_Animation_DeviceSelector])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String txt = "Set to 'Match Body Parts' when you only want to vibrate devices that match any of the OStim scene actions\n"
+        txt += ""
+        SetInfoText(txt)
+    EndEvent
+EndState
+
+State MENU_OSTIM_ANIMATION_SPEED
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_OstimSpeedOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Ostim_Animation_Speed_Control = index
+        SetMenuOptionValueST(_OstimSpeedOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_OstimSpeedOptions[TeleIntegration.Ostim_Animation_Speed_Control_Default])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String txt = "Configure dynamic speed control based on either animation speed, excitement or both combined. Default: Speed\n"
+        txt += "Speed: Animation Speed 1/4 = 25%, Animation Speed 2/4 = 50%...\n"
+        txt += "Excitement: Excitement 1% = 1%, Excitement 50% = 50%"
+        SetInfoText(txt)
+    EndEvent
+EndState
+
+State MENU_OSTIM_ANIMATION_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Ostim_Animation_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptions[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Linear': Constant vibration strength. 'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+State MENU_OSTIM_ANIMATION_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_VibrateFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TeleIntegration.Ostim_Animation_Funscript = _VibrateFunscriptNames[index]
+        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+    EndEvent
+EndState
+
+State OSTIM_EVENT_ANAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Anal)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Ostim_Animation_Event_Anal = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The device event that is triggered for in-game 'Anal' stimulation of the player. Default: Anal")
+    EndEvent
+EndState
+
+State OSTIM_EVENT_NIPPLE
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Nipple)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Ostim_Animation_Event_Nipple = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The device event that is triggered for in-game 'Nipple' stimulation of the player. Default: Nipple")
+    EndEvent
+EndState
+
+State OSTIM_EVENT_VAGINAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Vaginal)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Ostim_Animation_Event_Vaginal = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The device event that is triggered for in-game 'Vaginal' stimulation of the player. Default: Vaginal")
+    EndEvent
+EndState
+
+State OSTIM_EVENT_PENETRATION
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Vaginal)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Ostim_Animation_Event_Vaginal = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The device event that is triggered for in-game 'Penetration' of the player, active or passive. Default: Penetration")
+    EndEvent
+EndState
+
 ; Toys & Love
 
 State OPTION_TOYS_VIBRATE
@@ -867,7 +1104,7 @@ State MENU_TOYS_VIBRATE_DEVICE_SELECTOR
     EndEvent
 
     Event OnHighlightST()
-        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        String text = "Set to 'Match Body Parts' if you only want to vibrate devices that correspond to a matching in-game item\n"
         SetInfoText(text)
     EndEvent
 EndState
@@ -992,7 +1229,7 @@ State MENU_TOYS_ANIMATION_DEVICE_SELECTOR
     EndEvent
 
     Event OnHighlightST()
-        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        String text = "Set to 'Match Body Parts' if you only want to vibrate devices that correspond to a matching in-game item\n"
         SetInfoText(text)
     EndEvent
 EndState
@@ -1284,7 +1521,7 @@ State MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR
     EndEvent
 
     Event OnHighlightST()
-        String text = "Set to 'Match Events' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        String text = "Set to 'Match Body Parts' if you only want to vibrate devices that correspond to a matching in-game item\n"
         SetInfoText(text)
     EndEvent
 EndState
@@ -1542,9 +1779,9 @@ Event OnOptionHighlight(int oid)
     Int i = 0
     While (i < 31 && i < _DeviceNames.Length)
         If (oid == _DeviceEventOids[i])  
-            String infoText = "A comma-separated list of events that are associated with this device\n"
-            infoText += "Example 1: Vaginal,Anal,Nipple\n"
-            infoText += "Example 2: Nipple"
+            String infoText = "A comma-separated list of body parts associated with this device.\n"
+            infoText += "By default, the terms 'Nipple', 'Vaginal', 'Anal', 'Penetration' are used to describe these, but any is possible.\n"
+            infoText += "Example: Vaginal,Anal,Nipple\n"
             SetInfoText(infoText)
         EndIf
         i += 1

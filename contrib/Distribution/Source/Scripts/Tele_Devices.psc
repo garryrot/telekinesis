@@ -67,7 +67,6 @@ Event OnUpdate()
                 LogError(_ErrorText)
             ElseIf type == "DeviceEvent"
                 LogEvent(evt)
-                ; LogEvent(evt[1] + " for " + evt[2] + "s at " + evt[3] + " (" +  evt[4] + ") on " + evt[5] + " events: " + evt[6])
             EndIf
             i += 1
         EndWhile
@@ -124,8 +123,8 @@ Int Function VibratePattern(String pattern, Float duration_sec = -1.0, String[] 
     If Connects()
         return Tele_Api.Tele_Control("vibrate.pattern", 100, duration_sec, pattern, events)
     EndIf
-    return -1
     Trace("(Vibrate) pattern='" + pattern + " duration=" + duration_sec + " events=" + events)
+    return -1
 EndFunction
 
 Function StopHandle(Int handle)
