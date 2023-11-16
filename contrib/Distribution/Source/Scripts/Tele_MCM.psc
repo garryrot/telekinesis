@@ -148,9 +148,9 @@ Event OnPageReset(String page)
             If name != ""
                 String status = Tele_Api.Qry_Str_1("device.connection_status", name)
                 AddHeaderOption(name)
-                AddTextOption(Key(i, "State"), status, OPTION_FLAG_DISABLED)
+                AddTextOption(Key(i, "State"), status, OPTION_FLAG_DISABLED)                
                 AddTextOption(Key(i, "Actions"), Tele_Api.Qry_Lst_1("device.capabilities", name), OPTION_FLAG_DISABLED)
-                _DeviceEventOids[i] = AddInputOption(Key(i, " Body Parts"), Join(Tele_Api.Qry_Lst_1("device.settings.events", name), ","))
+                _DeviceEventOids[i] = AddInputOption(Key(i, "Body Parts"), Join(Tele_Api.Qry_Lst_1("device.settings.events", name), ","))
 
                 Int flags = OPTION_FLAG_DISABLED
                 If status == "Connected"
@@ -190,9 +190,9 @@ Event OnPageReset(String page)
             If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_DeviceSelector == 1
                 devious_devices_vibrate_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event for 'Anal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Anal, devious_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event for 'Vaginal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event on 'Nipple Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event 'Anal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Anal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event 'Vaginal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event 'Nipple Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
         
             AddHeaderOption("Actions")
             Int devious_devices_vibrate_pattern_flag = OPTION_FLAG_DISABLED
@@ -257,7 +257,7 @@ Event OnPageReset(String page)
 
     If page == " OStim"
         SetCursorFillMode(TOP_TO_BOTTOM)
-        If TeleIntegration.OStim
+        If TeleIntegration.OStim != None
             AddHeaderOption("Ostim Animations")
             AddToggleOptionST("OPTION_OSTIM_ANIMATION", "Enable Vibrators", TeleIntegration.Ostim_Animation)
             Int ostim_animation_selector_flag = OPTION_FLAG_DISABLED
@@ -267,6 +267,17 @@ Event OnPageReset(String page)
             
             AddHeaderOption("Devices")
             AddMenuOptionST("MENU_OSTIM_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
+
+            Int ostim_animation_event_flag = OPTION_FLAG_DISABLED
+            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_DeviceSelector == 1
+                ostim_animation_event_flag = OPTION_FLAG_NONE
+            EndIf
+            AddInputOptionST("OSTIM_EVENT_VAGINAL", "Event Vaginal Stimulation", TeleIntegration.Ostim_Animation_Event_Vaginal, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_ANAL", "Event Anal Stimulation", TeleIntegration.Ostim_Animation_Event_Anal, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_NIPPLE", "Event Nipple Stimulation", TeleIntegration.Ostim_Animation_Event_Nipple, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_PENIS", "Event Penis Stimulation", TeleIntegration.Ostim_Animation_Event_Penis, ostim_animation_event_flag)
+            ; Enable for thrusters
+            ; AddInputOptionST("OSTIM_EVENT_PENETRATION", "Event Penetrating", TeleIntegration.Ostim_Animation_Event_Penetration, ostim_animation_event_flag)
 
             AddHeaderOption("Actions")
             Int ostim_animation_speed_flag = OPTION_FLAG_DISABLED
@@ -286,18 +297,6 @@ Event OnPageReset(String page)
                 ostim_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_OSTIM_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Ostim_Animation_Funscript, ostim_animation_funscript_flag)
-
-            Int ostim_animation_event_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_DeviceSelector == 1
-                ostim_animation_event_flag = OPTION_FLAG_NONE
-            EndIf
-            
-            SetCursorPosition(1)
-            AddHeaderOption("Scene Tags")
-            AddInputOptionST("OSTIM_EVENT_VAGINAL", "Event on 'Vaginal'", TeleIntegration.Ostim_Animation_Event_Vaginal, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_ANAL", "Event on 'Anal'", TeleIntegration.Ostim_Animation_Event_Anal, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_NIPPLE", "Event on 'Nipple'", TeleIntegration.Ostim_Animation_Event_Nipple, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_PENETRATION", "Event on 'Penetration'", TeleIntegration.Ostim_Animation_Event_Penetration, ostim_animation_event_flag)
         Else
             AddTextOption("OStim", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
@@ -356,10 +355,10 @@ Event OnPageReset(String page)
             If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_DeviceSelector == 1
                 toys_animation_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_VAGINAL", "Event for 'Vaginal'", TeleIntegration.Toys_Animation_Event_Vaginal, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ANAL", "Event for 'Anal'", TeleIntegration.Toys_Animation_Event_Anal, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ORAL", "Event for 'Oral'", TeleIntegration.Toys_Animation_Event_Oral, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_NIPPLE", "Event for 'Nipple'", TeleIntegration.Toys_Animation_Event_Nipple, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_VAGINAL", "Event Vaginal Stimulation", TeleIntegration.Toys_Animation_Event_Vaginal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ANAL", "Event Anal Stimulation", TeleIntegration.Toys_Animation_Event_Anal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ORAL", "Event Oral Stimulation", TeleIntegration.Toys_Animation_Event_Oral, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_NIPPLE", "Event Nipple Stimulation", TeleIntegration.Toys_Animation_Event_Nipple, toys_animation_event_flag)
 
             AddHeaderOption("Actions")
             Int toys_animation_rousing = OPTION_FLAG_DISABLED
@@ -928,8 +927,8 @@ State MENU_OSTIM_ANIMATION_DEVICE_SELECTOR
     EndEvent
 
     Event OnHighlightST()
-        String txt = "Set to 'Match Body Parts' when you only want to vibrate devices that match any of the OStim scene actions\n"
-        txt += ""
+        String txt = "By default vibrate 'All' devices on sexual OStim scenes (anything involving vagina,anal,nipple or penis)\n" 
+        txt += "'Match Body Parts' will only vibrate devices that match specific body parts (configured below and in 'Devices' Page)\n"
         SetInfoText(txt)
     EndEvent
 EndState
@@ -1015,7 +1014,7 @@ State OSTIM_EVENT_ANAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game 'Anal' stimulation of the player. Default: Anal")
+        SetInfoText("The device event that is triggered for in-game anal stimulation of the player. Default: Anal")
     EndEvent
 EndState
 
@@ -1030,7 +1029,7 @@ State OSTIM_EVENT_NIPPLE
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game 'Nipple' stimulation of the player. Default: Nipple")
+        SetInfoText("The device event that is triggered for in-game nipple stimulation of the player. Default: Nipple")
     EndEvent
 EndState
 
@@ -1045,7 +1044,7 @@ State OSTIM_EVENT_VAGINAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game 'Vaginal' stimulation of the player. Default: Vaginal")
+        SetInfoText("The device event that is triggered for in-game vaginal stimulation of the player. Default: Vaginal")
     EndEvent
 EndState
 
@@ -1060,7 +1059,22 @@ State OSTIM_EVENT_PENETRATION
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game 'Penetration' of the player, active or passive. Default: Penetration")
+        SetInfoText("The device event that is triggered when the player penetrates an in-game character. Default: Penetration")
+    EndEvent
+EndState
+
+State OSTIM_EVENT_PENIS
+	Event OnInputOpenST()
+		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Penis)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TeleIntegration.Ostim_Animation_Event_Penis = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("The device event that is triggered for in-game penis stimulation of the player, active or passive. Default: Penis")
     EndEvent
 EndState
 

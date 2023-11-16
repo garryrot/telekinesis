@@ -40,9 +40,9 @@ Function LoadTelekinesis()
     EndIf
        
     If Game.GetModByName("OStim.esp") != 255
-        TeleIntegration.OStim = True
+        TeleIntegration.OStim = OUtils.GetOStim()
     Else
-        TeleIntegration.OStim = False
+        TeleIntegration.OStim = None
     EndIf
     
     TeleDevices.ConnectAndScanForDevices()
