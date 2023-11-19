@@ -151,7 +151,9 @@ impl TkButtplugScheduler {
         self.last_handle
     }
 
-    pub fn create(settings: TkPlayerSettings) -> (TkButtplugScheduler, UnboundedReceiver<TkDeviceAction>) {
+    pub fn create(
+        settings: TkPlayerSettings,
+    ) -> (TkButtplugScheduler, UnboundedReceiver<TkDeviceAction>) {
         let (device_action_sender, device_action_receiver) = unbounded_channel::<TkDeviceAction>();
         (
             TkButtplugScheduler {
@@ -297,65 +299,14 @@ impl TkPatternPlayer {
             TkPattern::Funscript(duration, pattern_name) => {
                 match read_pattern_name(&self.pattern_path, &pattern_name, true) {
                     Ok(funscript) => {
-                        let actions = funscript.actions;
-                        if actions.len() == 0 {
-                            return;
+                        let mut cancel = false;
+                        let mut  elapsed_us  = 0 as u64;
+                        while !cancel && elapsed_us < duration.as_us() {
+                            let last_timer_us;
+                            (cancel, last_timer_us) = self.play_pattern(&duration, &funscript).await;
+                            elapsed_us += last_timer_us;
+                            info!("Elapsed: {} Cancel: {}", elapsed_us, cancel)
                         }
-                        let duration = match duration {
-                            TkDuration::Infinite => Duration::MAX,
-                            TkDuration::Timed(duration) => duration,
-                        };
-
-                        let mut dropped = 0;
-                        let mut ignored = 0;
-                        let now = Instant::now();
-
-                        let first_speed = Speed::from_fs(&actions[0]);
-                        self.do_vibrate(first_speed, false, self.handle);
-
-                        let mut i = 1;
-                        let mut last_speed = first_speed.value as i32;
-                        while i < actions.len() && now.elapsed() < duration {
-                            let point = &actions[i];
-
-                            // skip until we have reached a delay of resolution_ms
-                            let mut j = i;
-                            while j + 1 < actions.len()
-                                && (actions[j + 1].at - actions[i].at) < self.resolution_ms
-                            {
-                                dropped += 1;
-                                j += 1;
-                            }
-                            i = j;
-
-                            let next_timer_us = (actions[i].at * 1000) as u64;
-                            let elapsed_us = now.elapsed().as_micros() as u64;
-                            if elapsed_us < next_timer_us {
-                                if false
-                                    == cancellable_wait(
-                                        Duration::from_micros(next_timer_us - elapsed_us),
-                                        &self.cancellation_token,
-                                    )
-                                    .await
-                                {
-                                    break;
-                                };
-                                if last_speed != point.pos {
-                                    self.do_update(Speed::from_fs(point));
-                                    last_speed = point.pos;
-                                } else {
-                                    ignored += 1;
-                                }
-                            }
-                            i += 1;
-                        }
-                        self.do_stop(false, self.handle);
-                        info!(
-                            "Pattern finished in {:?} dropped={} ignored={}",
-                            now.elapsed(),
-                            dropped,
-                            ignored
-                        );
                     }
                     Err(err) => error!(
                         "Error loading funscript pattern={} err={}",
@@ -364,6 +315,71 @@ impl TkPatternPlayer {
                 }
             }
         }
+    }
+
+    async fn play_pattern(&self, duration: &TkDuration, funscript: &FScript) -> (bool, u64) {
+        let actions = &funscript.actions;
+        if actions.len() == 0 {
+            return (true, 0);
+        }
+        let duration = match duration {
+            TkDuration::Infinite => Duration::MAX,
+            TkDuration::Timed(duration) => duration.clone(),
+        };
+
+        let mut cancelled = false;
+        let mut dropped = 0;
+        let mut ignored = 0;
+        let now = Instant::now();
+
+        let first_speed = Speed::from_fs(&actions[0]);
+        self.do_vibrate(first_speed, false, self.handle);
+
+        let mut i = 1;
+        let mut last_speed = first_speed.value as i32;
+        let mut next_timer_us = 0;
+        while i < actions.len() && now.elapsed() < duration {
+            let point = &actions[i];
+
+            // skip until we have reached a delay of resolution_ms
+            let mut j = i;
+            while j + 1 < actions.len() && (actions[j + 1].at - actions[i].at) < self.resolution_ms
+            {
+                dropped += 1;
+                j += 1;
+            }
+            i = j;
+
+            next_timer_us = (actions[i].at * 1000) as u64;
+            let elapsed_us = now.elapsed().as_micros() as u64;
+            if elapsed_us < next_timer_us {
+                if false
+                    == cancellable_wait(
+                        Duration::from_micros(next_timer_us - elapsed_us),
+                        &self.cancellation_token,
+                    )
+                    .await
+                {
+                    cancelled = true;
+                    break;
+                };
+                if last_speed != point.pos {
+                    self.do_update(Speed::from_fs(point));
+                    last_speed = point.pos;
+                } else {
+                    ignored += 1;
+                }
+            }
+            i += 1;
+        }
+        self.do_stop(false, self.handle);
+        info!(
+            "Pattern finished in {:?} dropped={} ignored={}",
+            now.elapsed(),
+            dropped,
+            ignored
+        );
+        (cancelled, next_timer_us)
     }
 
     fn do_update(&self, speed: Speed) {

@@ -122,6 +122,12 @@ impl TkDuration {
     pub fn from_secs(s: u64) -> TkDuration {
         TkDuration::Timed(Duration::from_secs(s))
     }
+    pub fn as_us(&self) -> u64 {
+        match self {
+            TkDuration::Infinite => u64::MAX,
+            TkDuration::Timed(duration) => duration.as_micros() as u64,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

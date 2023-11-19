@@ -796,6 +796,22 @@ mod tests {
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
     fn vibrate_pattern_then_cancel() {
+        let (mut tk, handle) = test_pattern("02_Cruel-Tease", TkDuration::from_secs(10));
+        thread::sleep(Duration::from_secs(2)); // dont disconnect
+        tk.stop(handle);
+        thread::sleep(Duration::from_secs(10));
+    }
+
+    #[test]
+    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
+    fn vibrate_pattern_loops() {
+        let (mut tk, handle) = test_pattern("03_Wub-Wub-Wub", TkDuration::from_secs(20));
+        thread::sleep(Duration::from_secs(20));
+        tk.stop(handle);
+        thread::sleep(Duration::from_secs(2));
+    }
+
+    fn test_pattern(pattern_name: &str, duration: TkDuration) -> (Telekinesis, i32) {
         let mut settings = TkSettings::default();
         settings.pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
@@ -811,40 +827,10 @@ mod tests {
 
         enable_log();
         let handle = tk.vibrate_pattern(
-            TkPattern::Funscript(TkDuration::from_secs(10), String::from("02_Cruel-Tease")),
+            TkPattern::Funscript( duration, String::from(pattern_name)),
             vec![],
         );
-        thread::sleep(Duration::from_secs(2)); // dont disconnect
-        tk.stop(handle);
-        thread::sleep(Duration::from_secs(10));
-    }
-
-    #[test]
-    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
-    fn test_funscript_vibrate_10s() {
-        // TODO: Does not assert if the vibration actually happened
-        enable_log();
-
-        let mut tk =
-            Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
-        tk.scan_for_devices();
-        tk.await_connect(1);
-        thread::sleep(Duration::from_secs(2));
-        let _ = tk.process_next_events();
-        assert!(matches!(
-            tk.connection_status.lock().unwrap().connection_status,
-            TkConnectionStatus::Connected
-        ));
-
-        tk.settings
-            .set_enabled(tk.get_known_device_names().first().unwrap(), true);
-
-        tk.vibrate_pattern(
-            TkPattern::Funscript(TkDuration::from_secs(10), String::from("01_Tease")),
-            vec![],
-        );
-        thread::sleep(Duration::from_secs(15)); // dont disconnect
-        tk.stop_all();
+        (tk, handle)
     }
 
     #[test]
