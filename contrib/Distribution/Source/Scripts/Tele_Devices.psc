@@ -99,9 +99,10 @@ Int Function Vibrate(Int speed, Float duration_sec = -1.0)
       Returns an Int handle to stop the vibration early, see StopHandle(Int) }
     If Connects()
         String[] events = new String[1]
-        return Tele_Api.Tele_Control("vibrate", InRange(speed, 0, 100), duration_sec, "", events)
+        Int handle = Tele_Api.Tele_Control("vibrate", InRange(speed, 0, 100), duration_sec, "", events)
+        Trace("(Vibrate) speed='" + speed + "' duration='" + duration_sec + "' all")
+        return handle
     EndIf
-    Trace("(Vibrate) speed='" + speed + "' duration='" + duration_sec + "' all")
     return -1
 EndFunction
 
@@ -110,9 +111,10 @@ Int Function VibrateEvents(Int speed, Float duration_sec = -1.0, String[] events
         - events (Vibrate devices that match the specified events)
       Returns an Int handle to stop the vibration early, see StopHandle(Int) }
     If Connects()
-        return Tele_Api.Tele_Control("vibrate", InRange(speed, 0, 100), duration_sec, "", events)
+        Int handle = Tele_Api.Tele_Control("vibrate", InRange(speed, 0, 100), duration_sec, "", events)
+        Trace("(Vibrate) speed='" + speed + " duration=" + duration_sec + " events=" + events + " handle=" + handle)
+        return handle
     EndIf
-    Trace("(Vibrate) speed='" + speed + " duration=" + duration_sec + " events=" + events)
     return -1
 EndFunction
 
