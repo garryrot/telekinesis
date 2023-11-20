@@ -6,6 +6,8 @@ ScriptName Tele_Integration extends Quest
 
 Tele_Devices Property TeleDevices Auto
 
+Actor Property PlayerRef Auto
+
 Quest Property ZadLib Auto        ; ZadLibs
 Quest Property SexLab Auto        ; SexLabFramework
 Quest Property Toys Auto          ; ToysFramework
@@ -414,8 +416,7 @@ EndEvent
 ; Devious Devices Events
 
 Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationStrength, Form sender)
-    Actor player = Game.GetPlayer()
-    If player.GetLeveledActorBase().GetName() != actorName
+    If PlayerRef.GetLeveledActorBase().GetName() != actorName
         return ; Not the player
     EndIf
     If ZadLib == None
@@ -425,23 +426,23 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     ; Reverse DD multi device calculation to get the actual strength
     String[] events = new String[3]
     Float numVibratorsMult = 0
-    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPlugVaginal)
+    If PlayerRef.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPlugVaginal)
         numVibratorsMult += 0.7
         events[0] = DeviousDevices_Vibrate_Event_Vaginal
     EndIf
-    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPlugAnal)
+    If PlayerRef.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPlugAnal)
         numVibratorsMult += 0.3
         events[1] = DeviousDevices_Vibrate_Event_Anal
     EndIf
-    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPiercingsNipple)
+    If PlayerRef.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPiercingsNipple)
         numVibratorsMult += 0.25
         events[2] = DeviousDevices_Vibrate_Event_Nipple
     EndIf
-    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPiercingsVaginal)
+    If PlayerRef.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousPiercingsVaginal)
         numVibratorsMult += 0.5
         events[0] = DeviousDevices_Vibrate_Event_Vaginal
     EndIf
-    If player.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousBlindfold) 
+    If PlayerRef.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousBlindfold) 
         numVibratorsMult /= 1.15
     EndIf
 
@@ -452,8 +453,7 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form sender)
-    Actor player = Game.GetPlayer()
-    If player.GetLeveledActorBase().GetName() != actorName
+    If PlayerRef.GetLeveledActorBase().GetName() != actorName
         return ; Not the player
     EndIf
     If ZadLib == None
@@ -469,8 +469,8 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 		TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
-    sslThreadController Controller = (Sexlab as SexLabFramework).GetController(threadID)
-    sslBaseAnimation animation = Controller.Animation
+    sslThreadController controller = (Sexlab as SexLabFramework).GetController(threadID)
+    sslBaseAnimation animation = controller.Animation
     _SexlabSceneTags = animation.GetTags()
 
     If Sexlab_Animation_Rousing
@@ -553,7 +553,6 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     EndIf
     TeleDevices.LogDebug("OnOStimSceneChanged")
 
-    Actor player = Game.GetPlayer()
     Int playerActorIndex = -1
     Int playerTargetIndex = -1
 
@@ -562,7 +561,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     While i > 0
         i -= 1
         Int actorIndex = sceneActors[i]
-        If OStim.GetActor(actorIndex) == player
+        If OStim.GetActor(actorIndex) == PlayerRef
             playerActorIndex = actorIndex
         EndIf
     EndWhile
@@ -572,7 +571,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     While j > 0
         j -= 1
         Int actorIndex = sceneTargets[j]
-        If OStim.GetActor(actorIndex) == player
+        If OStim.GetActor(actorIndex) == PlayerRef
             playerTargetIndex = actorIndex
         EndIf
     EndWhile
@@ -613,7 +612,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     UpdateRousingControlledSexScene()
 EndEvent
 
-Int Function GetOStimSpeed(Actor player)
+Int Function GetOStimSpeed()
     If Ostim_Animation_Speed_Control == 1
         Float speed = OThread.GetSpeed(0) as Float
         If speed == 0.0
@@ -624,7 +623,7 @@ Int Function GetOStimSpeed(Actor player)
     EndIf
 
     If Ostim_Animation_Speed_Control == 2
-        Float excitement = OActor.GetExcitement(player)
+        Float excitement = OActor.GetExcitement(PlayerRef)
         return excitement as Int
     EndIf
 
@@ -634,7 +633,7 @@ Int Function GetOStimSpeed(Actor player)
             speed = 0.5
         EndIf
         Float speedFactor = speed / (_OstimMaxSpeed as Float)
-        Float excitement = OActor.GetExcitement(player)
+        Float excitement = OActor.GetExcitement(PlayerRef)
         return (excitement * speedFactor) as Int
     EndIf
 
