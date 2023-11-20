@@ -842,7 +842,7 @@ Function UpdateRousingControlledSexScene()
         Int rousing = (Toys as ToysFramework).GetRousing()
         String[] evts = GetLoveTags(_LoveName)
         Int oldHandle = _ToysSceneVibrationHandle
-        _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, 2.5, 0, Toys_Animation_Funscript, rousing, evts)
+        _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, 5, 0, Toys_Animation_Funscript, rousing, evts)
         TeleDevices.StopHandle(oldHandle)
         TeleDevices.LogDebug("UpdatingToysScene Rousing=" + rousing)
         RegisterForSingleUpdate(2)
@@ -852,9 +852,9 @@ Function UpdateRousingControlledSexScene()
             TeleDevices.StopHandle(_ToysSceneVibrationHandle)
         EndIf
     ElseIf _InSexlabScene
-        Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(Game.GetPlayer())
+        Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
         Int oldHandle = _SexlabSceneVibrationHandle
-        _SexlabSceneVibrationHandle = HandleVibration(Sexlab_Animation_DeviceSelector, 2.5, 0, Sexlab_Animation_Funscript, arousal, _SexlabSceneTags)
+        _SexlabSceneVibrationHandle = HandleVibration(Sexlab_Animation_DeviceSelector, 5, 0, Sexlab_Animation_Funscript, arousal, _SexlabSceneTags)
         TeleDevices.StopHandle(oldHandle)
         TeleDevices.LogDebug("UpdatingSexlabScene Arousal=" + arousal)
         RegisterForSingleUpdate(2)
@@ -863,11 +863,9 @@ Function UpdateRousingControlledSexScene()
             TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
         EndIf
 	ElseIf _InOstimScene
-        Actor player = Game.GetPlayer()
-
         Int oldHandle = _OstimSceneVibrationHandle
         If _OstimInSexualScene
-            _OstimSceneVibrationHandle = HandleVibration(Ostim_Animation_DeviceSelector, 2.5, 0, Ostim_Animation_Funscript, GetOStimSpeed(player), _OstimSceneTags)
+            _OstimSceneVibrationHandle = HandleVibration(Ostim_Animation_DeviceSelector, 5, 0, Ostim_Animation_Funscript, GetOStimSpeed(), _OstimSceneTags)
         Else
             _OstimSceneVibrationHandle = -1
         EndIf
