@@ -2,7 +2,7 @@ use anyhow::Error;
 use api::*;
 use buttplug::client::ButtplugClientDevice;
 use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus, TkStatus};
-use pattern::{get_pattern_names, TkButtplugScheduler};
+use pattern::{get_pattern_names, TkButtplugScheduler, TkPattern};
 use settings::PATTERN_PATH;
 use std::{
     sync::{Arc, Mutex},
@@ -130,11 +130,6 @@ impl TkDuration {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum TkPattern {
-    Linear(TkDuration, Speed),
-    Funscript(TkDuration, String),
-}
 
 fn tk_new() -> Box<TkApi> {
     Box::new(TkApi {

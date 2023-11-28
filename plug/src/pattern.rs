@@ -1,7 +1,9 @@
 use anyhow::anyhow;
 use buttplug::client::{ButtplugClientDevice, ScalarValueCommand};
+
 use funscript::FScript;
 use std::collections::HashMap;
+
 use std::{
     fs::{self},
     path::PathBuf,
@@ -15,7 +17,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{Speed, TkDuration, TkPattern};
+use crate::{Speed, TkDuration};
 
 #[derive(Clone, Debug)]
 pub enum TkDeviceAction {
@@ -23,6 +25,12 @@ pub enum TkDeviceAction {
     Update(Arc<ButtplugClientDevice>, Speed),
     End(Arc<ButtplugClientDevice>, bool, i32),
     StopAll, // global but required for resetting device state
+}
+
+#[derive(Clone, Debug)]
+pub enum TkPattern {
+    Linear(TkDuration, Speed),
+    Funscript(TkDuration, String),
 }
 
 struct ReferenceCounter {
@@ -133,45 +141,17 @@ impl DeviceAccess {
     }
 }
 
-pub struct TkPlayerSettings {
-    pub player_resolution_ms: i32,
-    pub pattern_path: String,
+pub struct TkButtplugWorker {
+    tasks: UnboundedReceiver<TkDeviceAction>,
 }
 
-pub struct TkButtplugScheduler {
-    device_action_sender: UnboundedSender<TkDeviceAction>,
-    settings: TkPlayerSettings,
-    cancellation_tokens: HashMap<i32, CancellationToken>,
-    last_handle: i32,
-}
-
-impl TkButtplugScheduler {
-    fn get_next_handle(&mut self) -> i32 {
-        self.last_handle += 1;
-        self.last_handle
-    }
-
-    pub fn create(
-        settings: TkPlayerSettings,
-    ) -> (TkButtplugScheduler, UnboundedReceiver<TkDeviceAction>) {
-        let (device_action_sender, device_action_receiver) = unbounded_channel::<TkDeviceAction>();
-        (
-            TkButtplugScheduler {
-                device_action_sender,
-                settings,
-                cancellation_tokens: HashMap::new(),
-                last_handle: 0,
-            },
-            device_action_receiver,
-        )
-    }
-
-    pub async fn run_worker_thread(mut device_action_receiver: UnboundedReceiver<TkDeviceAction>) {
+impl TkButtplugWorker {
+    pub async fn run_worker_thread(&mut self) {
         // TODO do cleanup of cancelled
         let mut device_counter = ReferenceCounter::new();
         let mut device_access = DeviceAccess::new();
         loop {
-            if let Some(next_action) = device_action_receiver.recv().await {
+            if let Some(next_action) = self.tasks.recv().await {
                 trace!("Exec device action {:?}", next_action);
                 match next_action {
                     TkDeviceAction::Start(device, speed, priority, handle) => {
@@ -234,6 +214,38 @@ impl TkButtplugScheduler {
                 }
             }
         }
+    }
+}
+
+pub struct TkPlayerSettings {
+    pub player_resolution_ms: i32,
+    pub pattern_path: String,
+}
+
+pub struct TkButtplugScheduler {
+    device_action_sender: UnboundedSender<TkDeviceAction>,
+    settings: TkPlayerSettings,
+    cancellation_tokens: HashMap<i32, CancellationToken>,
+    last_handle: i32,
+}
+
+impl TkButtplugScheduler {
+    fn get_next_handle(&mut self) -> i32 {
+        self.last_handle += 1;
+        self.last_handle
+    }
+
+    pub fn create(settings: TkPlayerSettings) -> (TkButtplugScheduler, TkButtplugWorker) {
+        let (device_action_sender, tasks) = unbounded_channel::<TkDeviceAction>();
+        (
+            TkButtplugScheduler {
+                device_action_sender,
+                settings,
+                cancellation_tokens: HashMap::new(),
+                last_handle: 0,
+            },
+            TkButtplugWorker { tasks },
+        )
     }
 
     pub fn stop_task(&mut self, handle: i32) {
@@ -300,10 +312,11 @@ impl TkPatternPlayer {
                 match read_pattern_name(&self.pattern_path, &pattern_name, true) {
                     Ok(funscript) => {
                         let mut cancel = false;
-                        let mut  elapsed_us  = 0 as u64;
+                        let mut elapsed_us = 0 as u64;
                         while !cancel && elapsed_us < duration.as_us() {
                             let last_timer_us;
-                            (cancel, last_timer_us) = self.play_pattern(&duration, &funscript).await;
+                            (cancel, last_timer_us) =
+                                self.play_pattern(&duration, &funscript).await;
                             elapsed_us += last_timer_us;
                             info!("Elapsed: {} Cancel: {}", elapsed_us, cancel)
                         }
@@ -499,4 +512,221 @@ fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::E
         })
     }
     Ok(patterns)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::fakes::tests::get_test_client;
+    use crate::fakes::{scalar, FakeConnectorCallRegistry};
+    use crate::pattern::TkPattern;
+    use crate::{Speed, TkDuration};
+    use buttplug::client::ButtplugClientDevice;
+    use buttplug::core::message::ActuatorType;
+    use futures::future::join_all;
+    use std::sync::Arc;
+    use std::thread;
+    use std::time::{Duration, Instant};
+    use tokio::runtime::Handle;
+    use tokio::task::JoinHandle;
+
+    use super::{TkButtplugScheduler, TkPlayerSettings};
+
+    struct PlayerTest {
+        scheduler: TkButtplugScheduler,
+        handles: Vec<JoinHandle<()>>,
+        all_devices: Vec<Arc<ButtplugClientDevice>>,
+    }
+
+    impl PlayerTest {
+        fn setup(all_devices: Vec<Arc<ButtplugClientDevice>>) -> Self {
+            PlayerTest {
+                scheduler: get_test_scheduler(),
+                handles: vec![],
+                all_devices,
+            }
+        }
+
+        fn play_background(&mut self, pattern: TkPattern) {
+            let mut player = self.scheduler.create_player(self.all_devices.clone());
+            self.handles.push(Handle::current().spawn(async move {
+                player.play(pattern).await;
+            }));
+        }
+
+        async fn play(&mut self, pattern: TkPattern) {
+            let mut player = self.scheduler.create_player(self.all_devices.clone());
+            player.play(pattern).await;
+        }
+
+        async fn finish_background(self) {
+            join_all(self.handles).await;
+        }
+    }
+
+    async fn wait_ms(ms: u64) {
+        tokio::time::sleep(Duration::from_millis(ms)).await;
+    }
+
+    fn get_test_scheduler() -> TkButtplugScheduler {
+        let pattern_path =
+            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+        let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
+            player_resolution_ms: 100,
+            pattern_path,
+        });
+        Handle::current().spawn(async move {
+            worker.run_worker_thread().await;
+        });
+        scheduler
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_linear_access_1() {
+        // call1  |111111111111111111111-->|
+        // call2         |2222->|
+        // result |111111122222211111111-->|
+
+        // arrange
+        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(test_client.created_devices);
+
+        // act
+        let start = Instant::now();
+
+        player.play_background(TkPattern::Linear(
+            TkDuration::from_millis(500),
+            Speed::new(50),
+        ));
+        wait_ms(100).await;
+        player
+            .play(TkPattern::Linear(
+                TkDuration::from_millis(100),
+                Speed::new(100),
+            ))
+            .await;
+        player.finish_background().await;
+
+        // assert
+        print_device_calls(&test_client.call_registry, 1, start);
+        assert!(test_client.call_registry.get_device(1)[0].vibration_started_strength(0.5));
+        assert!(test_client.call_registry.get_device(1)[1].vibration_started_strength(1.0));
+        assert!(test_client.call_registry.get_device(1)[2].vibration_started_strength(0.5));
+        assert!(test_client.call_registry.get_device(1)[3].vibration_stopped());
+        assert_eq!(test_client.call_registry.get_device(1).len(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_linear_access_3() {
+        // call1  |111111111111111111111111111-->|
+        // call2       |22222222222222->|
+        // call3            |333->|
+        // result |111122222333332222222111111-->|
+
+        // arrange
+        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(test_client.created_devices);
+
+        // act
+        let start = Instant::now();
+        player.play_background(TkPattern::Linear(TkDuration::from_secs(3), Speed::new(20)));
+        wait_ms(250).await;
+
+        player.play_background(TkPattern::Linear(TkDuration::from_secs(2), Speed::new(40)));
+        wait_ms(250).await;
+
+        player
+            .play(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
+            .await;
+        player.finish_background().await;
+
+        // assert
+        print_device_calls(&test_client.call_registry, 1, start);
+
+        assert!(test_client.call_registry.get_device(1)[0].vibration_started_strength(0.2));
+        assert!(test_client.call_registry.get_device(1)[1].vibration_started_strength(0.4));
+        assert!(test_client.call_registry.get_device(1)[2].vibration_started_strength(0.8));
+        assert!(test_client.call_registry.get_device(1)[3].vibration_started_strength(0.4));
+        assert!(test_client.call_registry.get_device(1)[4].vibration_started_strength(0.2));
+        assert!(test_client.call_registry.get_device(1)[5].vibration_stopped());
+        assert_eq!(test_client.call_registry.get_device(1).len(), 6);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_linear_access_4() {
+        // call1  |111111111111111111111111111-->|
+        // call2       |22222222222->|
+        // call3            |333333333-->|
+        // result |111122222222222233333331111-->|
+
+        // arrange
+        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(test_client.created_devices);
+
+        // act
+        let start = Instant::now();
+        player.play_background(TkPattern::Linear(TkDuration::from_secs(3), Speed::new(20)));
+        wait_ms(250).await;
+
+        player.play_background(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(40)));
+        wait_ms(250).await;
+
+        player
+            .play(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
+            .await;
+        thread::sleep(Duration::from_secs(2));
+        player.finish_background().await;
+
+        // assert
+        print_device_calls(&test_client.call_registry, 1, start);
+
+        assert!(test_client.call_registry.get_device(1)[0].vibration_started_strength(0.2));
+        assert!(test_client.call_registry.get_device(1)[1].vibration_started_strength(0.4));
+        assert!(test_client.call_registry.get_device(1)[2].vibration_started_strength(0.8));
+        assert!(test_client.call_registry.get_device(1)[3].vibration_started_strength(0.8));
+        assert!(test_client.call_registry.get_device(1)[4].vibration_started_strength(0.2));
+        assert!(test_client.call_registry.get_device(1)[5].vibration_stopped());
+        assert_eq!(test_client.call_registry.get_device(1).len(), 6);
+    }
+
+    #[tokio::test]
+    async fn linear_overrides_pattern() {
+        // lin1   |11111111111111111-->|
+        // pat1       |23452345234523452345234-->|
+        // result |1111111111111111111123452345234-->|
+
+        // arrange
+        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(test_client.created_devices);
+
+        // act
+        let start = Instant::now();
+        player.play_background(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(99)));
+        wait_ms(250).await;
+        player.play(TkPattern::Funscript(TkDuration::from_secs(3), String::from("31_Sawtooth-Fast"))).await;
+
+        // assert
+        print_device_calls(&test_client.call_registry, 1, start);
+        assert!(test_client.call_registry.get_device(1).len() > 3);
+    }
+
+    fn print_device_calls(
+        call_registry: &FakeConnectorCallRegistry,
+        index: u32,
+        test_start: Instant,
+    ) {
+        for i in 0..call_registry.get_device(index).len() {
+            let fake_call = call_registry.get_device(1)[i].clone();
+            let s = fake_call.get_scalar_strength();
+            let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
+            let perc = (s * 100.0).round();
+            println!(
+                "{:02} @{:04} ms {percent:>3}% {empty:=>width$}",
+                i,
+                t,
+                percent = perc as i32,
+                empty = "",
+                width = (perc / 5.0).floor() as usize
+            );
+        }
+    }
 }

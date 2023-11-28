@@ -79,13 +79,13 @@ impl Telekinesis {
             handle_connection(event_sender, command_receiver, client, connection_status).await;
         });
 
-        let (scheduler, action_receiver) = TkButtplugScheduler::create(TkPlayerSettings {
+        let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
             player_resolution_ms: 100,
             pattern_path,
         });
 
         runtime.spawn(async move {
-            TkButtplugScheduler::run_worker_thread(action_receiver).await;
+            worker.run_worker_thread().await;
             info!("Worker closed")
         });
 
@@ -362,16 +362,6 @@ mod tests {
 
     use super::*;
 
-    impl Telekinesis {
-        /// should only be used by tests or fake backends
-        pub fn await_connect(&self, devices: usize) {
-            assert_timeout!(
-                self.connection_status.lock().unwrap().device_status.len() == devices,
-                "Awaiting connect"
-            );
-        }
-    }
-
     #[test]
     fn get_devices_contains_connected_devices() {
         // arrange
@@ -483,126 +473,6 @@ mod tests {
         // assert
         call_registry.assert_vibrated(1);
         call_registry.assert_vibrated(2);
-    }
-
-    #[test]
-    fn linear_correct_priority_2() {
-        // call1  |111111111111111111111-->|
-        // call2         |2222->|
-        // result |111111122222211111111-->|
-
-        // arrange
-        let start = Instant::now();
-        let (mut tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-
-        // act
-        tk.vibrate(Speed::new(50), TkDuration::from_secs(1), vec![]);
-        thread::sleep(Duration::from_millis(500));
-        tk.vibrate(Speed::new(100), TkDuration::from_millis(10), vec![]);
-        thread::sleep(Duration::from_secs(1));
-
-        // assert
-        print_device_calls(&call_registry, 1, start);
-
-        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.5));
-        assert!(call_registry.get_device(1)[1].vibration_started_strength(1.0));
-        assert!(call_registry.get_device(1)[2].vibration_started_strength(0.5));
-        assert!(call_registry.get_device(1)[3].vibration_stopped());
-        assert_eq!(call_registry.get_device(1).len(), 4);
-    }
-
-    #[test]
-    fn linear_correct_priority_3() {
-        // call1  |111111111111111111111111111-->|
-        // call2       |22222222222222->|
-        // call3            |333->|
-        // result |111122222333332222222111111-->|
-
-        // arrange
-        let start = Instant::now();
-        let (mut tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-
-        // act
-        tk.vibrate(Speed::new(20), TkDuration::from_secs(3), vec![]);
-        thread::sleep(Duration::from_millis(250));
-        tk.vibrate(Speed::new(40), TkDuration::from_secs(2), vec![]);
-        thread::sleep(Duration::from_millis(250));
-        tk.vibrate(Speed::new(80), TkDuration::from_secs(1), vec![]);
-
-        thread::sleep(Duration::from_secs(3));
-
-        // assert
-        print_device_calls(&call_registry, 1, start);
-
-        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.2));
-        assert!(call_registry.get_device(1)[1].vibration_started_strength(0.4));
-        assert!(call_registry.get_device(1)[2].vibration_started_strength(0.8));
-        assert!(call_registry.get_device(1)[3].vibration_started_strength(0.4));
-        assert!(call_registry.get_device(1)[4].vibration_started_strength(0.2));
-        assert!(call_registry.get_device(1)[5].vibration_stopped());
-        assert_eq!(call_registry.get_device(1).len(), 6);
-    }
-
-    #[test]
-    fn linear_correct_priority_4() {
-        // call1  |111111111111111111111111111-->|
-        // call2       |22222222222->|
-        // call3            |333333333-->|
-        // result |111122222222222233333331111-->|
-
-        // arrange
-        let start = Instant::now();
-        let (mut tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-
-        // act
-        tk.vibrate(Speed::new(20), TkDuration::from_secs(3), vec![]);
-        thread::sleep(Duration::from_millis(250));
-        tk.vibrate(Speed::new(40), TkDuration::from_secs(1), vec![]);
-        thread::sleep(Duration::from_millis(250));
-        tk.vibrate(Speed::new(80), TkDuration::from_secs(2), vec![]);
-        thread::sleep(Duration::from_secs(3));
-
-        // assert
-        print_device_calls(&call_registry, 1, start);
-
-        assert!(call_registry.get_device(1)[0].vibration_started_strength(0.2));
-        assert!(call_registry.get_device(1)[1].vibration_started_strength(0.4));
-        assert!(call_registry.get_device(1)[2].vibration_started_strength(0.8));
-        assert!(call_registry.get_device(1)[3].vibration_started_strength(0.8));
-        assert!(call_registry.get_device(1)[4].vibration_started_strength(0.2));
-        assert!(call_registry.get_device(1)[5].vibration_stopped());
-        assert_eq!(call_registry.get_device(1).len(), 6);
-    }
-
-    #[test]
-    fn linear_overrides_pattern() {
-        // lin1   |11111111111111111-->|
-        // pat1       |23452345234523452345234-->|
-        // result |1111111111111111111123452345234-->|
-
-        // arrange
-        let start = Instant::now();
-        let (mut tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-
-        // act
-        let _lin1 = tk.vibrate(Speed::new(99), TkDuration::Infinite, vec![]);
-        thread::sleep(Duration::from_millis(10));
-        let _pat1 = tk.vibrate_pattern(
-            TkPattern::Funscript(TkDuration::Infinite, String::from("31_Sawtooth-Fast")),
-            vec![],
-        );
-
-        // assert
-        print_device_calls(&call_registry, 1, start);
-
-        thread::sleep(Duration::from_secs(2));
-        tk.stop(_lin1);
-        thread::sleep(Duration::from_secs(2));
-        assert!(call_registry.get_device(1).len() > 3);
     }
 
     #[test]
@@ -874,26 +744,5 @@ mod tests {
             }
             _ => todo!(),
         };
-    }
-
-    fn print_device_calls(
-        call_registry: &FakeConnectorCallRegistry,
-        index: u32,
-        test_start: Instant,
-    ) {
-        for i in 0..call_registry.get_device(index).len() {
-            let fake_call = call_registry.get_device(1)[i].clone();
-            let s = fake_call.get_scalar_strength();
-            let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
-            let perc = (s * 100.0).round();
-            println!(
-                "{:02} @{:04} ms {percent:>3}% {empty:=>width$}",
-                i,
-                t,
-                percent = perc as i32,
-                empty = "",
-                width = (perc / 5.0).floor() as usize
-            );
-        }
     }
 }

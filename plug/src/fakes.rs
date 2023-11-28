@@ -30,17 +30,12 @@ use std::{thread, vec};
 use tracing::error;
 
 use crate::util::assert_timeout;
+use crate::Telekinesis;
 use std::time::Instant;
 
 #[derive(Clone)]
 pub struct FakeConnectorCallRegistry {
     pub actions: Arc<Mutex<HashMap<u32, Box<Vec<FakeMessage>>>>>,
-}
-
-pub struct FakeDeviceConnector {
-    pub devices: Vec<DeviceAdded>,
-    server_outbound_sender: Sender<ButtplugCurrentSpecServerMessage>,
-    call_registry: FakeConnectorCallRegistry,
 }
 
 #[derive(Clone)]
@@ -147,6 +142,12 @@ impl FakeConnectorCallRegistry {
     }
 }
 
+pub struct FakeDeviceConnector {
+    pub devices: Vec<DeviceAdded>,
+    server_outbound_sender: Sender<ButtplugCurrentSpecServerMessage>,
+    call_registry: FakeConnectorCallRegistry,
+}
+
 // Connector that allows to instantiate various fake devices for testing purposes
 #[allow(dead_code)]
 impl FakeDeviceConnector {
@@ -161,7 +162,6 @@ impl FakeDeviceConnector {
         (connector, calls)
     }
 
-    // A demo configuration that exposes various devices
     pub fn device_demo() -> (Self, FakeConnectorCallRegistry) {
         Self::new(vec![
             vibrator(1, "Vibator 1"),
@@ -374,15 +374,58 @@ pub fn rotate(id: u32, name: &str) -> DeviceAdded {
     )
 }
 
+impl Telekinesis {
+    /// should only be used by tests or fake backends
+    pub fn await_connect(&self, devices: usize) {
+        assert_timeout!(
+            self.connection_status.lock().unwrap().device_status.len() == devices,
+            "Awaiting connect"
+        );
+    }
+}
+
+
 #[cfg(test)]
-mod tests {
+pub mod tests {
+
+    pub struct ButtplugTestClient {
+        pub client: ButtplugClient, 
+        pub call_registry: FakeConnectorCallRegistry,
+        pub created_devices: Vec<Arc<ButtplugClientDevice>>,
+    }    
+
+    pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
+        let devices_len = devices.len();
+        let mut created_devices = vec![];
+    
+        let (connector, call_registry) = FakeDeviceConnector::new(devices);
+        let client = ButtplugClient::new("FakeClient");
+        client.connect(connector).await.unwrap();
+    
+        while created_devices.len() < devices_len {
+            let event = client.event_stream().next().await.unwrap();
+            match event {
+                buttplug::client::ButtplugClientEvent::DeviceAdded(device) => {
+                    created_devices.push(device)
+                }
+                _ => {}
+            }
+        }
+    
+        ButtplugTestClient {
+            client: client,
+            call_registry,
+            created_devices,
+        }
+    }
+
     use buttplug::{
         client::{
             ButtplugClient, ButtplugClientDevice, LinearCommand, RotateCommand, ScalarCommand,
         },
         core::message::ActuatorType,
     };
-    use futures::Future;
+    use futures::{Future, StreamExt};
     use tracing::Level;
 
     use super::*;
