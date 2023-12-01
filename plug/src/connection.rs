@@ -11,7 +11,7 @@ use tracing::{error, info, span, Level};
 
 use crate::{
     input::TkParams,
-    DeviceList, Speed,
+    DeviceList, pattern::Speed,
 };
 
 #[derive(Debug, Clone, PartialEq)]

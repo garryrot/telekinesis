@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use buttplug::client::{ButtplugClientDevice, ScalarValueCommand};
-
-use funscript::FScript;
+use std::fmt::{self, Display};
+use funscript::{FScript, FSPoint};
 use std::collections::HashMap;
 
 use std::{
@@ -17,7 +17,42 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{Speed, TkDuration};
+#[derive(Clone, Debug)]
+pub enum TkDuration {
+    Infinite,
+    Timed(Duration),
+}
+
+pub struct TkPatternPlayer {
+    pub devices: Vec<Arc<ButtplugClientDevice>>,
+    pub action_sender: UnboundedSender<TkDeviceAction>,
+    pub resolution_ms: i32,
+    pub pattern_path: String,
+    pub handle: i32,
+    pub cancellation_token: CancellationToken,
+}
+
+pub struct TkButtplugScheduler {
+    device_action_sender: UnboundedSender<TkDeviceAction>,
+    settings: TkPlayerSettings,
+    cancellation_tokens: HashMap<i32, CancellationToken>,
+    last_handle: i32,
+}
+
+pub struct TkPlayerSettings {
+    pub player_resolution_ms: i32,
+    pub pattern_path: String,
+}
+
+pub struct TkButtplugWorker {
+    tasks: UnboundedReceiver<TkDeviceAction>,
+}
+
+struct TkPatternFile {
+    path: PathBuf,
+    is_vibration: bool,
+    name: String,
+}
 
 #[derive(Clone, Debug)]
 pub enum TkDeviceAction {
@@ -25,6 +60,11 @@ pub enum TkDeviceAction {
     Update(Arc<ButtplugClientDevice>, Speed),
     End(Arc<ButtplugClientDevice>, bool, i32),
     StopAll, // global but required for resetting device state
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Speed {
+    pub value: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -35,6 +75,64 @@ pub enum TkPattern {
 
 struct ReferenceCounter {
     access_list: HashMap<u32, u32>,
+}
+
+struct DeviceAccess {
+    device_actions: HashMap<u32, Vec<(i32, Speed)>>,
+}
+
+impl TkDuration {
+    pub fn from_input_float(secs: f32) -> TkDuration {
+        if secs > 0.0 {
+            return TkDuration::Timed(Duration::from_millis((secs * 1000.0) as u64));
+        } else {
+            return TkDuration::Infinite;
+        }
+    }
+    pub fn from_millis(ms: u64) -> TkDuration {
+        TkDuration::Timed(Duration::from_millis(ms))
+    }
+    pub fn from_secs(s: u64) -> TkDuration {
+        TkDuration::Timed(Duration::from_secs(s))
+    }
+    pub fn as_us(&self) -> u64 {
+        match self {
+            TkDuration::Infinite => u64::MAX,
+            TkDuration::Timed(duration) => duration.as_micros() as u64,
+        }
+    }
+}
+
+impl Display for Speed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl Speed {
+    pub fn new(mut percentage: i64) -> Speed {
+        if percentage < 0 {
+            percentage = 0;
+        }
+        if percentage > 100 {
+            percentage = 100;
+        }
+        Speed {
+            value: percentage as u16,
+        }
+    }
+    pub fn from_fs(point: &FSPoint) -> Speed {
+        Speed::new(point.pos.into())
+    }
+    pub fn min() -> Speed {
+        Speed { value: 0 }
+    }
+    pub fn max() -> Speed {
+        Speed { value: 100 }
+    }
+    pub fn as_float(self) -> f64 {
+        self.value as f64 / 100.0
+    }
 }
 
 impl ReferenceCounter {
@@ -72,7 +170,7 @@ impl ReferenceCounter {
         )
     }
 
-    pub fn needs_to_stop(&self, device: &Arc<ButtplugClientDevice>) -> bool {
+    pub fn should_stop(&self, device: &Arc<ButtplugClientDevice>) -> bool {
         self.current_references(device) == 0
     }
 
@@ -86,10 +184,6 @@ impl ReferenceCounter {
     pub fn clear(&mut self) {
         self.access_list.clear();
     }
-}
-
-struct DeviceAccess {
-    device_actions: HashMap<u32, Vec<(i32, Speed)>>,
 }
 
 impl DeviceAccess {
@@ -125,7 +219,7 @@ impl DeviceAccess {
         None
     }
 
-    pub fn calculate_actual_speed(
+    pub fn get_actual_speed(
         &self,
         device: &Arc<ButtplugClientDevice>,
         new_speed: Speed,
@@ -139,10 +233,6 @@ impl DeviceAccess {
         }
         new_speed
     }
-}
-
-pub struct TkButtplugWorker {
-    tasks: UnboundedReceiver<TkDeviceAction>,
 }
 
 impl TkButtplugWorker {
@@ -162,7 +252,7 @@ impl TkButtplugWorker {
                         let result = device
                             .vibrate(&ScalarValueCommand::ScalarValue(
                                 device_access
-                                    .calculate_actual_speed(&device, speed)
+                                    .get_actual_speed(&device, speed)
                                     .as_float(),
                             ))
                             .await;
@@ -178,7 +268,7 @@ impl TkButtplugWorker {
                     TkDeviceAction::Update(device, speed) => device
                         .vibrate(&ScalarValueCommand::ScalarValue(
                             device_access
-                                .calculate_actual_speed(&device, speed)
+                                .get_actual_speed(&device, speed)
                                 .as_float(),
                         ))
                         .await
@@ -188,17 +278,17 @@ impl TkButtplugWorker {
                         if priority {
                             device_access.record_stop(&device, handle);
                         }
-                        if device_counter.needs_to_stop(&device) {
+                        if device_counter.should_stop(&device) {
                             // nothing else is controlling the device, stop it
                             device
                                 .vibrate(&ScalarValueCommand::ScalarValue(0.0))
                                 .await
                                 .unwrap_or_else(|_| error!("Failed to stop vibration"));
                             info!("Device stopped {}", device.name())
-                        } else if let Some(remaining_speed) =
-                            device_access.get_remaining_speed(&device)
+                        } 
+                        else if let Some(remaining_speed) = device_access.get_remaining_speed(&device)
                         {
-                            // see if we have a lower priority vibration still running
+                            // see if we have an earlier action still requiring movement
                             device
                                 .vibrate(&ScalarValueCommand::ScalarValue(
                                     remaining_speed.as_float(),
@@ -215,18 +305,6 @@ impl TkButtplugWorker {
             }
         }
     }
-}
-
-pub struct TkPlayerSettings {
-    pub player_resolution_ms: i32,
-    pub pattern_path: String,
-}
-
-pub struct TkButtplugScheduler {
-    device_action_sender: UnboundedSender<TkDeviceAction>,
-    settings: TkPlayerSettings,
-    cancellation_tokens: HashMap<i32, CancellationToken>,
-    last_handle: i32,
 }
 
 impl TkButtplugScheduler {
@@ -279,15 +357,6 @@ impl TkButtplugScheduler {
             entry.1.cancel();
         }
     }
-}
-
-pub struct TkPatternPlayer {
-    pub devices: Vec<Arc<ButtplugClientDevice>>,
-    pub action_sender: UnboundedSender<TkDeviceAction>,
-    pub resolution_ms: i32,
-    pub pattern_path: String,
-    pub handle: i32,
-    pub cancellation_token: CancellationToken,
 }
 
 impl TkPatternPlayer {
@@ -439,12 +508,6 @@ async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> boo
     };
 }
 
-struct TkPatternFile {
-    path: PathBuf,
-    is_vibration: bool,
-    name: String,
-}
-
 pub fn get_pattern_names(pattern_path: &str, vibration_patterns: bool) -> Vec<String> {
     match get_pattern_paths(pattern_path) {
         Ok(patterns) => patterns
@@ -520,7 +583,7 @@ mod tests {
     use crate::fakes::{scalar, FakeConnectorCallRegistry};
     use crate::pattern::TkPattern;
     use crate::{Speed, TkDuration};
-    use buttplug::client::ButtplugClientDevice;
+    use buttplug::client::{ButtplugClientDevice, ButtplugClient};
     use buttplug::core::message::ActuatorType;
     use futures::future::join_all;
     use std::sync::Arc;
@@ -544,6 +607,17 @@ mod tests {
                 handles: vec![],
                 all_devices,
             }
+        }
+
+        fn play_background_on_device(
+            &mut self,
+            pattern: TkPattern,
+            device: Arc<ButtplugClientDevice>,
+        ) {
+            let mut player = self.scheduler.create_player(vec![device]);
+            self.handles.push(Handle::current().spawn(async move {
+                player.play(pattern).await;
+            }));
         }
 
         fn play_background(&mut self, pattern: TkPattern) {
@@ -581,7 +655,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_concurrent_linear_access_1() {
+    async fn test_concurrent_linear_access_2_threads() {
         // call1  |111111111111111111111-->|
         // call2         |2222->|
         // result |111111122222211111111-->|
@@ -616,7 +690,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_concurrent_linear_access_3() {
+    async fn test_concurrent_linear_access_3_threads() {
         // call1  |111111111111111111111111111-->|
         // call2       |22222222222222->|
         // call3            |333->|
@@ -652,7 +726,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_concurrent_linear_access_4() {
+    async fn test_concurrent_linear_access_3_threads_2() {
         // call1  |111111111111111111111111111-->|
         // call2       |22222222222->|
         // call3            |333333333-->|
@@ -688,8 +762,37 @@ mod tests {
         assert_eq!(test_client.call_registry.get_device(1).len(), 6);
     }
 
+    pub struct TkActuator {
+        device: Arc<ButtplugClientDevice>,
+        actuator: ActuatorType,
+        index_in_device: u32
+    }
+
+    pub fn get_actuators( client: ButtplugClient ) -> Vec<TkActuator> {
+        let mut actuators = vec![];
+        for device in client.devices() {
+            if let Some(linear_cmd) = device.message_attributes().linear_cmd() {
+                for linear_cmd in linear_cmd {
+                    actuators.push(TkActuator {
+                        device: device.clone(),
+                        actuator: linear_cmd.actuator_type().clone(),
+                        index_in_device: *linear_cmd.index() })
+                }
+            }
+            if let Some(scalar_cmd) = device.message_attributes().scalar_cmd() {
+                for scalar_cmd in scalar_cmd {
+                    actuators.push(TkActuator {
+                        device: device.clone(),
+                        actuator: scalar_cmd.actuator_type().clone(),
+                        index_in_device: *scalar_cmd.index() })
+                }
+            }
+        }
+        actuators
+    }
+
     #[tokio::test]
-    async fn linear_overrides_pattern() {
+    async fn test_concurrency_linear_and_pattern() {
         // lin1   |11111111111111111-->|
         // pat1       |23452345234523452345234-->|
         // result |1111111111111111111123452345234-->|
@@ -702,11 +805,45 @@ mod tests {
         let start = Instant::now();
         player.play_background(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(99)));
         wait_ms(250).await;
-        player.play(TkPattern::Funscript(TkDuration::from_secs(3), String::from("31_Sawtooth-Fast"))).await;
+        player
+            .play(TkPattern::Funscript(
+                TkDuration::from_secs(3),
+                String::from("31_Sawtooth-Fast"),
+            ))
+            .await;
 
         // assert
         print_device_calls(&test_client.call_registry, 1, start);
         assert!(test_client.call_registry.get_device(1).len() > 3);
+    }
+
+    #[tokio::test]
+    async fn test_concurrency_two_devices_simulatenously_both_are_started_and_stopped() {
+        let test_client = get_test_client(vec![
+            scalar(1, "vib1", ActuatorType::Vibrate),
+            scalar(2, "vib2", ActuatorType::Vibrate),
+        ])
+        .await;
+
+        let devices = test_client.created_devices.clone();
+        let mut player = PlayerTest::setup(test_client.created_devices);
+
+        // act
+        player.play_background_on_device(
+            TkPattern::Linear(TkDuration::from_millis(3000), Speed::new(99)),
+            devices[0].clone(),
+        );
+
+        player.play_background_on_device(
+            TkPattern::Linear(TkDuration::from_millis(3000), Speed::new(88)),
+            devices[1].clone(),
+        );
+
+        player.finish_background().await;
+
+        // assert
+        test_client.call_registry.assert_vibrated(1);
+        test_client.call_registry.assert_vibrated(2);
     }
 
     fn print_device_calls(

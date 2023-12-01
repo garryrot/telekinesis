@@ -30,7 +30,6 @@ use std::{thread, vec};
 use tracing::error;
 
 use crate::util::assert_timeout;
-use crate::Telekinesis;
 use std::time::Instant;
 
 #[derive(Clone)]
@@ -109,7 +108,6 @@ impl FakeConnectorCallRegistry {
             Some(some) => some.clone(),
             None => Box::new(vec![]),
         };
-        // let box_copy = *bucket.clone();
         bucket.deref_mut().push(cmd);
         calls.deref_mut().insert(device_id, bucket);
     }
@@ -271,9 +269,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::StopAllDevices(_) => {
-                // doesn't work cause no id
-                // self.call_registry
-                //     .store_record(&cmd, FakeMessage::new(msg_clone));
+                // cannot store cause no id
                 self.ok_response(msg_id)
             }
             ButtplugCurrentSpecClientMessage::StartScanning(cmd) => {
@@ -374,17 +370,6 @@ pub fn rotate(id: u32, name: &str) -> DeviceAdded {
     )
 }
 
-impl Telekinesis {
-    /// should only be used by tests or fake backends
-    pub fn await_connect(&self, devices: usize) {
-        assert_timeout!(
-            self.connection_status.lock().unwrap().device_status.len() == devices,
-            "Awaiting connect"
-        );
-    }
-}
-
-
 #[cfg(test)]
 pub mod tests {
 
@@ -395,27 +380,17 @@ pub mod tests {
     }    
 
     pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
-        let devices_len = devices.len();
-        let mut created_devices = vec![];
-    
         let (connector, call_registry) = FakeDeviceConnector::new(devices);
         let client = ButtplugClient::new("FakeClient");
         client.connect(connector).await.unwrap();
-    
-        while created_devices.len() < devices_len {
-            let event = client.event_stream().next().await.unwrap();
-            match event {
-                buttplug::client::ButtplugClientEvent::DeviceAdded(device) => {
-                    created_devices.push(device)
-                }
-                _ => {}
-            }
-        }
-    
+
+        let _ = client.event_stream().next().await.unwrap();
+
+        let devices = client.devices().clone();
         ButtplugTestClient {
             client: client,
             call_registry,
-            created_devices,
+            created_devices: devices,
         }
     }
 

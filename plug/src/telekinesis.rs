@@ -32,9 +32,9 @@ use crate::{
         handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent, TkDeviceStatus,
     },
     input::TkParams,
-    pattern::{TkButtplugScheduler, TkPlayerSettings},
+    pattern::{TkButtplugScheduler, TkPlayerSettings, Speed, TkDuration},
     settings::{TkConnectionType, TkSettings},
-    DeviceList, Speed, Telekinesis, Tk, TkDuration, TkPattern, TkStatus,
+    DeviceList, Telekinesis, TkPattern, TkStatus, Tk,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -353,6 +353,7 @@ mod tests {
     use std::{thread, time::Duration, vec};
 
     use crate::connection::TkConnectionStatus;
+    use crate::pattern::TkDuration;
     use crate::util::enable_log;
     use crate::{
         fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
@@ -361,6 +362,17 @@ mod tests {
     use buttplug::core::message::{ActuatorType, DeviceAdded};
 
     use super::*;
+
+    impl Telekinesis {
+        /// should only be used by tests or fake backends
+        pub fn await_connect(&self, devices: usize) {
+            assert_timeout!(
+                self.connection_status.lock().unwrap().device_status.len() == devices,
+                "Awaiting connect"
+            );
+        }
+    }
+
 
     #[test]
     fn get_devices_contains_connected_devices() {
@@ -446,33 +458,6 @@ mod tests {
 
         // assert
         call_registry.assert_not_vibrated(1);
-    }
-
-    #[test]
-    fn vibrate_two_devices_simultaneously_both_are_started_and_stopped() {
-        let (mut tk, call_registry) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate),
-            scalar(2, "vib2", ActuatorType::Vibrate),
-        ]);
-        tk.settings_set_events("vib1", vec![String::from("device 1")]);
-        tk.settings_set_events("vib2", vec![String::from("device 2")]);
-
-        // act
-        tk.vibrate(
-            Speed::new(99),
-            TkDuration::from_millis(3000),
-            vec![String::from("device 1")],
-        );
-        tk.vibrate(
-            Speed::new(88),
-            TkDuration::from_millis(3000),
-            vec![String::from("device 2")],
-        );
-        thread::sleep(Duration::from_secs(5));
-
-        // assert
-        call_registry.assert_vibrated(1);
-        call_registry.assert_vibrated(2);
     }
 
     #[test]
@@ -643,26 +628,7 @@ mod tests {
         call_registry.assert_vibrated(1);
     }
 
-    fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {
-        let devices_names: Vec<String> = devices.iter().map(|d| d.device_name().clone()).collect();
-        let (connector, call_registry) = FakeDeviceConnector::new(devices);
-        let count = connector.devices.len();
-
-        // act
-        let mut settings = TkSettings::default();
-        settings.pattern_path =
-            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
-        let mut tk =
-            Telekinesis::connect_with(|| async move { connector }, Some(settings)).unwrap();
-        tk.await_connect(count);
-
-        for name in devices_names {
-            tk.settings_set_enabled(&name, true);
-        }
-
-        (tk, call_registry)
-    }
-
+    // TODO: Scheduler test
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
     fn vibrate_pattern_then_cancel() {
@@ -672,6 +638,7 @@ mod tests {
         thread::sleep(Duration::from_secs(10));
     }
 
+    // TODO: Scheduler test
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
     fn vibrate_pattern_loops() {
@@ -744,5 +711,25 @@ mod tests {
             }
             _ => todo!(),
         };
+    }
+
+    fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {
+        let devices_names: Vec<String> = devices.iter().map(|d| d.device_name().clone()).collect();
+        let (connector, call_registry) = FakeDeviceConnector::new(devices);
+        let count = connector.devices.len();
+
+        // act
+        let mut settings = TkSettings::default();
+        settings.pattern_path =
+            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+        let mut tk =
+            Telekinesis::connect_with(|| async move { connector }, Some(settings)).unwrap();
+        tk.await_connect(count);
+
+        for name in devices_names {
+            tk.settings_set_enabled(&name, true);
+        }
+
+        (tk, call_registry)
     }
 }

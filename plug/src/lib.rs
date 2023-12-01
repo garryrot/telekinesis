@@ -2,7 +2,7 @@ use anyhow::Error;
 use api::*;
 use buttplug::client::ButtplugClientDevice;
 use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus, TkStatus};
-use pattern::{get_pattern_names, TkButtplugScheduler, TkPattern};
+use pattern::{get_pattern_names, TkButtplugScheduler, TkPattern, Speed, TkDuration};
 use settings::PATTERN_PATH;
 use std::{
     sync::{Arc, Mutex},
@@ -96,40 +96,6 @@ pub struct Telekinesis {
     connection_events: UnboundedReceiver<TkConnectionEvent>,
     event_sender: UnboundedSender<TkConnectionEvent>,
 }
-
-#[derive(Debug, Clone, Copy)]
-pub struct Speed {
-    pub value: u16,
-}
-
-#[derive(Clone, Debug)]
-pub enum TkDuration {
-    Infinite,
-    Timed(Duration),
-}
-
-impl TkDuration {
-    pub fn from_input_float(secs: f32) -> TkDuration {
-        if secs > 0.0 {
-            return TkDuration::Timed(Duration::from_millis((secs * 1000.0) as u64));
-        } else {
-            return TkDuration::Infinite;
-        }
-    }
-    pub fn from_millis(ms: u64) -> TkDuration {
-        TkDuration::Timed(Duration::from_millis(ms))
-    }
-    pub fn from_secs(s: u64) -> TkDuration {
-        TkDuration::Timed(Duration::from_secs(s))
-    }
-    pub fn as_us(&self) -> u64 {
-        match self {
-            TkDuration::Infinite => u64::MAX,
-            TkDuration::Timed(duration) => duration.as_micros() as u64,
-        }
-    }
-}
-
 
 fn tk_new() -> Box<TkApi> {
     Box::new(TkApi {
