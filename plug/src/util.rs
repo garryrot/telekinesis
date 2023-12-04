@@ -19,18 +19,4 @@ pub fn enable_trace() {
     .unwrap();
 }
 
-macro_rules! assert_timeout {
-    ($cond:expr, $arg:tt) => {
-        // starting time
-        let start: Instant = Instant::now();
-        while !$cond {
-            thread::sleep(Duration::from_millis(10));
-            if start.elapsed().as_secs() > 5 {
-                panic!($arg);
-            }
-        }
-    };
-}
-
-pub(crate) use assert_timeout;
 use tracing::Level;

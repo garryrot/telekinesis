@@ -32,7 +32,7 @@ use crate::{
         handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent, TkDeviceStatus,
     },
     input::TkParams,
-    pattern::{TkButtplugScheduler, TkPlayerSettings, Speed, TkDuration},
+    pattern::{TkButtplugScheduler, TkPlayerSettings, Speed, TkDuration, get_actuators},
     settings::{TkConnectionType, TkSettings},
     DeviceList, Telekinesis, TkPattern, TkStatus, Tk,
 };
@@ -235,17 +235,17 @@ impl Tk for Telekinesis {
 
         let mut player = self
             .scheduler
-            .create_player(params.filter_devices(self.get_devices()));
+            .create_player(get_actuators(params.filter_devices(self.get_devices())));
         let handle = player.handle;
 
         let sender_clone = self.event_sender.clone();
         self.runtime.spawn(async move {
             let now = Instant::now();
-            player.play(params.pattern.clone()).await;
+            player.play_scalar(params.pattern.clone()).await;
             sender_clone
                 .send(TkConnectionEvent::DeviceEvent(TkDeviceEvent::new(
                     now.elapsed(),
-                    &player.devices,
+                    &player.devices.iter().map( |d| d.device.clone() ).collect(),
                     params,
                 )))
                 .expect("queue full");
@@ -355,13 +355,28 @@ mod tests {
     use crate::connection::TkConnectionStatus;
     use crate::pattern::TkDuration;
     use crate::util::enable_log;
-    use crate::{
-        fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector},
-        util::assert_timeout,
-    };
+    use crate::fakes::{
+            linear, 
+            scalar, 
+            FakeConnectorCallRegistry, 
+            FakeDeviceConnector
+        };
     use buttplug::core::message::{ActuatorType, DeviceAdded};
 
     use super::*;
+
+    macro_rules! assert_timeout {
+        ($cond:expr, $arg:tt) => {
+            // starting time
+            let start: Instant = Instant::now();
+            while !$cond {
+                thread::sleep(Duration::from_millis(10));
+                if start.elapsed().as_secs() > 5 {
+                    panic!($arg);
+                }
+            }
+        };
+    }
 
     impl Telekinesis {
         /// should only be used by tests or fake backends
@@ -372,7 +387,6 @@ mod tests {
             );
         }
     }
-
 
     #[test]
     fn get_devices_contains_connected_devices() {
@@ -422,9 +436,11 @@ mod tests {
         tk.vibrate(Speed::new(100), TkDuration::from_millis(1), vec![]);
 
         // assert
-        call_registry.assert_vibrated(1); // scalar
-        call_registry.assert_not_vibrated(4); // linear
-        call_registry.assert_not_vibrated(7); // rotator
+        thread::sleep(Duration::from_millis(500));
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        call_registry.get_device(1)[1].assert_strenth(0.0);
+        call_registry.assert_unused(4); // linear
+        call_registry.assert_unused(7); // rotator
     }
 
     #[test]
@@ -438,8 +454,10 @@ mod tests {
         tk.vibrate(Speed::new(100), TkDuration::from_millis(1), vec![]);
 
         // assert
-        call_registry.assert_vibrated(1);
-        call_registry.assert_not_vibrated(2);
+        thread::sleep(Duration::from_millis(500));
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        call_registry.get_device(1)[1].assert_strenth(0.0);
+        call_registry.assert_unused(2);
     }
 
     #[test]
@@ -457,7 +475,7 @@ mod tests {
         thread::sleep(Duration::from_millis(50));
 
         // assert
-        call_registry.assert_not_vibrated(1);
+        call_registry.assert_unused(1);
     }
 
     #[test]
@@ -475,9 +493,11 @@ mod tests {
         thread::sleep(Duration::from_secs(1));
 
         // assert
-        call_registry.assert_vibrated(1);
-        call_registry.assert_vibrated(3);
-        call_registry.assert_not_vibrated(2);
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        call_registry.get_device(1)[1].assert_strenth(0.0);
+        call_registry.get_device(3)[0].assert_strenth(1.0);
+        call_registry.get_device(3)[1].assert_strenth(0.0);
+        call_registry.assert_unused(2);
     }
 
     #[test]
@@ -516,8 +536,10 @@ mod tests {
         );
         thread::sleep(Duration::from_secs(1));
 
-        call_registry.assert_vibrated(1);
-        call_registry.assert_not_vibrated(2);
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        call_registry.get_device(1)[1].assert_strenth(0.0);
+
+        call_registry.assert_unused(2);
     }
 
     #[test]
@@ -532,7 +554,9 @@ mod tests {
             vec![String::from(" SoMe EvEnT    ")],
         );
 
-        call_registry.assert_vibrated(1);
+        thread::sleep(Duration::from_millis(500));
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        call_registry.get_device(1)[1].assert_strenth(0.0);
     }
 
     #[test]
@@ -547,7 +571,9 @@ mod tests {
             vec![String::from("some event")],
         );
 
-        call_registry.assert_vibrated(1);
+        thread::sleep(Duration::from_millis(500));
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        call_registry.get_device(1)[1].assert_strenth(0.0);
     }
 
     #[test]
@@ -602,11 +628,13 @@ mod tests {
 
         // act
         let handle = tk.vibrate(Speed::max(), TkDuration::Infinite, vec![]);
+
         thread::sleep(Duration::from_secs(1));
-        call_registry.assert_started(1);
+        call_registry.get_device(1)[0].assert_strenth(1.0);
 
         tk.stop(handle);
-        call_registry.assert_vibrated(1);
+        thread::sleep(Duration::from_secs(1));
+        call_registry.get_device(1)[1].assert_strenth(0.0);
     }
 
     #[test]
@@ -622,10 +650,12 @@ mod tests {
             vec![],
         );
         thread::sleep(Duration::from_secs(1));
-        call_registry.assert_started(1);
 
+        call_registry.get_device(1)[0].assert_strenth(1.0);
         tk.stop_all();
-        call_registry.assert_vibrated(1);
+
+        thread::sleep(Duration::from_secs(1));
+        call_registry.get_device(1)[1].assert_strenth(0.0);
     }
 
     // TODO: Scheduler test

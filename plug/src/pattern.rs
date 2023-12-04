@@ -1,8 +1,9 @@
 use anyhow::anyhow;
-use buttplug::client::{ButtplugClientDevice, ScalarValueCommand};
-use std::fmt::{self, Display};
-use funscript::{FScript, FSPoint};
+use buttplug::client::{device, ButtplugClientDevice, ScalarValueCommand};
+use buttplug::core::message::ActuatorType;
+use funscript::{FSPoint, FScript};
 use std::collections::HashMap;
+use std::fmt::{self, Display};
 
 use std::{
     fs::{self},
@@ -24,7 +25,7 @@ pub enum TkDuration {
 }
 
 pub struct TkPatternPlayer {
-    pub devices: Vec<Arc<ButtplugClientDevice>>,
+    pub devices: Vec<Arc<TkActuator>>,
     pub action_sender: UnboundedSender<TkDeviceAction>,
     pub resolution_ms: i32,
     pub pattern_path: String,
@@ -55,10 +56,60 @@ struct TkPatternFile {
 }
 
 #[derive(Clone, Debug)]
+pub struct TkActuator {
+    pub device: Arc<ButtplugClientDevice>,
+    pub actuator: ActuatorType,
+    pub index_in_device: usize,
+}
+
+impl TkActuator {
+    pub fn name(&self) -> &String {
+        // TODO: Rename to identifier
+        // TODO: Needs to be actuator-specfic
+        self.device.name()
+    }
+}
+
+pub fn get_actuators(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<Arc<TkActuator>> {
+    let mut actuators = vec![];
+    for device in devices {
+        if let Some(scalar_cmd) = device.message_attributes().scalar_cmd() {
+            for (idx, scalar_cmd) in scalar_cmd.iter().enumerate() {
+                actuators.push(Arc::new(TkActuator {
+                    device: device.clone(),
+                    actuator: scalar_cmd.actuator_type().clone(),
+                    index_in_device: idx,
+                }))
+            }
+        }
+        if let Some(linear_cmd) = device.message_attributes().linear_cmd() {
+            for (idx, _) in linear_cmd.iter().enumerate() {
+                actuators.push(Arc::new(TkActuator {
+                    device: device.clone(),
+                    actuator: ActuatorType::Position,
+                    index_in_device: idx,
+                }));
+            }
+        }
+        if let Some(rotate_cmd) = device.message_attributes().rotate_cmd() {
+            for (idx, _) in rotate_cmd.iter().enumerate() {
+                actuators.push(Arc::new(TkActuator {
+                    device: device.clone(),
+                    actuator: ActuatorType::Rotate,
+                    index_in_device: idx,
+                }))
+            }
+        }
+    }
+    actuators
+}
+
+#[derive(Clone, Debug)]
 pub enum TkDeviceAction {
-    Start(Arc<ButtplugClientDevice>, Speed, bool, i32),
-    Update(Arc<ButtplugClientDevice>, Speed),
-    End(Arc<ButtplugClientDevice>, bool, i32),
+    Start(Arc<TkActuator>, Speed, bool, i32),
+    Update(Arc<TkActuator>, Speed),
+    Move(Arc<TkActuator>, f64, u32),
+    End(Arc<TkActuator>, bool, i32),
     StopAll, // global but required for resetting device state
 }
 
@@ -71,6 +122,12 @@ pub struct Speed {
 pub enum TkPattern {
     Linear(TkDuration, Speed),
     Funscript(TkDuration, String),
+}
+
+#[derive(Clone, Debug)]
+pub struct TkFunscript {
+    pub duration: TkDuration,
+    pub pattern: String,
 }
 
 struct ReferenceCounter {
@@ -141,20 +198,20 @@ impl ReferenceCounter {
             access_list: HashMap::new(),
         }
     }
-    pub fn reserve(&mut self, device: &Arc<ButtplugClientDevice>) {
+    pub fn reserve(&mut self, actuator: &Arc<TkActuator>) {
         self.access_list
-            .entry(device.index())
+            .entry(actuator.device.index())
             .and_modify(|counter| *counter += 1)
             .or_insert(1);
         trace!(
             "Reserved device={} ref-count={}",
-            device.name(),
-            self.current_references(&device)
+            actuator.device.name(),
+            self.current_references(&actuator)
         )
     }
-    pub fn release(&mut self, device: &Arc<ButtplugClientDevice>) {
+    pub fn release(&mut self, actuator: &Arc<TkActuator>) {
         self.access_list
-            .entry(device.index())
+            .entry(actuator.device.index())
             .and_modify(|counter| {
                 if *counter > 0 {
                     *counter -= 1
@@ -165,17 +222,17 @@ impl ReferenceCounter {
             .or_insert(0);
         trace!(
             "Released device={} ref-count={}",
-            device.name(),
-            self.current_references(&device)
+            actuator.device.name(),
+            self.current_references(&actuator)
         )
     }
 
-    pub fn should_stop(&self, device: &Arc<ButtplugClientDevice>) -> bool {
-        self.current_references(device) == 0
+    pub fn should_stop(&self, actuator: &Arc<TkActuator>) -> bool {
+        self.current_references(actuator) == 0
     }
 
-    fn current_references(&self, device: &Arc<ButtplugClientDevice>) -> u32 {
-        match self.access_list.get(&device.index()) {
+    fn current_references(&self, actuator: &Arc<TkActuator>) -> u32 {
+        match self.access_list.get(&actuator.device.index()) {
             Some(count) => *count,
             None => 0,
         }
@@ -193,23 +250,24 @@ impl DeviceAccess {
         }
     }
 
-    pub fn record_start(&mut self, device: &Arc<ButtplugClientDevice>, handle: i32, action: Speed) {
+    pub fn record_start(&mut self, actuator: &Arc<TkActuator>, handle: i32, action: Speed) {
         self.device_actions
-            .entry(device.index())
+            .entry(actuator.device.index())
             .and_modify(|bag| bag.push((handle, action)))
             .or_insert(vec![(handle, action)]);
     }
 
-    pub fn record_stop(&mut self, device: &Arc<ButtplugClientDevice>, handle: i32) {
-        if let Some(action) = self.device_actions.remove(&device.index()) {
+    pub fn record_stop(&mut self, actuator: &Arc<TkActuator>, handle: i32) {
+        if let Some(action) = self.device_actions.remove(&actuator.device.index()) {
             let except_handle: Vec<(i32, Speed)> =
                 action.into_iter().filter(|t| t.0 != handle).collect();
-            self.device_actions.insert(device.index(), except_handle);
+            self.device_actions
+                .insert(actuator.device.index(), except_handle);
         }
     }
 
-    pub fn get_remaining_speed(&self, device: &Arc<ButtplugClientDevice>) -> Option<Speed> {
-        if let Some(actions) = self.device_actions.get(&device.index()) {
+    pub fn get_remaining_speed(&self, actuator: &Arc<TkActuator>) -> Option<Speed> {
+        if let Some(actions) = self.device_actions.get(&actuator.device.index()) {
             let mut sorted: Vec<(i32, Speed)> = actions.clone();
             sorted.sort_by_key(|b| b.0);
             if let Some(tuple) = sorted.last() {
@@ -219,12 +277,8 @@ impl DeviceAccess {
         None
     }
 
-    pub fn get_actual_speed(
-        &self,
-        device: &Arc<ButtplugClientDevice>,
-        new_speed: Speed,
-    ) -> Speed {
-        if let Some(actions) = self.device_actions.get(&device.index()) {
+    pub fn get_actual_speed(&self, actuator: &Arc<TkActuator>, new_speed: Speed) -> Speed {
+        if let Some(actions) = self.device_actions.get(&actuator.device.index()) {
             let mut sorted: Vec<(i32, Speed)> = actions.clone();
             sorted.sort_by_key(|b| b.0);
             if let Some(tuple) = sorted.last() {
@@ -237,6 +291,8 @@ impl DeviceAccess {
 
 impl TkButtplugWorker {
     pub async fn run_worker_thread(&mut self) {
+        trace!("Exec run_worker_thread");
+
         // TODO do cleanup of cancelled
         let mut device_counter = ReferenceCounter::new();
         let mut device_access = DeviceAccess::new();
@@ -244,16 +300,16 @@ impl TkButtplugWorker {
             if let Some(next_action) = self.tasks.recv().await {
                 trace!("Exec device action {:?}", next_action);
                 match next_action {
-                    TkDeviceAction::Start(device, speed, priority, handle) => {
-                        device_counter.reserve(&device);
+                    TkDeviceAction::Start(actuator, speed, priority, handle) => {
+                        device_counter.reserve(&actuator);
                         if priority {
-                            device_access.record_start(&device, handle, speed);
+                            device_access.record_start(&actuator, handle, speed);
                         }
-                        let result = device
+                        let result = actuator
+                            .device
                             .vibrate(&ScalarValueCommand::ScalarValue(
-                                device_access
-                                    .get_actual_speed(&device, speed)
-                                    .as_float(),
+                                device_access.get_actual_speed(&actuator, speed).as_float(),
+                                // TODO select only the
                             ))
                             .await;
                         match result {
@@ -265,37 +321,50 @@ impl TkButtplugWorker {
                             _ => {}
                         }
                     }
-                    TkDeviceAction::Update(device, speed) => device
-                        .vibrate(&ScalarValueCommand::ScalarValue(
-                            device_access
-                                .get_actual_speed(&device, speed)
-                                .as_float(),
-                        ))
-                        .await
-                        .unwrap_or_else(|_| error!("Failed to set device vibration speed.")),
-                    TkDeviceAction::End(device, priority, handle) => {
-                        device_counter.release(&device);
+                    TkDeviceAction::Update(actuator, speed) => {
+                        actuator
+                            .device
+                            .vibrate(&ScalarValueCommand::ScalarValue(
+                                device_access.get_actual_speed(&actuator, speed).as_float(),
+                                // TODO select just the actuator
+                            ))
+                            .await
+                            .unwrap_or_else(|_| error!("Failed to set device vibration speed."))
+                    }
+                    TkDeviceAction::End(actuator, priority, handle) => {
+                        device_counter.release(&actuator);
                         if priority {
-                            device_access.record_stop(&device, handle);
+                            device_access.record_stop(&actuator, handle);
                         }
-                        if device_counter.should_stop(&device) {
+                        if device_counter.should_stop(&actuator) {
                             // nothing else is controlling the device, stop it
-                            device
-                                .vibrate(&ScalarValueCommand::ScalarValue(0.0))
+                            actuator
+                                .device
+                                .vibrate(
+                                    &ScalarValueCommand::ScalarValue(0.0), // TODO: select just the actuator
+                                )
                                 .await
                                 .unwrap_or_else(|_| error!("Failed to stop vibration"));
-                            info!("Device stopped {}", device.name())
-                        } 
-                        else if let Some(remaining_speed) = device_access.get_remaining_speed(&device)
+                            info!("Device stopped {}", actuator.device.name())
+                        } else if let Some(remaining_speed) =
+                            device_access.get_remaining_speed(&actuator)
                         {
                             // see if we have an earlier action still requiring movement
-                            device
+                            actuator
+                                .device
                                 .vibrate(&ScalarValueCommand::ScalarValue(
                                     remaining_speed.as_float(),
                                 ))
                                 .await
                                 .unwrap_or_else(|_| error!("Failed to reset vibration"))
                         }
+                    }
+                    TkDeviceAction::Move(actuator, position, duration) => {
+                        actuator
+                            .device
+                            .linear(&device::LinearCommand::Linear(duration, position))
+                            .await
+                            .unwrap_or_else(|_| error!("Failed to move linear"));
                     }
                     TkDeviceAction::StopAll => {
                         device_counter.clear();
@@ -334,12 +403,12 @@ impl TkButtplugScheduler {
         }
     }
 
-    pub fn create_player(&mut self, devices: Vec<Arc<ButtplugClientDevice>>) -> TkPatternPlayer {
+    pub fn create_player(&mut self, actuators: Vec<Arc<TkActuator>>) -> TkPatternPlayer {
         let token = CancellationToken::new();
         let handle = self.get_next_handle();
         self.cancellation_tokens.insert(handle, token.clone());
         TkPatternPlayer {
-            devices: devices,
+            devices: actuators,
             action_sender: self.device_action_sender.clone(),
             resolution_ms: 100,
             pattern_path: self.settings.pattern_path.clone(),
@@ -360,18 +429,34 @@ impl TkButtplugScheduler {
 }
 
 impl TkPatternPlayer {
-    pub async fn play(&mut self, pattern: TkPattern) {
+    pub async fn play_linear(&mut self, funscript: FScript, duration: TkDuration) {
+        let mut last_timestamp : u32 = 0;
+        for point in funscript.actions {
+            if point.at != 0 {
+                let point_as_float = (point.pos as f64) / 100.0;
+                let duration_ms = point.at as u32 - last_timestamp;
+                self.do_linear(point_as_float, duration_ms);
+                trace!("do_linear to {} over {}ms", point_as_float, duration_ms);
+                if false == cancellable_wait(Duration::from_millis(duration_ms as u64), &self.cancellation_token).await{
+                    break;
+                };
+            }
+            last_timestamp = point.at as u32;
+        }
+    }
+
+    pub async fn play_scalar(&mut self, pattern: TkPattern) {
         info!("Playing pattern {:?}", pattern);
         match pattern {
             TkPattern::Linear(duration, speed) => match duration {
                 TkDuration::Infinite => {
-                    self.do_vibrate(speed, true, self.handle);
+                    self.do_scalar(speed, true, self.handle);
                     self.cancellation_token.cancelled().await;
                     self.do_stop(true, self.handle);
                     info!("Infinite stopped")
                 }
                 TkDuration::Timed(duration) => {
-                    self.do_vibrate(speed, true, self.handle);
+                    self.do_scalar(speed, true, self.handle);
                     cancellable_wait(duration, &self.cancellation_token).await;
                     self.do_stop(true, self.handle);
                     info!("Linear finished");
@@ -385,13 +470,13 @@ impl TkPatternPlayer {
                         while !cancel && elapsed_us < duration.as_us() {
                             let last_timer_us;
                             (cancel, last_timer_us) =
-                                self.play_pattern(&duration, &funscript).await;
+                                self.play_scalar_pattern(&duration, &funscript).await;
                             elapsed_us += last_timer_us;
                             info!("Elapsed: {} Cancel: {}", elapsed_us, cancel)
                         }
                     }
                     Err(err) => error!(
-                        "Error loading funscript pattern={} err={}",
+                        "Error loading funscript vibration pattern={} err={}",
                         pattern_name, err
                     ),
                 }
@@ -399,7 +484,7 @@ impl TkPatternPlayer {
         }
     }
 
-    async fn play_pattern(&self, duration: &TkDuration, funscript: &FScript) -> (bool, u64) {
+    async fn play_scalar_pattern(&self, duration: &TkDuration, funscript: &FScript) -> (bool, u64) {
         let actions = &funscript.actions;
         if actions.len() == 0 {
             return (true, 0);
@@ -415,7 +500,7 @@ impl TkPatternPlayer {
         let now = Instant::now();
 
         let first_speed = Speed::from_fs(&actions[0]);
-        self.do_vibrate(first_speed, false, self.handle);
+        self.do_scalar(first_speed, false, self.handle);
 
         let mut i = 1;
         let mut last_speed = first_speed.value as i32;
@@ -473,9 +558,17 @@ impl TkPatternPlayer {
         }
     }
 
-    fn do_vibrate(&self, speed: Speed, priority: bool, handle: i32) {
+    fn do_linear(&self, pos: f64, duration_ms: u32) {
         for device in self.devices.iter() {
-            trace!("do_vibrate {} {:?}", speed, device);
+            self.action_sender
+                .send(TkDeviceAction::Move(device.clone(), pos, duration_ms))
+                .unwrap_or_else(|_| error!("queue full"));
+        }
+    }
+
+    fn do_scalar(&self, speed: Speed, priority: bool, handle: i32) {
+        for device in self.devices.iter() {
+            trace!("do_scalar {} {:?}", speed, device);
             self.action_sender
                 .send(TkDeviceAction::Start(
                     device.clone(),
@@ -580,11 +673,13 @@ fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::E
 #[cfg(test)]
 mod tests {
     use crate::fakes::tests::get_test_client;
-    use crate::fakes::{scalar, FakeConnectorCallRegistry};
+    use crate::fakes::{scalar, FakeConnectorCallRegistry, linear, FakeMessage};
     use crate::pattern::TkPattern;
+    use crate::util::{enable_trace};
     use crate::{Speed, TkDuration};
-    use buttplug::client::{ButtplugClientDevice, ButtplugClient};
-    use buttplug::core::message::ActuatorType;
+    use buttplug::client::ButtplugClientDevice;
+    use buttplug::core::message::{ActuatorType, self};
+    use funscript::{FSPoint, FScript};
     use futures::future::join_all;
     use std::sync::Arc;
     use std::thread;
@@ -592,7 +687,7 @@ mod tests {
     use tokio::runtime::Handle;
     use tokio::task::JoinHandle;
 
-    use super::{TkButtplugScheduler, TkPlayerSettings};
+    use super::{get_actuators, TkButtplugScheduler, TkPlayerSettings};
 
     struct PlayerTest {
         scheduler: TkButtplugScheduler,
@@ -614,22 +709,33 @@ mod tests {
             pattern: TkPattern,
             device: Arc<ButtplugClientDevice>,
         ) {
-            let mut player = self.scheduler.create_player(vec![device]);
+            let mut player = self.scheduler.create_player(get_actuators(vec![device]));
             self.handles.push(Handle::current().spawn(async move {
-                player.play(pattern).await;
+                player.play_scalar(pattern).await;
             }));
         }
 
         fn play_background(&mut self, pattern: TkPattern) {
-            let mut player = self.scheduler.create_player(self.all_devices.clone());
+            let mut player = self
+                .scheduler
+                .create_player(get_actuators(self.all_devices.clone()));
             self.handles.push(Handle::current().spawn(async move {
-                player.play(pattern).await;
+                player.play_scalar(pattern).await;
             }));
         }
 
-        async fn play(&mut self, pattern: TkPattern) {
-            let mut player = self.scheduler.create_player(self.all_devices.clone());
-            player.play(pattern).await;
+        async fn play_scalar(&mut self, pattern: TkPattern) {
+            let mut player = self
+                .scheduler
+                .create_player(get_actuators(self.all_devices.clone()));
+            player.play_scalar(pattern).await;
+        }
+
+        async fn play_linear(&mut self, funscript: FScript, duration: TkDuration) {
+            let mut player = self
+                .scheduler
+                .create_player(get_actuators(self.all_devices.clone()));
+            player.play_linear(funscript, duration).await;
         }
 
         async fn finish_background(self) {
@@ -673,7 +779,7 @@ mod tests {
         ));
         wait_ms(100).await;
         player
-            .play(TkPattern::Linear(
+            .play_scalar(TkPattern::Linear(
                 TkDuration::from_millis(100),
                 Speed::new(100),
             ))
@@ -682,10 +788,10 @@ mod tests {
 
         // assert
         print_device_calls(&test_client.call_registry, 1, start);
-        assert!(test_client.call_registry.get_device(1)[0].vibration_started_strength(0.5));
-        assert!(test_client.call_registry.get_device(1)[1].vibration_started_strength(1.0));
-        assert!(test_client.call_registry.get_device(1)[2].vibration_started_strength(0.5));
-        assert!(test_client.call_registry.get_device(1)[3].vibration_stopped());
+        test_client.call_registry.get_device(1)[0].assert_strenth(0.5);
+        test_client.call_registry.get_device(1)[1].assert_strenth(1.0);
+        test_client.call_registry.get_device(1)[2].assert_strenth(0.5);
+        test_client.call_registry.get_device(1)[3].assert_strenth(0.0);
         assert_eq!(test_client.call_registry.get_device(1).len(), 4);
     }
 
@@ -709,19 +815,19 @@ mod tests {
         wait_ms(250).await;
 
         player
-            .play(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
+            .play_scalar(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
             .await;
         player.finish_background().await;
 
         // assert
         print_device_calls(&test_client.call_registry, 1, start);
 
-        assert!(test_client.call_registry.get_device(1)[0].vibration_started_strength(0.2));
-        assert!(test_client.call_registry.get_device(1)[1].vibration_started_strength(0.4));
-        assert!(test_client.call_registry.get_device(1)[2].vibration_started_strength(0.8));
-        assert!(test_client.call_registry.get_device(1)[3].vibration_started_strength(0.4));
-        assert!(test_client.call_registry.get_device(1)[4].vibration_started_strength(0.2));
-        assert!(test_client.call_registry.get_device(1)[5].vibration_stopped());
+        test_client.call_registry.get_device(1)[0].assert_strenth(0.2);
+        test_client.call_registry.get_device(1)[1].assert_strenth(0.4);
+        test_client.call_registry.get_device(1)[2].assert_strenth(0.8);
+        test_client.call_registry.get_device(1)[3].assert_strenth(0.4);
+        test_client.call_registry.get_device(1)[4].assert_strenth(0.2);
+        test_client.call_registry.get_device(1)[5].assert_strenth(0.0);
         assert_eq!(test_client.call_registry.get_device(1).len(), 6);
     }
 
@@ -745,50 +851,20 @@ mod tests {
         wait_ms(250).await;
 
         player
-            .play(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
+            .play_scalar(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
             .await;
         thread::sleep(Duration::from_secs(2));
         player.finish_background().await;
 
         // assert
         print_device_calls(&test_client.call_registry, 1, start);
-
-        assert!(test_client.call_registry.get_device(1)[0].vibration_started_strength(0.2));
-        assert!(test_client.call_registry.get_device(1)[1].vibration_started_strength(0.4));
-        assert!(test_client.call_registry.get_device(1)[2].vibration_started_strength(0.8));
-        assert!(test_client.call_registry.get_device(1)[3].vibration_started_strength(0.8));
-        assert!(test_client.call_registry.get_device(1)[4].vibration_started_strength(0.2));
-        assert!(test_client.call_registry.get_device(1)[5].vibration_stopped());
+        test_client.call_registry.get_device(1)[0].assert_strenth(0.2);
+        test_client.call_registry.get_device(1)[1].assert_strenth(0.4);
+        test_client.call_registry.get_device(1)[2].assert_strenth(0.8);
+        test_client.call_registry.get_device(1)[3].assert_strenth(0.8);
+        test_client.call_registry.get_device(1)[4].assert_strenth(0.2);
+        test_client.call_registry.get_device(1)[5].assert_strenth(0.0);
         assert_eq!(test_client.call_registry.get_device(1).len(), 6);
-    }
-
-    pub struct TkActuator {
-        device: Arc<ButtplugClientDevice>,
-        actuator: ActuatorType,
-        index_in_device: u32
-    }
-
-    pub fn get_actuators( client: ButtplugClient ) -> Vec<TkActuator> {
-        let mut actuators = vec![];
-        for device in client.devices() {
-            if let Some(linear_cmd) = device.message_attributes().linear_cmd() {
-                for linear_cmd in linear_cmd {
-                    actuators.push(TkActuator {
-                        device: device.clone(),
-                        actuator: linear_cmd.actuator_type().clone(),
-                        index_in_device: *linear_cmd.index() })
-                }
-            }
-            if let Some(scalar_cmd) = device.message_attributes().scalar_cmd() {
-                for scalar_cmd in scalar_cmd {
-                    actuators.push(TkActuator {
-                        device: device.clone(),
-                        actuator: scalar_cmd.actuator_type().clone(),
-                        index_in_device: *scalar_cmd.index() })
-                }
-            }
-        }
-        actuators
     }
 
     #[tokio::test]
@@ -806,7 +882,7 @@ mod tests {
         player.play_background(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(99)));
         wait_ms(250).await;
         player
-            .play(TkPattern::Funscript(
+            .play_scalar(TkPattern::Funscript(
                 TkDuration::from_secs(3),
                 String::from("31_Sawtooth-Fast"),
             ))
@@ -842,8 +918,29 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        test_client.call_registry.assert_vibrated(1);
-        test_client.call_registry.assert_vibrated(2);
+        test_client.call_registry.get_device(1)[0].assert_strenth(0.99);
+        test_client.call_registry.get_device(1)[1].assert_strenth(0.0);
+        test_client.call_registry.get_device(2)[0].assert_strenth(0.88);
+        test_client.call_registry.get_device(2)[1].assert_strenth(0.0);
+    }
+
+    #[tokio::test]
+    async fn test_linear_pattern() {
+        let test_client = get_test_client(vec![linear(1, "lin1")]).await;
+
+        let mut fscript = FScript::default();
+        fscript.actions.push(FSPoint { pos: 50, at: 0 }); // ignored
+        fscript.actions.push(FSPoint { pos: 0, at: 200 });
+        fscript.actions.push(FSPoint { pos: 100, at: 450 });
+        fscript.actions.push(FSPoint { pos: 25, at: 1000 });
+
+        let mut player = PlayerTest::setup(test_client.created_devices);
+        player.play_linear(fscript, TkDuration::Infinite).await;
+
+        let device_calls = test_client.call_registry.get_device(1);
+        device_calls[0].assert_position(0.0).assert_duration(200);
+        device_calls[1].assert_position(1.0).assert_duration(250);
+        device_calls[2].assert_position(0.25).assert_duration(550);
     }
 
     fn print_device_calls(
@@ -852,8 +949,8 @@ mod tests {
         test_start: Instant,
     ) {
         for i in 0..call_registry.get_device(index).len() {
-            let fake_call = call_registry.get_device(1)[i].clone();
-            let s = fake_call.get_scalar_strength();
+            let fake_call: FakeMessage = call_registry.get_device(1)[i].clone();
+            let s = get_scalar_strength(&fake_call);
             let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
             let perc = (s * 100.0).round();
             println!(
@@ -864,6 +961,15 @@ mod tests {
                 empty = "",
                 width = (perc / 5.0).floor() as usize
             );
+        }
+    }
+
+    pub fn get_scalar_strength(fake: &FakeMessage) -> f64 {
+        match fake.message.clone() {
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                cmd.scalars().iter().next().unwrap().scalar()
+            }
+            _ => panic!("Message is not scalar cmd"),
         }
     }
 }

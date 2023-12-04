@@ -2,7 +2,6 @@
 mod tests {
     use crate::telekinesis::in_process_connector;
     use crate::*;
-    use crate::util::assert_timeout;
     use std::thread;
     use std::time::Duration;
     use std::time::Instant;
@@ -60,7 +59,8 @@ mod tests {
     }
 
     fn _assert_one_event(tk: &mut Telekinesis) {
-        assert_timeout!(tk.get_next_event().is_some(), "Exactly one element exists");
+        _sleep();
+        assert!(tk.get_next_event().is_some(), "Exactly one element exists");
         assert!(tk.get_next_event().is_none());
     }
 

@@ -2,7 +2,7 @@ use anyhow::Error;
 use api::*;
 use buttplug::client::ButtplugClientDevice;
 use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus, TkStatus};
-use pattern::{get_pattern_names, TkButtplugScheduler, TkPattern, Speed, TkDuration};
+use pattern::{get_pattern_names, TkButtplugScheduler, TkPattern, Speed, TkDuration, TkActuator};
 use settings::PATTERN_PATH;
 use std::{
     sync::{Arc, Mutex},
