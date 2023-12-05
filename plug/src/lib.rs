@@ -2,12 +2,9 @@ use anyhow::Error;
 use api::*;
 use buttplug::client::ButtplugClientDevice;
 use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus, TkStatus};
-use pattern::{get_pattern_names, TkButtplugScheduler, TkPattern, Speed, TkDuration, TkActuator};
+use pattern::{get_pattern_names, Speed, TkButtplugScheduler, TkDuration, TkPattern};
 use settings::PATTERN_PATH;
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::sync::{Arc, Mutex};
 use tokio::{
     runtime::Runtime,
     sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender},
@@ -54,7 +51,14 @@ mod ffi {
         fn tk_qry_lst_1(&mut self, qry: &str, arg0: &str) -> Vec<String>;
         fn tk_qry_bool(&mut self, qry: &str) -> bool;
         fn tk_qry_bool_1(&mut self, qry: &str, arg0: &str) -> bool;
-        fn tk_control(&mut self, qry: &str, arg0: i32, arg1: f32, arg2: &str, arg3: &CxxVector<CxxString>) -> i32;
+        fn tk_control(
+            &mut self,
+            qry: &str,
+            arg0: i32,
+            arg1: f32,
+            arg2: &str,
+            arg3: &CxxVector<CxxString>,
+        ) -> i32;
         fn tk_stop(&mut self, arg0: i32) -> bool;
     }
 }
@@ -99,7 +103,7 @@ pub struct Telekinesis {
 
 fn tk_new() -> Box<TkApi> {
     Box::new(TkApi {
-        state: Arc::new( Mutex::new( None ) )
+        state: Arc::new(Mutex::new(None)),
     })
 }
 
@@ -113,7 +117,7 @@ impl TkApi {
     fn tk_cmd_1(&mut self, cmd: &str, arg0: &str) -> bool {
         self.exec_cmd_1(cmd, arg0)
     }
-    
+
     #[instrument]
     fn tk_cmd_2(&mut self, cmd: &str, arg0: &str, arg1: &str) -> bool {
         self.exec_cmd_2(cmd, arg0, arg1)
@@ -143,14 +147,21 @@ impl TkApi {
     fn tk_qry_bool(&mut self, qry: &str) -> bool {
         self.exec_qry_bool(qry)
     }
-    
+
     #[instrument]
     fn tk_qry_bool_1(&mut self, qry: &str, arg0: &str) -> bool {
         self.exec_qry_bool_1(qry, arg0)
     }
 
     #[instrument]
-    fn tk_control(&mut self, qry: &str, arg0: i32, arg1: f32, arg2: &str, arg3: &CxxVector<CxxString>) -> i32 {
+    fn tk_control(
+        &mut self,
+        qry: &str,
+        arg0: i32,
+        arg1: f32,
+        arg2: &str,
+        arg3: &CxxVector<CxxString>,
+    ) -> i32 {
         self.exec_control(qry, arg0, arg1, arg2, arg3)
     }
 
@@ -163,18 +174,16 @@ impl TkApi {
     fn tk_destroy(&mut self) {
         self.destroy();
     }
-
 }
 
 pub fn build_api() -> ApiBuilder<Telekinesis> {
-    ApiBuilder::new(
-        ApiInit {
-            name: "connect",
-            exec: || {
-                Telekinesis::connect(TkSettings::try_read_or_default(
-                    SETTINGS_PATH,
-                    SETTINGS_FILE,
-                ))
+    ApiBuilder::new(ApiInit {
+        name: "connect",
+        exec: || {
+            Telekinesis::connect(TkSettings::try_read_or_default(
+                SETTINGS_PATH,
+                SETTINGS_FILE,
+            ))
         },
     })
     // connection
@@ -202,7 +211,6 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             TkConnectionStatus::NotConnected.serialize_papyrus()
         },
     })
-
     // scan
     .def_cmd(ApiCmd0 {
         name: "start_scan",
@@ -212,9 +220,8 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "stop_scan",
         exec: |tk| tk.stop_scan(),
     })
-
     // status
-    .def_qry_lst(ApiQryList { 
+    .def_qry_lst(ApiQryList {
         name: "events",
         exec: |tk| {
             tk.process_next_events()
@@ -223,7 +230,6 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
                 .collect::<Vec<String>>()
         },
     })
-
     // controls
     .def_control(ApiControl {
         name: "vibrate",
@@ -249,20 +255,18 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         },
         default: ERROR_HANDLE,
     })
-    .def_stop(
-        ApiStop { exec: |tk: &mut Telekinesis, handle| tk.stop(handle) }
-    )
+    .def_stop(ApiStop {
+        exec: |tk: &mut Telekinesis, handle| tk.stop(handle),
+    })
     .def_cmd(ApiCmd0 {
         name: "stop_all",
         exec: |tk| tk.stop_all(),
     })
-
     // settings
     .def_cmd(ApiCmd0 {
         name: "settings.store",
         exec: |tk| tk.settings.try_write(SETTINGS_PATH, SETTINGS_FILE),
     })
-
     // devices settings
     .def_qry_lst(ApiQryList {
         name: "devices",
@@ -311,7 +315,6 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             TkConnectionStatus::NotConnected.serialize_papyrus()
         },
     })
-
     // patterns
     .def_qry_lst(ApiQryList {
         name: "patterns.vibrator",
@@ -336,10 +339,13 @@ impl Api<Telekinesis> for TkApi {
     fn fns(&self) -> ApiBuilder<Telekinesis> {
         build_api()
     }
-     fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
-         ApiCmd0 {
-             name: "disconnect",
-             exec: |tk| { tk.disconnect(); true },
-         }
-     }
+    fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
+        ApiCmd0 {
+            name: "disconnect",
+            exec: |tk| {
+                tk.disconnect();
+                true
+            },
+        }
+    }
 }

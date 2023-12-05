@@ -63,8 +63,7 @@ pub struct TkActuator {
 }
 
 impl TkActuator {
-    pub fn name(&self) -> &String {
-        // TODO: Rename to identifier
+    pub fn identifier(&self) -> &String {
         // TODO: Needs to be actuator-specfic
         self.device.name()
     }
@@ -205,7 +204,7 @@ impl ReferenceCounter {
             .or_insert(1);
         trace!(
             "Reserved device={} ref-count={}",
-            actuator.device.name(),
+            actuator.identifier(),
             self.current_references(&actuator)
         )
     }
@@ -222,7 +221,7 @@ impl ReferenceCounter {
             .or_insert(0);
         trace!(
             "Released device={} ref-count={}",
-            actuator.device.name(),
+            actuator.identifier(),
             self.current_references(&actuator)
         )
     }
@@ -345,7 +344,7 @@ impl TkButtplugWorker {
                                 )
                                 .await
                                 .unwrap_or_else(|_| error!("Failed to stop vibration"));
-                            info!("Device stopped {}", actuator.device.name())
+                            info!("Device stopped {}", actuator.identifier())
                         } else if let Some(remaining_speed) =
                             device_access.get_remaining_speed(&actuator)
                         {
@@ -430,14 +429,20 @@ impl TkButtplugScheduler {
 
 impl TkPatternPlayer {
     pub async fn play_linear(&mut self, funscript: FScript, duration: TkDuration) {
-        let mut last_timestamp : u32 = 0;
+        let mut last_timestamp: u32 = 0;
         for point in funscript.actions {
             if point.at != 0 {
                 let point_as_float = (point.pos as f64) / 100.0;
                 let duration_ms = point.at as u32 - last_timestamp;
                 self.do_linear(point_as_float, duration_ms);
                 trace!("do_linear to {} over {}ms", point_as_float, duration_ms);
-                if false == cancellable_wait(Duration::from_millis(duration_ms as u64), &self.cancellation_token).await{
+                if false
+                    == cancellable_wait(
+                        Duration::from_millis(duration_ms as u64),
+                        &self.cancellation_token,
+                    )
+                    .await
+                {
                     break;
                 };
             }
@@ -673,12 +678,11 @@ fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::E
 #[cfg(test)]
 mod tests {
     use crate::fakes::tests::get_test_client;
-    use crate::fakes::{scalar, FakeConnectorCallRegistry, linear, FakeMessage};
+    use crate::fakes::{linear, scalar};
     use crate::pattern::TkPattern;
-    use crate::util::{enable_trace};
     use crate::{Speed, TkDuration};
     use buttplug::client::ButtplugClientDevice;
-    use buttplug::core::message::{ActuatorType, self};
+    use buttplug::core::message::ActuatorType;
     use funscript::{FSPoint, FScript};
     use futures::future::join_all;
     use std::sync::Arc;
@@ -696,11 +700,11 @@ mod tests {
     }
 
     impl PlayerTest {
-        fn setup(all_devices: Vec<Arc<ButtplugClientDevice>>) -> Self {
+        fn setup(all_devices: &Vec<Arc<ButtplugClientDevice>>) -> Self {
             PlayerTest {
                 scheduler: get_test_scheduler(),
                 handles: vec![],
-                all_devices,
+                all_devices: all_devices.clone(),
             }
         }
 
@@ -767,8 +771,8 @@ mod tests {
         // result |111111122222211111111-->|
 
         // arrange
-        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
-        let mut player = PlayerTest::setup(test_client.created_devices);
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
         let start = Instant::now();
@@ -787,12 +791,12 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        print_device_calls(&test_client.call_registry, 1, start);
-        test_client.call_registry.get_device(1)[0].assert_strenth(0.5);
-        test_client.call_registry.get_device(1)[1].assert_strenth(1.0);
-        test_client.call_registry.get_device(1)[2].assert_strenth(0.5);
-        test_client.call_registry.get_device(1)[3].assert_strenth(0.0);
-        assert_eq!(test_client.call_registry.get_device(1).len(), 4);
+        client.print_device_calls(1, start);
+        client.get_messages(1)[0].assert_strenth(0.5);
+        client.get_messages(1)[1].assert_strenth(1.0);
+        client.get_messages(1)[2].assert_strenth(0.5);
+        client.get_messages(1)[3].assert_strenth(0.0);
+        assert_eq!(client.call_registry.get_device(1).len(), 4);
     }
 
     #[tokio::test]
@@ -803,8 +807,8 @@ mod tests {
         // result |111122222333332222222111111-->|
 
         // arrange
-        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
-        let mut player = PlayerTest::setup(test_client.created_devices);
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
         let start = Instant::now();
@@ -820,15 +824,15 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        print_device_calls(&test_client.call_registry, 1, start);
+        client.print_device_calls(1, start);
 
-        test_client.call_registry.get_device(1)[0].assert_strenth(0.2);
-        test_client.call_registry.get_device(1)[1].assert_strenth(0.4);
-        test_client.call_registry.get_device(1)[2].assert_strenth(0.8);
-        test_client.call_registry.get_device(1)[3].assert_strenth(0.4);
-        test_client.call_registry.get_device(1)[4].assert_strenth(0.2);
-        test_client.call_registry.get_device(1)[5].assert_strenth(0.0);
-        assert_eq!(test_client.call_registry.get_device(1).len(), 6);
+        client.get_messages(1)[0].assert_strenth(0.2);
+        client.get_messages(1)[1].assert_strenth(0.4);
+        client.get_messages(1)[2].assert_strenth(0.8);
+        client.get_messages(1)[3].assert_strenth(0.4);
+        client.get_messages(1)[4].assert_strenth(0.2);
+        client.get_messages(1)[5].assert_strenth(0.0);
+        assert_eq!(client.call_registry.get_device(1).len(), 6);
     }
 
     #[tokio::test]
@@ -839,8 +843,8 @@ mod tests {
         // result |111122222222222233333331111-->|
 
         // arrange
-        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
-        let mut player = PlayerTest::setup(test_client.created_devices);
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
         let start = Instant::now();
@@ -857,14 +861,14 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        print_device_calls(&test_client.call_registry, 1, start);
-        test_client.call_registry.get_device(1)[0].assert_strenth(0.2);
-        test_client.call_registry.get_device(1)[1].assert_strenth(0.4);
-        test_client.call_registry.get_device(1)[2].assert_strenth(0.8);
-        test_client.call_registry.get_device(1)[3].assert_strenth(0.8);
-        test_client.call_registry.get_device(1)[4].assert_strenth(0.2);
-        test_client.call_registry.get_device(1)[5].assert_strenth(0.0);
-        assert_eq!(test_client.call_registry.get_device(1).len(), 6);
+        client.print_device_calls(1, start);
+        client.get_messages(1)[0].assert_strenth(0.2);
+        client.get_messages(1)[1].assert_strenth(0.4);
+        client.get_messages(1)[2].assert_strenth(0.8);
+        client.get_messages(1)[3].assert_strenth(0.8);
+        client.get_messages(1)[4].assert_strenth(0.2);
+        client.get_messages(1)[5].assert_strenth(0.0);
+        assert_eq!(client.call_registry.get_device(1).len(), 6);
     }
 
     #[tokio::test]
@@ -874,8 +878,8 @@ mod tests {
         // result |1111111111111111111123452345234-->|
 
         // arrange
-        let test_client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
-        let mut player = PlayerTest::setup(test_client.created_devices);
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
         let start = Instant::now();
@@ -889,20 +893,20 @@ mod tests {
             .await;
 
         // assert
-        print_device_calls(&test_client.call_registry, 1, start);
-        assert!(test_client.call_registry.get_device(1).len() > 3);
+        client.print_device_calls(1, start);
+        assert!(client.call_registry.get_device(1).len() > 3);
     }
 
     #[tokio::test]
     async fn test_concurrency_two_devices_simulatenously_both_are_started_and_stopped() {
-        let test_client = get_test_client(vec![
+        let client = get_test_client(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
         ])
         .await;
 
-        let devices = test_client.created_devices.clone();
-        let mut player = PlayerTest::setup(test_client.created_devices);
+        let devices = client.created_devices.clone();
+        let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
         player.play_background_on_device(
@@ -918,15 +922,15 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        test_client.call_registry.get_device(1)[0].assert_strenth(0.99);
-        test_client.call_registry.get_device(1)[1].assert_strenth(0.0);
-        test_client.call_registry.get_device(2)[0].assert_strenth(0.88);
-        test_client.call_registry.get_device(2)[1].assert_strenth(0.0);
+        client.get_messages(1)[0].assert_strenth(0.99);
+        client.get_messages(1)[1].assert_strenth(0.0);
+        client.get_messages(2)[0].assert_strenth(0.88);
+        client.get_messages(2)[1].assert_strenth(0.0);
     }
 
     #[tokio::test]
     async fn test_linear_pattern() {
-        let test_client = get_test_client(vec![linear(1, "lin1")]).await;
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
 
         let mut fscript = FScript::default();
         fscript.actions.push(FSPoint { pos: 50, at: 0 }); // ignored
@@ -934,42 +938,17 @@ mod tests {
         fscript.actions.push(FSPoint { pos: 100, at: 450 });
         fscript.actions.push(FSPoint { pos: 25, at: 1000 });
 
-        let mut player = PlayerTest::setup(test_client.created_devices);
+        let mut player = PlayerTest::setup(&client.created_devices);
         player.play_linear(fscript, TkDuration::Infinite).await;
 
-        let device_calls = test_client.call_registry.get_device(1);
-        device_calls[0].assert_position(0.0).assert_duration(200);
-        device_calls[1].assert_position(1.0).assert_duration(250);
-        device_calls[2].assert_position(0.25).assert_duration(550);
-    }
-
-    fn print_device_calls(
-        call_registry: &FakeConnectorCallRegistry,
-        index: u32,
-        test_start: Instant,
-    ) {
-        for i in 0..call_registry.get_device(index).len() {
-            let fake_call: FakeMessage = call_registry.get_device(1)[i].clone();
-            let s = get_scalar_strength(&fake_call);
-            let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
-            let perc = (s * 100.0).round();
-            println!(
-                "{:02} @{:04} ms {percent:>3}% {empty:=>width$}",
-                i,
-                t,
-                percent = perc as i32,
-                empty = "",
-                width = (perc / 5.0).floor() as usize
-            );
-        }
-    }
-
-    pub fn get_scalar_strength(fake: &FakeMessage) -> f64 {
-        match fake.message.clone() {
-            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
-                cmd.scalars().iter().next().unwrap().scalar()
-            }
-            _ => panic!("Message is not scalar cmd"),
-        }
+        client.get_messages(1)[0]
+            .assert_position(0.0)
+            .assert_duration(200);
+        client.get_messages(1)[1]
+            .assert_position(1.0)
+            .assert_duration(250);
+        client.get_messages(1)[2]
+            .assert_position(0.25)
+            .assert_duration(550);
     }
 }

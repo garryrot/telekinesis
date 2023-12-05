@@ -26,8 +26,8 @@ use futures::{future::BoxFuture, FutureExt};
 use std::ops::{DerefMut, RangeInclusive};
 use std::sync::Mutex;
 use std::time::Duration;
+use std::vec;
 use std::{collections::HashMap, sync::Arc};
-use std::{thread, vec};
 use tracing::error;
 
 use std::time::Instant;
@@ -83,7 +83,7 @@ impl FakeMessage {
                     assert_eq!(pos, position);
                     true
                 });
-            },
+            }
             _ => panic!("Message is not linear cmd"),
         }
         self
@@ -94,14 +94,47 @@ impl FakeMessage {
             message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
                 cmd.vectors().iter().all(|v| {
                     let actual = v.duration();
-                    assert!(actual > duration - 10 && actual < duration + 10, "{}ms is not {}ms +/-10", actual, duration);
+                    assert!(
+                        actual > duration - 10 && actual < duration + 10,
+                        "{}ms is not {}ms +/-10",
+                        actual,
+                        duration
+                    );
                     true
                 });
-            },
+            }
             _ => panic!("Message is not linear cmd"),
         }
         self
     }
+
+    pub fn assert_rotation(&self, strength: f64) -> &Self {
+        match self.message.clone() {
+            message::ButtplugSpecV3ClientMessage::RotateCmd(cmd) => {
+                cmd.rotations().iter().all(|v| {
+                    let actual = v.speed();
+                    assert_eq!(actual, strength);
+                    true
+                });
+            }
+            _ => panic!("Message is not rotation cmd"),
+        }
+        self
+    }
+
+    pub fn assert_direction(&self, clockwise: bool) -> &Self {
+        match self.message.clone() {
+            message::ButtplugSpecV3ClientMessage::RotateCmd(cmd) => {
+                cmd.rotations().iter().all(|v| {
+                    let actual = v.clockwise();
+                    assert_eq!(actual, clockwise);
+                    true
+                });
+            }
+            _ => panic!("Message is not rotation cmd"),
+        }
+        self
+    } 
 
     pub fn vibration_stopped(&self) -> bool {
         match self.message.clone() {
@@ -143,7 +176,7 @@ impl FakeConnectorCallRegistry {
     }
 
     pub fn assert_unused(&self, device_id: u32) {
-        assert_eq!( self.get_device(device_id).len(), 0);
+        assert_eq!(self.get_device(device_id).len(), 0);
     }
 }
 
@@ -211,7 +244,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
             async_manager::spawn(async move {
                 // assure that other thread has registered listener when the test devices
                 // are added. Quick and dirty but its just test code anyways
-                sleep(Duration::from_millis(100)).await;
+                sleep(Duration::from_millis(10)).await;
                 for device in devices {
                     if send
                         .send(ButtplugSpecV3ServerMessage::DeviceAdded(device))
@@ -379,23 +412,43 @@ pub fn rotate(id: u32, name: &str) -> DeviceAdded {
 
 #[cfg(test)]
 pub mod tests {
-    macro_rules! assert_timeout {
-        ($cond:expr, $arg:tt) => {
-            // starting time
-            let start: Instant = Instant::now();
-            while !$cond {
-                thread::sleep(Duration::from_millis(10));
-                if start.elapsed().as_secs() > 5 {
-                    panic!($arg);
-                }
-            }
-        };
-    }
-    
     pub struct ButtplugTestClient {
         pub client: ButtplugClient,
         pub call_registry: FakeConnectorCallRegistry,
         pub created_devices: Vec<Arc<ButtplugClientDevice>>,
+    }
+
+    impl ButtplugTestClient {
+        pub fn get_messages(&self, device_id: u32) -> Vec<FakeMessage> {
+            self.call_registry.get_device(device_id)
+        }
+
+        pub fn print_device_calls(&self, index: u32, test_start: Instant) {
+            let call_registry = &self.call_registry;
+            for i in 0..call_registry.get_device(index).len() {
+                let fake_call: FakeMessage = call_registry.get_device(1)[i].clone();
+                let s = self.get_scalar_strength(&fake_call);
+                let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
+                let perc = (s * 100.0).round();
+                println!(
+                    "{:02} @{:04} ms {percent:>3}% {empty:=>width$}",
+                    i,
+                    t,
+                    percent = perc as i32,
+                    empty = "",
+                    width = (perc / 5.0).floor() as usize
+                );
+            }
+        }
+
+        fn get_scalar_strength(&self, fake: &FakeMessage) -> f64 {
+            match fake.message.clone() {
+                message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                    cmd.scalars().iter().next().unwrap().scalar()
+                }
+                _ => panic!("Message is not scalar cmd"),
+            }
+        }
     }
 
     pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
@@ -419,7 +472,7 @@ pub mod tests {
         },
         core::message::ActuatorType,
     };
-    use futures::{Future, StreamExt};
+    use futures::StreamExt;
     use tracing::Level;
 
     use super::*;
@@ -434,132 +487,55 @@ pub mod tests {
         .unwrap();
     }
 
-    pub fn await_devices(buttplug: &ButtplugClient, devices: usize) {
-        assert_timeout!(
-            buttplug.devices().len() == devices,
-            "Awaiting devices connected"
-        );
+    #[tokio::test]
+    async fn adding_test_devices_works() {
+        let client = get_test_client(vec![
+            vibrator(1, "eins"),
+            vibrator(2, "zwei"),
+            vibrator(3, "drei"),
+        ]).await;
+
+        assert_eq!(client.created_devices.iter().filter(|d| d.index() == 1).next().unwrap().name(), "eins");
+        assert_eq!(client.created_devices.iter().filter(|d| d.index() == 2).next().unwrap().name(), "zwei");
+        assert_eq!(client.created_devices.iter().filter(|d| d.index() == 3).next().unwrap().name(), "drei");
     }
 
-    #[test]
-    fn adding_test_devices_works() {
-        async_manager::block_on(async {
-            // arrange
-            let buttplug = ButtplugClient::new("Foobar");
-            let (connector, _) = FakeDeviceConnector::new(vec![
-                vibrator(1, "eins"),
-                vibrator(2, "zwei"),
-                vibrator(3, "drei"),
-            ]);
+    #[tokio::test]
+    async fn call_registry_stores_vibrate() {
+        // arrange
+        let client: ButtplugTestClient = get_test_client(vec![vibrator(1, "vibrator")]).await;
 
-            // act
-            buttplug.connect(connector).await.expect("connects");
-            await_devices(&buttplug, 3);
+        // act
+        let device = &client.created_devices[0];
+        let _ = device.scalar(&ScalarCommand::Scalar((1.0, ActuatorType::Vibrate))).await;
 
-            // assert
-            assert_eq!(
-                buttplug
-                    .devices()
-                    .iter()
-                    .filter(|x| x.index() == 1)
-                    .next()
-                    .unwrap()
-                    .name(),
-                "eins"
-            );
-            assert_eq!(
-                buttplug
-                    .devices()
-                    .iter()
-                    .filter(|x| x.index() == 2)
-                    .next()
-                    .unwrap()
-                    .name(),
-                "zwei"
-            );
-            assert_eq!(
-                buttplug
-                    .devices()
-                    .iter()
-                    .filter(|x| x.index() == 3)
-                    .next()
-                    .unwrap()
-                    .name(),
-                "drei"
-            );
-            ()
-        });
+        // asssert
+        client.get_messages(1)[0].assert_strenth(1.0);
     }
 
-    #[test]
-    fn call_registry_stores_vibrate() {
-        async_manager::block_on(async {
-            // arrange
-            let (connector, call_registry) =
-                FakeDeviceConnector::new(vec![vibrator(1, "vibrator"), linear(2, "oscillator")]);
+    #[tokio::test]
+    async fn call_registry_stores_linear() {
+        // arrange
+        let client: ButtplugTestClient = get_test_client(vec![linear(1, "linear")]).await;
 
-            // act
-            execute_test(connector, |x| {
-                x.scalar(&ScalarCommand::Scalar((1.0, ActuatorType::Vibrate)))
-            })
-            .await;
+        // act
+        let device = &client.created_devices[0];
+        let _ = device.linear(&LinearCommand::Linear(42, 0.9)).await;
 
-            // assert
-            assert!(matches!(
-                call_registry.get_device(1).first().unwrap().message,
-                ButtplugCurrentSpecClientMessage::ScalarCmd(..)
-            ));
-        });
+        // asert
+        client.get_messages(1)[0].assert_position(0.9).assert_duration(42);
     }
 
-    #[test]
-    fn call_registry_stores_linear() {
-        async_manager::block_on(async {
-            // arrange
-            let (connector, call_registry) =
-                FakeDeviceConnector::new(vec![vibrator(1, "vibrator"), linear(2, "oscillator")]);
+    #[tokio::test]
+    async fn call_registry_stores_rotate() {
+        // arrange
+        let client: ButtplugTestClient = get_test_client(vec![rotate(1, "rotator")]).await;
 
-            // act
-            execute_test(connector, |x| x.linear(&LinearCommand::Linear(88, 0.9))).await;
+        // act
+        let device = &client.created_devices[0];
+        let _ = device.rotate(&RotateCommand::Rotate(0.42, false)).await;
 
-            // asert
-            assert!(matches!(
-                call_registry.get_device(2).first().unwrap().message,
-                ButtplugCurrentSpecClientMessage::LinearCmd(..)
-            ));
-        });
-    }
-
-    #[test]
-    fn call_registry_stores_rotate() {
-        async_manager::block_on(async {
-            // arrange
-            let (connector, call_registry) =
-                FakeDeviceConnector::new(vec![vibrator(1, "vibrator"), rotate(2, "rotator")]);
-
-            // act
-            execute_test(connector, |x| x.rotate(&RotateCommand::Rotate(0.9, true))).await;
-
-            // asert
-            assert!(matches!(
-                call_registry.get_device(2)[0].message,
-                ButtplugCurrentSpecClientMessage::RotateCmd(..)
-            ));
-        });
-    }
-
-    async fn execute_test<Fut, F>(connector: FakeDeviceConnector, func: F) -> ButtplugClient
-    where
-        F: Fn(&Arc<ButtplugClientDevice>) -> Fut,
-        Fut: Future,
-    {
-        let device_count = connector.devices.len();
-        let buttplug = ButtplugClient::new("Foobar");
-        buttplug.connect(connector).await.expect("connects");
-        await_devices(&buttplug, device_count);
-        for device in buttplug.devices().iter() {
-            func(device).await;
-        }
-        buttplug
+        // asert
+        client.get_messages(1)[0].assert_rotation(0.42).assert_direction(false);
     }
 }
