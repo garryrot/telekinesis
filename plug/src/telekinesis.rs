@@ -80,7 +80,8 @@ impl Telekinesis {
         });
 
         let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
-            player_resolution_ms: 100,
+            player_linear_alignment_ms: 1_000,
+            player_scalar_resolution_ms: 100,
             pattern_path,
         });
 

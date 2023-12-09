@@ -41,7 +41,9 @@ pub struct TkButtplugScheduler {
 }
 
 pub struct TkPlayerSettings {
-    pub player_resolution_ms: i32,
+    /// The max duration
+    pub player_linear_alignment_ms: i32,
+    pub player_scalar_resolution_ms: i32,
     pub pattern_path: String,
 }
 
@@ -430,17 +432,27 @@ impl TkButtplugScheduler {
 impl TkPatternPlayer {
     pub async fn play_linear(&mut self, funscript: FScript, duration: TkDuration) {
         let start = Instant::now();
-        for point in funscript.actions {
-            if point.at != 0 {
-                let point_as_float = (point.pos as f64) / 100.0;
-                let future_at = Duration::from_millis(point.at as u64);
-                let duration = future_at - start.elapsed();
-                self.do_linear(point_as_float, duration.as_millis() as u32);
-                trace!("do_linear to {} over {:?}", point_as_float, duration);
-                if false == cancellable_wait( duration, &self.cancellation_token).await
-                {
+        let real_duration =  match duration {
+            TkDuration::Infinite => Duration::MAX,
+            TkDuration::Timed(duration) => duration,
+        };
+        while start.elapsed() <= real_duration
+        {
+            let current_start = Instant::now();
+            for point in &funscript.actions {
+                if start.elapsed() > real_duration {
                     break;
-                };
+                }
+                if point.at != 0 {
+                    let point_as_float = (point.pos as f64) / 100.0;
+                    let future_at = Duration::from_millis(point.at as u64);
+                    let duration = future_at - current_start.elapsed();
+                    self.do_linear(point_as_float, duration.as_millis() as u32);
+                    trace!("do_linear to {} over {:?}", point_as_float, duration);
+                    if false == cancellable_wait(duration, &self.cancellation_token).await {
+                        break;
+                    };
+                }
             }
         }
     }
@@ -675,7 +687,7 @@ mod tests {
     use crate::fakes::tests::get_test_client;
     use crate::fakes::{linear, scalar};
     use crate::pattern::TkPattern;
-    use crate::util::enable_trace;
+    use crate::settings::TkSettings;
     use crate::{Speed, TkDuration};
     use buttplug::client::ButtplugClientDevice;
     use buttplug::core::message::ActuatorType;
@@ -697,8 +709,28 @@ mod tests {
 
     impl PlayerTest {
         fn setup(all_devices: &Vec<Arc<ButtplugClientDevice>>) -> Self {
+            PlayerTest::setup_with_settings(
+                all_devices,
+                TkPlayerSettings {
+                    player_linear_alignment_ms: 1_000,
+                    player_scalar_resolution_ms: 100,
+                    pattern_path: String::from(
+                        "../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns",
+                    ),
+                },
+            )
+        }
+
+        fn setup_with_settings(
+            all_devices: &Vec<Arc<ButtplugClientDevice>>,
+            settings: TkPlayerSettings,
+        ) -> Self {
+            let (scheduler, mut worker) = TkButtplugScheduler::create(settings);
+            Handle::current().spawn(async move {
+                worker.run_worker_thread().await;
+            });
             PlayerTest {
-                scheduler: get_test_scheduler(),
+                scheduler,
                 handles: vec![],
                 all_devices: all_devices.clone(),
             }
@@ -745,19 +777,6 @@ mod tests {
 
     async fn wait_ms(ms: u64) {
         tokio::time::sleep(Duration::from_millis(ms)).await;
-    }
-
-    fn get_test_scheduler() -> TkButtplugScheduler {
-        let pattern_path =
-            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
-        let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
-            player_resolution_ms: 100,
-            pattern_path,
-        });
-        Handle::current().spawn(async move {
-            worker.run_worker_thread().await;
-        });
-        scheduler
     }
 
     #[tokio::test]
@@ -898,8 +917,7 @@ mod tests {
         let client = get_test_client(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
-        ])
-        .await;
+        ]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
@@ -924,18 +942,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_linear() {
+    async fn test_linear_is_executed() {
         // arrange
         let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
         let mut fscript = FScript::default();
         fscript.actions.push(FSPoint { pos: 50, at: 0 }); // zero_action_is_ignored
         fscript.actions.push(FSPoint { pos: 0, at: 200 });
         fscript.actions.push(FSPoint { pos: 100, at: 400 });
-        let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
         let start = Instant::now();
-        player.play_linear(fscript, TkDuration::Infinite).await;
+        let duration = get_duration_ms(&fscript);
+        player.play_linear(fscript, duration).await;
 
         // assert
         client.print_device_calls(start);
@@ -952,24 +972,83 @@ mod tests {
     #[tokio::test]
     async fn test_linear_timing_remains_synced_with_clock() {
         // arrange
-        let n: usize = 40 as usize;
         let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        let n: usize = 40 as usize;
+
         let mut fscript = FScript::default();
         fscript.actions.push(FSPoint { pos: 0, at: 0 });
         for i in 0..n {
-            fscript.actions.push(FSPoint { pos: 0, at: (i * 100) as i32 });
+            fscript.actions.push(FSPoint {
+                pos: 0,
+                at: (i * 100) as i32,
+            });
         }
-        let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
         let start = Instant::now();
-        player.play_linear(fscript, TkDuration::Infinite).await;
+        let duration = get_duration_ms(&fscript);
+        player.play_linear(fscript, duration).await;
 
         // assert
-        for i in 0..n-1 {
-            client.get_device_calls(1)[i]
-                .assert_timestamp((i * 100) as i32, start);
+        for i in 0..n - 1 {
+            client.get_device_calls(1)[i].assert_timestamp((i * 100) as i32, start);
         }
         client.print_device_calls(start);
+    }
+
+    #[tokio::test]
+    async fn test_linear_repeats_until_duration_ends() {
+        // arrange
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+   
+        let mut fscript = FScript::default();
+        fscript.actions.push(FSPoint { pos: 100, at: 200 });
+        fscript.actions.push(FSPoint { pos: 0, at: 400 });
+
+        // act
+        let start = Instant::now();
+        let duration = TkDuration::from_millis(800);
+        player
+            .play_linear(fscript, duration )
+            .await;
+
+        // assert
+        client.print_device_calls(start);
+
+        let calls = client.get_device_calls(1);
+        calls[0].assert_position(1.0).assert_timestamp(0, start);
+        calls[1].assert_position(0.0).assert_timestamp(200, start);
+        calls[2].assert_position(1.0).assert_timestamp(400, start);
+        calls[3].assert_position(0.0).assert_timestamp(600, start);
+    }
+
+    #[tokio::test]
+    async fn test_linear_cancels_after_duration() {
+        // arrange
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        let mut fscript = FScript::default();
+        fscript.actions.push(FSPoint { pos: 0, at: 400 });
+        fscript.actions.push(FSPoint { pos: 0, at: 800 });
+
+        // act
+        let start = Instant::now();
+        let duration = TkDuration::from_millis(400);
+        player
+            .play_linear(fscript, duration )
+            .await;
+
+        // assert
+        client.print_device_calls(start);
+        assert_eq!(client.get_device_calls(1).len(), 1, "Stops after duration ends");
+    }
+
+    fn get_duration_ms( fs: &FScript ) -> TkDuration
+    {
+         TkDuration::from_millis(fs.actions.last().unwrap().at as u64)
     }
 }
