@@ -429,24 +429,19 @@ impl TkButtplugScheduler {
 
 impl TkPatternPlayer {
     pub async fn play_linear(&mut self, funscript: FScript, duration: TkDuration) {
-        let mut last_timestamp: u32 = 0;
+        let start = Instant::now();
         for point in funscript.actions {
             if point.at != 0 {
                 let point_as_float = (point.pos as f64) / 100.0;
-                let duration_ms = point.at as u32 - last_timestamp;
-                self.do_linear(point_as_float, duration_ms);
-                trace!("do_linear to {} over {}ms", point_as_float, duration_ms);
-                if false
-                    == cancellable_wait(
-                        Duration::from_millis(duration_ms as u64),
-                        &self.cancellation_token,
-                    )
-                    .await
+                let future_at = Duration::from_millis(point.at as u64);
+                let duration = future_at - start.elapsed();
+                self.do_linear(point_as_float, duration.as_millis() as u32);
+                trace!("do_linear to {} over {:?}", point_as_float, duration);
+                if false == cancellable_wait( duration, &self.cancellation_token).await
                 {
                     break;
                 };
             }
-            last_timestamp = point.at as u32;
         }
     }
 
@@ -680,6 +675,7 @@ mod tests {
     use crate::fakes::tests::get_test_client;
     use crate::fakes::{linear, scalar};
     use crate::pattern::TkPattern;
+    use crate::util::enable_trace;
     use crate::{Speed, TkDuration};
     use buttplug::client::ButtplugClientDevice;
     use buttplug::core::message::ActuatorType;
@@ -791,11 +787,11 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        client.print_device_calls(1, start);
-        client.get_messages(1)[0].assert_strenth(0.5);
-        client.get_messages(1)[1].assert_strenth(1.0);
-        client.get_messages(1)[2].assert_strenth(0.5);
-        client.get_messages(1)[3].assert_strenth(0.0);
+        client.print_device_calls(start);
+        client.get_device_calls(1)[0].assert_strenth(0.5);
+        client.get_device_calls(1)[1].assert_strenth(1.0);
+        client.get_device_calls(1)[2].assert_strenth(0.5);
+        client.get_device_calls(1)[3].assert_strenth(0.0);
         assert_eq!(client.call_registry.get_device(1).len(), 4);
     }
 
@@ -824,14 +820,14 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        client.print_device_calls(1, start);
+        client.print_device_calls(start);
 
-        client.get_messages(1)[0].assert_strenth(0.2);
-        client.get_messages(1)[1].assert_strenth(0.4);
-        client.get_messages(1)[2].assert_strenth(0.8);
-        client.get_messages(1)[3].assert_strenth(0.4);
-        client.get_messages(1)[4].assert_strenth(0.2);
-        client.get_messages(1)[5].assert_strenth(0.0);
+        client.get_device_calls(1)[0].assert_strenth(0.2);
+        client.get_device_calls(1)[1].assert_strenth(0.4);
+        client.get_device_calls(1)[2].assert_strenth(0.8);
+        client.get_device_calls(1)[3].assert_strenth(0.4);
+        client.get_device_calls(1)[4].assert_strenth(0.2);
+        client.get_device_calls(1)[5].assert_strenth(0.0);
         assert_eq!(client.call_registry.get_device(1).len(), 6);
     }
 
@@ -861,13 +857,13 @@ mod tests {
         player.finish_background().await;
 
         // assert
-        client.print_device_calls(1, start);
-        client.get_messages(1)[0].assert_strenth(0.2);
-        client.get_messages(1)[1].assert_strenth(0.4);
-        client.get_messages(1)[2].assert_strenth(0.8);
-        client.get_messages(1)[3].assert_strenth(0.8);
-        client.get_messages(1)[4].assert_strenth(0.2);
-        client.get_messages(1)[5].assert_strenth(0.0);
+        client.print_device_calls(start);
+        client.get_device_calls(1)[0].assert_strenth(0.2);
+        client.get_device_calls(1)[1].assert_strenth(0.4);
+        client.get_device_calls(1)[2].assert_strenth(0.8);
+        client.get_device_calls(1)[3].assert_strenth(0.8);
+        client.get_device_calls(1)[4].assert_strenth(0.2);
+        client.get_device_calls(1)[5].assert_strenth(0.0);
         assert_eq!(client.call_registry.get_device(1).len(), 6);
     }
 
@@ -893,7 +889,7 @@ mod tests {
             .await;
 
         // assert
-        client.print_device_calls(1, start);
+        client.print_device_calls(start);
         assert!(client.call_registry.get_device(1).len() > 3);
     }
 
@@ -904,51 +900,76 @@ mod tests {
             scalar(2, "vib2", ActuatorType::Vibrate),
         ])
         .await;
-
-        let devices = client.created_devices.clone();
         let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
+        let start = Instant::now();
         player.play_background_on_device(
-            TkPattern::Linear(TkDuration::from_millis(3000), Speed::new(99)),
-            devices[0].clone(),
+            TkPattern::Linear(TkDuration::from_millis(300), Speed::new(99)),
+            client.get_device(1),
         );
-
         player.play_background_on_device(
-            TkPattern::Linear(TkDuration::from_millis(3000), Speed::new(88)),
-            devices[1].clone(),
+            TkPattern::Linear(TkDuration::from_millis(200), Speed::new(88)),
+            client.get_device(2),
         );
 
         player.finish_background().await;
 
         // assert
-        client.get_messages(1)[0].assert_strenth(0.99);
-        client.get_messages(1)[1].assert_strenth(0.0);
-        client.get_messages(2)[0].assert_strenth(0.88);
-        client.get_messages(2)[1].assert_strenth(0.0);
+        client.print_device_calls(start);
+        client.get_device_calls(1)[0].assert_strenth(0.99);
+        client.get_device_calls(1)[1].assert_strenth(0.0);
+        client.get_device_calls(2)[0].assert_strenth(0.88);
+        client.get_device_calls(2)[1].assert_strenth(0.0);
     }
 
     #[tokio::test]
-    async fn test_linear_pattern() {
+    async fn test_linear() {
+        // arrange
         let client = get_test_client(vec![linear(1, "lin1")]).await;
-
         let mut fscript = FScript::default();
-        fscript.actions.push(FSPoint { pos: 50, at: 0 }); // ignored
+        fscript.actions.push(FSPoint { pos: 50, at: 0 }); // zero_action_is_ignored
         fscript.actions.push(FSPoint { pos: 0, at: 200 });
-        fscript.actions.push(FSPoint { pos: 100, at: 450 });
-        fscript.actions.push(FSPoint { pos: 25, at: 1000 });
-
+        fscript.actions.push(FSPoint { pos: 100, at: 400 });
         let mut player = PlayerTest::setup(&client.created_devices);
+
+        // act
+        let start = Instant::now();
         player.play_linear(fscript, TkDuration::Infinite).await;
 
-        client.get_messages(1)[0]
+        // assert
+        client.print_device_calls(start);
+        client.get_device_calls(1)[0]
             .assert_position(0.0)
-            .assert_duration(200);
-        client.get_messages(1)[1]
+            .assert_duration(200)
+            .assert_timestamp(0, start);
+        client.get_device_calls(1)[1]
             .assert_position(1.0)
-            .assert_duration(250);
-        client.get_messages(1)[2]
-            .assert_position(0.25)
-            .assert_duration(550);
+            .assert_duration(200)
+            .assert_timestamp(200, start);
+    }
+
+    #[tokio::test]
+    async fn test_linear_timing_remains_synced_with_clock() {
+        // arrange
+        let n: usize = 40 as usize;
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut fscript = FScript::default();
+        fscript.actions.push(FSPoint { pos: 0, at: 0 });
+        for i in 0..n {
+            fscript.actions.push(FSPoint { pos: 0, at: (i * 100) as i32 });
+        }
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        // act
+        let start = Instant::now();
+        player.play_linear(fscript, TkDuration::Infinite).await;
+
+        // assert
+        for i in 0..n-1 {
+            client.get_device_calls(1)[i]
+                .assert_timestamp((i * 100) as i32, start);
+        }
+        client.print_device_calls(start);
     }
 }

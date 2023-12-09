@@ -4,7 +4,6 @@ mod tests {
     use crate::*;
     use std::thread;
     use std::time::Duration;
-    use std::time::Instant;
 
     #[test]
     fn vibrate_delayed_command_is_overwritten() {

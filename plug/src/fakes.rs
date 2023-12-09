@@ -28,7 +28,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::vec;
 use std::{collections::HashMap, sync::Arc};
-use tracing::error;
+use tracing::{debug, error, warn};
 
 use std::time::Instant;
 
@@ -37,7 +37,7 @@ pub struct FakeConnectorCallRegistry {
     pub actions: Arc<Mutex<HashMap<u32, Box<Vec<FakeMessage>>>>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FakeMessage {
     pub message: ButtplugCurrentSpecClientMessage,
     pub time: Instant,
@@ -49,15 +49,6 @@ impl FakeMessage {
         FakeMessage {
             message: msg,
             time: Instant::now(),
-        }
-    }
-
-    pub fn vibration_started(&self) -> bool {
-        match self.message.clone() {
-            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
-                cmd.scalars().iter().any(|v| v.scalar() > 0.0)
-            }
-            _ => panic!("Message is not scalar cmd"),
         }
     }
 
@@ -108,6 +99,19 @@ impl FakeMessage {
         self
     }
 
+    pub fn assert_timestamp(&self, time_ms: i32, start_instant: Instant) -> &Self {
+        debug!("self.time.elapsed: {:?}", self.time.elapsed());
+        debug!("start_instant.elapsed: {:?}", start_instant.elapsed());
+        let elapsed_ms = (start_instant.elapsed() - self.time.elapsed()).as_millis() as i32;
+        assert!(
+            elapsed_ms > time_ms - 20 && elapsed_ms < time_ms + 20,
+            "Elapsed {}ms != timestamp {}ms +/-10",
+            elapsed_ms,
+            time_ms
+        );
+        self
+    }
+
     pub fn assert_rotation(&self, strength: f64) -> &Self {
         match self.message.clone() {
             message::ButtplugSpecV3ClientMessage::RotateCmd(cmd) => {
@@ -134,7 +138,7 @@ impl FakeMessage {
             _ => panic!("Message is not rotation cmd"),
         }
         self
-    } 
+    }
 
     pub fn vibration_stopped(&self) -> bool {
         match self.message.clone() {
@@ -164,6 +168,7 @@ impl FakeConnectorCallRegistry {
             Some(some) => some.clone(),
             None => Box::new(vec![]),
         };
+        warn!("store_record device_id={:?} {:?}", device_id, cmd);
         bucket.deref_mut().push(cmd);
         calls.deref_mut().insert(device_id, bucket);
     }
@@ -419,34 +424,52 @@ pub mod tests {
     }
 
     impl ButtplugTestClient {
-        pub fn get_messages(&self, device_id: u32) -> Vec<FakeMessage> {
+        pub fn get_device(&self, device_id: u32) -> Arc<ButtplugClientDevice> {
+            self.created_devices
+                .iter()
+                .filter(|d| d.index() == device_id)
+                .next()
+                .unwrap()
+                .clone()
+        }
+
+        pub fn get_device_calls(&self, device_id: u32) -> Vec<FakeMessage> {
             self.call_registry.get_device(device_id)
         }
 
-        pub fn print_device_calls(&self, index: u32, test_start: Instant) {
-            let call_registry = &self.call_registry;
-            for i in 0..call_registry.get_device(index).len() {
-                let fake_call: FakeMessage = call_registry.get_device(1)[i].clone();
-                let s = self.get_scalar_strength(&fake_call);
-                let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
-                let perc = (s * 100.0).round();
-                println!(
-                    "{:02} @{:04} ms {percent:>3}% {empty:=>width$}",
-                    i,
-                    t,
-                    percent = perc as i32,
-                    empty = "",
-                    width = (perc / 5.0).floor() as usize
-                );
+        pub fn print_device_calls(&self, test_start: Instant) {
+            for device in &self.created_devices {
+                println!("Device: {}", device.index());
+                let call_registry = &self.call_registry;
+                for i in 0..call_registry.get_device(device.index()).len() {
+                    let fake_call: FakeMessage =
+                        call_registry.get_device(device.index())[i].clone();
+                    
+                    let s = self.get_value(&fake_call);
+                    let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
+                    let perc = (s * 100.0).round();
+                    println!(
+                        " {:02} @{:04} ms {percent:>3}% {empty:=>width$}",
+                        i,
+                        t,
+                        percent = perc as i32,
+                        empty = "",
+                        width = (perc / 5.0).floor() as usize
+                    );
+                }
+                println!();
             }
         }
 
-        fn get_scalar_strength(&self, fake: &FakeMessage) -> f64 {
+        fn get_value(&self, fake: &FakeMessage) -> f64 {
             match fake.message.clone() {
                 message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
                     cmd.scalars().iter().next().unwrap().scalar()
                 }
-                _ => panic!("Message is not scalar cmd"),
+                message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
+                    cmd.vectors().iter().next().unwrap().position()
+                },
+                _ => panic!("Message is not supported"),
             }
         }
     }
@@ -493,11 +516,39 @@ pub mod tests {
             vibrator(1, "eins"),
             vibrator(2, "zwei"),
             vibrator(3, "drei"),
-        ]).await;
+        ])
+        .await;
 
-        assert_eq!(client.created_devices.iter().filter(|d| d.index() == 1).next().unwrap().name(), "eins");
-        assert_eq!(client.created_devices.iter().filter(|d| d.index() == 2).next().unwrap().name(), "zwei");
-        assert_eq!(client.created_devices.iter().filter(|d| d.index() == 3).next().unwrap().name(), "drei");
+        assert_eq!(
+            client
+                .created_devices
+                .iter()
+                .filter(|d| d.index() == 1)
+                .next()
+                .unwrap()
+                .name(),
+            "eins"
+        );
+        assert_eq!(
+            client
+                .created_devices
+                .iter()
+                .filter(|d| d.index() == 2)
+                .next()
+                .unwrap()
+                .name(),
+            "zwei"
+        );
+        assert_eq!(
+            client
+                .created_devices
+                .iter()
+                .filter(|d| d.index() == 3)
+                .next()
+                .unwrap()
+                .name(),
+            "drei"
+        );
     }
 
     #[tokio::test]
@@ -507,10 +558,12 @@ pub mod tests {
 
         // act
         let device = &client.created_devices[0];
-        let _ = device.scalar(&ScalarCommand::Scalar((1.0, ActuatorType::Vibrate))).await;
+        let _ = device
+            .scalar(&ScalarCommand::Scalar((1.0, ActuatorType::Vibrate)))
+            .await;
 
         // asssert
-        client.get_messages(1)[0].assert_strenth(1.0);
+        client.get_device_calls(1)[0].assert_strenth(1.0);
     }
 
     #[tokio::test]
@@ -523,7 +576,9 @@ pub mod tests {
         let _ = device.linear(&LinearCommand::Linear(42, 0.9)).await;
 
         // asert
-        client.get_messages(1)[0].assert_position(0.9).assert_duration(42);
+        client.get_device_calls(1)[0]
+            .assert_position(0.9)
+            .assert_duration(42);
     }
 
     #[tokio::test]
@@ -536,6 +591,8 @@ pub mod tests {
         let _ = device.rotate(&RotateCommand::Rotate(0.42, false)).await;
 
         // asert
-        client.get_messages(1)[0].assert_rotation(0.42).assert_direction(false);
+        client.get_device_calls(1)[0]
+            .assert_rotation(0.42)
+            .assert_direction(false);
     }
 }
