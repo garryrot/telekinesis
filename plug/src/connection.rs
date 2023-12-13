@@ -67,10 +67,10 @@ pub struct TkDeviceEvent {
 }
 
 impl TkDeviceEvent {
-    pub fn new(elapsed: Duration, devices: &DeviceList, params: TkParams) -> Self {
+    pub fn new(elapsed: Duration, devices: &DeviceList, params: TkParams, pattern_name: String) -> Self {
         let (speed, pattern) = match params.pattern {
             crate::TkPattern::Linear(_, speed) => (speed, String::from("Linear")),
-            crate::TkPattern::Funscript(_, pattern) => (Speed::max(), pattern),
+            crate::TkPattern::Funscript(_, _) => (Speed::max(), pattern_name),
         };
         TkDeviceEvent {
             elapsed_sec: elapsed.as_secs_f32(),

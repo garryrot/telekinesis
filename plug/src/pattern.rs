@@ -18,11 +18,6 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 
-#[derive(Clone, Debug)]
-pub enum TkDuration {
-    Infinite,
-    Timed(Duration),
-}
 pub struct TkPatternPlayer {
     pub actuators: Vec<Arc<TkActuator>>,
     pub action_sender: UnboundedSender<TkDeviceAction>,
@@ -124,13 +119,13 @@ pub struct Speed {
 
 #[derive(Clone, Debug)]
 pub enum TkPattern {
-    Linear(TkDuration, Speed),
-    Funscript(TkDuration, String),
+    Linear(Duration, Speed),
+    Funscript(Duration, Arc<FScript>),
 }
 
 #[derive(Clone, Debug)]
 pub struct TkFunscript {
-    pub duration: TkDuration,
+    pub duration: Duration,
     pub pattern: String,
 }
 
@@ -140,28 +135,6 @@ struct ReferenceCounter {
 
 struct DeviceAccess {
     device_actions: HashMap<u32, Vec<(i32, Speed)>>,
-}
-
-impl TkDuration {
-    pub fn from_input_float(secs: f32) -> TkDuration {
-        if secs > 0.0 {
-            return TkDuration::Timed(Duration::from_millis((secs * 1000.0) as u64));
-        } else {
-            return TkDuration::Infinite;
-        }
-    }
-    pub fn from_millis(ms: u64) -> TkDuration {
-        TkDuration::Timed(Duration::from_millis(ms))
-    }
-    pub fn from_secs(s: u64) -> TkDuration {
-        TkDuration::Timed(Duration::from_secs(s))
-    }
-    pub fn as_us(&self) -> u64 {
-        match self {
-            TkDuration::Infinite => u64::MAX,
-            TkDuration::Timed(duration) => duration.as_micros() as u64,
-        }
-    }
 }
 
 impl Display for Speed {
@@ -434,16 +407,12 @@ impl TkButtplugScheduler {
 }
 
 impl TkPatternPlayer {
-    pub async fn play_linear(&mut self, funscript: FScript, duration: TkDuration) {
+    pub async fn play_linear(&mut self, funscript: FScript, duration: Duration) {
         let start = Instant::now();
-        let real_duration = match duration {
-            TkDuration::Infinite => Duration::MAX,
-            TkDuration::Timed(duration) => duration,
-        };
-        while start.elapsed() <= real_duration {
+        while start.elapsed() <= duration {
             let current_start = Instant::now();
             for point in &funscript.actions {
-                if start.elapsed() > real_duration {
+                if start.elapsed() > duration {
                     break;
                 }
                 if point.at != 0 {
@@ -463,105 +432,74 @@ impl TkPatternPlayer {
     pub async fn play_scalar(&mut self, pattern: TkPattern) {
         info!("Playing pattern {:?}", pattern);
         match pattern {
-            TkPattern::Linear(duration, speed) => match duration {
-                TkDuration::Infinite => {
-                    self.do_scalar(speed, true, self.handle);
-                    self.cancellation_token.cancelled().await;
-                    self.do_stop(true, self.handle);
-                    info!("Infinite stopped")
-                }
-                TkDuration::Timed(duration) => {
-                    self.do_scalar(speed, true, self.handle);
-                    cancellable_wait(duration, &self.cancellation_token).await;
-                    self.do_stop(true, self.handle);
-                    info!("Linear finished");
-                }
+            TkPattern::Linear(duration, speed) => {
+                self.do_scalar(speed, true, self.handle);
+                cancellable_wait(duration, &self.cancellation_token).await;
+                self.do_stop(true, self.handle);
+                info!("Linear finished");
             },
-            TkPattern::Funscript(duration, pattern_name) => {
-                match read_pattern_name(&self.pattern_path, &pattern_name, true) {
-                    Ok(funscript) => {
-                        let mut cancel = false;
-                        let mut elapsed_us = 0 as u64;
-                        while !cancel && elapsed_us < duration.as_us() {
-                            let last_timer_us;
-                            (cancel, last_timer_us) =
-                                self.play_scalar_pattern(&duration, &funscript).await;
-                            elapsed_us += last_timer_us;
-                            info!("Elapsed: {} Cancel: {}", elapsed_us, cancel)
+            TkPattern::Funscript(duration, fscript) => {
+                let actions = &fscript.actions;
+                if actions.len() == 0 || 
+                    actions.iter().all(|x| x.at == 0) {
+                    return;
+                }
+                
+                let start_timer = Instant::now();
+                let mut dropped = 0;
+                let mut ignored = 0;
+                let mut cancel = false;
+                while !cancel && start_timer.elapsed() < duration {
+                    info!("OUTER {:?} {:?}", start_timer.elapsed(), duration);
+                    let current_start = Instant::now();
+                    let first_speed = Speed::from_fs(&actions[0]);
+                    self.do_scalar(first_speed, false, self.handle);
+
+                    let mut i = 1;
+                    let mut last_speed = first_speed.value as i32;
+
+                    let actions = &fscript.actions;
+                    while i < actions.len() && start_timer.elapsed() < duration {
+                        info!("INNER i={} {:?} {:?}", i, start_timer.elapsed(), duration);
+                        // skip until we have reached a delay of player_scalar_resolution_ms
+                        let mut j = i;
+                        while j + 1 < actions.len() && (actions[j + 1].at - actions[i].at) < self.player_scalar_resolution_ms
+                        {
+                            dropped += 1;
+                            j += 1;
                         }
+                        i = j;
+
+                        let future_at = Duration::from_millis(actions[i].at as u64);
+                        if current_start.elapsed() < future_at {
+                            let remaining = future_at - current_start.elapsed();
+                            if false == cancellable_wait(remaining, &self.cancellation_token).await
+                            {
+                                cancel = true;
+                                break;
+                            };
+                            let point = &actions[i];
+                            if last_speed != point.pos {
+                                self.do_update(Speed::from_fs(point));
+                                last_speed = point.pos;
+                            } else {
+                                ignored += 1;
+                            }
+                        }
+                        i += 1;
                     }
-                    Err(err) => error!(
-                        "Error loading funscript vibration pattern={} err={}",
-                        pattern_name, err
-                    ),
                 }
+                self.do_stop(false, self.handle);
+
+                info!(
+                    "Pattern finished {:?} dropped={} ignored={} cancelled={}",
+                    start_timer.elapsed(),
+                    dropped,
+                    ignored,
+                    cancel
+                );
             }
         }
-    }
-
-    async fn play_scalar_pattern(&self, duration: &TkDuration, funscript: &FScript) -> (bool, u64) {
-        let actions = &funscript.actions;
-        if actions.len() == 0 {
-            return (true, 0);
-        }
-        let duration = match duration {
-            TkDuration::Infinite => Duration::MAX,
-            TkDuration::Timed(duration) => duration.clone(),
-        };
-
-        let mut cancelled = false;
-        let mut dropped = 0;
-        let mut ignored = 0;
-        let now = Instant::now();
-
-        let first_speed = Speed::from_fs(&actions[0]);
-        self.do_scalar(first_speed, false, self.handle);
-
-        let mut i = 1;
-        let mut last_speed = first_speed.value as i32;
-        let mut next_timer_us = 0;
-        while i < actions.len() && now.elapsed() < duration {
-            let point = &actions[i];
-
-            // skip until we have reached a delay of resolution_ms
-            let mut j = i;
-            while j + 1 < actions.len() && (actions[j + 1].at - actions[i].at) < self.resolution_ms
-            {
-                dropped += 1;
-                j += 1;
-            }
-            i = j;
-
-            next_timer_us = (actions[i].at * 1000) as u64;
-            let elapsed_us = now.elapsed().as_micros() as u64;
-            if elapsed_us < next_timer_us {
-                if false
-                    == cancellable_wait(
-                        Duration::from_micros(next_timer_us - elapsed_us),
-                        &self.cancellation_token,
-                    )
-                    .await
-                {
-                    cancelled = true;
-                    break;
-                };
-                if last_speed != point.pos {
-                    self.do_update(Speed::from_fs(point));
-                    last_speed = point.pos;
-                } else {
-                    ignored += 1;
-                }
-            }
-            i += 1;
-        }
-        self.do_stop(false, self.handle);
-        info!(
-            "Pattern finished in {:?} dropped={} ignored={}",
-            now.elapsed(),
-            dropped,
-            ignored
-        );
-        (cancelled, next_timer_us)
     }
 
     fn do_update(&self, speed: Speed) {
@@ -616,82 +554,13 @@ async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> boo
     };
 }
 
-pub fn get_pattern_names(pattern_path: &str, vibration_patterns: bool) -> Vec<String> {
-    match get_pattern_paths(pattern_path) {
-        Ok(patterns) => patterns
-            .iter()
-            .filter(|p| p.is_vibration == vibration_patterns)
-            .map(|p| p.name.clone())
-            .collect::<Vec<String>>(),
-        Err(err) => {
-            error!("Failed reading patterns {}", err);
-            vec![]
-        }
-    }
-}
-
-fn read_pattern_name(
-    pattern_path: &str,
-    pattern_name: &str,
-    vibration_pattern: bool,
-) -> Result<FScript, anyhow::Error> {
-    let now = Instant::now();
-    let patterns = get_pattern_paths(pattern_path)?;
-    let pattern = patterns
-        .iter()
-        .filter(|d| {
-            d.is_vibration == vibration_pattern
-                && d.name.to_lowercase() == pattern_name.to_lowercase()
-        })
-        .next()
-        .ok_or_else(|| anyhow!("Pattern '{}' not found", pattern_name))?;
-
-    let fs = funscript::load_funscript(pattern.path.to_str().unwrap())?;
-    debug!("Read pattern {} in {:?}", pattern_name, now.elapsed());
-    Ok(fs)
-}
-
-fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::Error> {
-    let mut patterns = vec![];
-    let pattern_dir = fs::read_dir(pattern_path)?;
-    for entry in pattern_dir {
-        let file = entry?;
-
-        let path = file.path();
-        let path_clone = path.clone();
-        let file_name = path
-            .file_name()
-            .ok_or_else(|| anyhow!("No file name"))?
-            .to_str()
-            .ok_or_else(|| anyhow!("Invalid unicode"))?;
-        if false == file_name.to_lowercase().ends_with(".funscript") {
-            continue;
-        }
-
-        let is_vibration = file_name.to_lowercase().ends_with(".vibrator.funscript");
-        let removal;
-        if is_vibration {
-            removal = file_name.len() - ".vibrator.funscript".len();
-        } else {
-            removal = file_name.len() - ".funscript".len();
-        }
-
-        patterns.push(TkPatternFile {
-            path: path_clone,
-            is_vibration,
-            name: String::from(&file_name[0..removal]),
-        })
-    }
-    Ok(patterns)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::fakes::tests::get_test_client;
-    use crate::fakes::{linear, scalar};
+    use crate::fakes::{linear, scalar, scalars, FakeMessage};
     use crate::pattern::TkPattern;
-    use crate::{Speed, TkDuration};
-    use std::ops::RangeInclusive;
+    use crate::Speed;
+    use crate::util::enable_log;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -778,7 +647,7 @@ mod tests {
             player.play_scalar(pattern).await;
         }
 
-        async fn play_linear(&mut self, funscript: FScript, duration: TkDuration) {
+        async fn play_linear(&mut self, funscript: FScript, duration: Duration) {
             let mut player = self
                 .scheduler
                 .create_player(get_actuators(self.all_devices.clone()));
@@ -862,13 +731,13 @@ mod tests {
         let start = Instant::now();
 
         player.play_background(TkPattern::Linear(
-            TkDuration::from_millis(500),
+            Duration::from_millis(500),
             Speed::new(50),
         ));
         wait_ms(100).await;
         player
-            .play_scalar(TkPattern::Linear(
-                TkDuration::from_millis(100),
+            .play(TkPattern::Linear(
+                Duration::from_millis(100),
                 Speed::new(100),
             ))
             .await;
@@ -896,14 +765,14 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background(TkPattern::Linear(TkDuration::from_secs(3), Speed::new(20)));
+        player.play_background(TkPattern::Linear(Duration::from_secs(3), Speed::new(20)));
         wait_ms(250).await;
 
-        player.play_background(TkPattern::Linear(TkDuration::from_secs(2), Speed::new(40)));
+        player.play_background(TkPattern::Linear(Duration::from_secs(2), Speed::new(40)));
         wait_ms(250).await;
 
         player
-            .play_scalar(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
+            .play(TkPattern::Linear(Duration::from_secs(1), Speed::new(80)))
             .await;
         player.finish_background().await;
 
@@ -932,14 +801,14 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background(TkPattern::Linear(TkDuration::from_secs(3), Speed::new(20)));
+        player.play_background(TkPattern::Linear(Duration::from_secs(3), Speed::new(20)));
         wait_ms(250).await;
 
-        player.play_background(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(40)));
+        player.play_background(TkPattern::Linear(Duration::from_secs(1), Speed::new(40)));
         wait_ms(250).await;
 
         player
-            .play_scalar(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(80)))
+            .play(TkPattern::Linear(Duration::from_secs(1), Speed::new(80)))
             .await;
         thread::sleep(Duration::from_secs(2));
         player.finish_background().await;
@@ -967,12 +836,12 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background(TkPattern::Linear(TkDuration::from_secs(1), Speed::new(99)));
+        player.play_background(TkPattern::Linear(Duration::from_secs(1), Speed::new(99)));
         wait_ms(250).await;
         player
-            .play_scalar(TkPattern::Funscript(
-                TkDuration::from_secs(3),
-                String::from("31_Sawtooth-Fast"),
+            .play(TkPattern::Funscript(
+                Duration::from_secs(3),
+                Arc::new(fscript),
             ))
             .await;
 
@@ -992,13 +861,13 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background_on_device(
-            TkPattern::Linear(TkDuration::from_millis(300), Speed::new(99)),
-            client.get_device(1),
+        player.play_background_on(
+            TkPattern::Linear(Duration::from_millis(300), Speed::new(99)),
+            get_actuators(vec![client.get_device(1)]),
         );
-        player.play_background_on_device(
-            TkPattern::Linear(TkDuration::from_millis(200), Speed::new(88)),
-            client.get_device(2),
+        player.play_background_on(
+            TkPattern::Linear(Duration::from_millis(200), Speed::new(88)),
+            get_actuators(vec![client.get_device(2)]),
         );
 
         player.finish_background().await;
@@ -1123,7 +992,7 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(ms)).await;
     }
 
-    fn get_duration_ms(fs: &FScript) -> TkDuration {
-        TkDuration::from_millis(fs.actions.last().unwrap().at as u64)
+    fn get_duration_ms(fs: &FScript) -> Duration {
+        Duration::from_millis(fs.actions.last().unwrap().at as u64)
     }
 }

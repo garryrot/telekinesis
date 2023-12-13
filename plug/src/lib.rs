@@ -2,17 +2,18 @@ use anyhow::Error;
 use api::*;
 use buttplug::client::ButtplugClientDevice;
 use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus, TkStatus};
-use pattern::{get_pattern_names, Speed, TkButtplugScheduler, TkDuration, TkPattern};
-use settings::PATTERN_PATH;
-use std::sync::{Arc, Mutex};
+use input::get_duration_from_secs;
+use pattern::{Speed, TkButtplugScheduler, TkPattern};
+use std::{sync::{Arc, Mutex}, time::Duration};
 use tokio::{
     runtime::Runtime,
     sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender},
 };
-use tracing::instrument;
+use tracing::{instrument, error};
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::ERROR_HANDLE;
+use settings::PATTERN_PATH;
+use telekinesis::{ERROR_HANDLE, read_pattern, get_pattern_names};
 
 use crate::{
     input::{parse_list_string, read_input_string},
@@ -79,8 +80,8 @@ pub trait Tk {
     fn get_known_device_names(&self) -> Vec<String>;
     fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus;
     fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
-    fn vibrate(&mut self, speed: Speed, duration: TkDuration, events: Vec<String>) -> i32;
-    fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32;
+    fn vibrate(&mut self, speed: Speed, duration: Duration, events: Vec<String>) -> i32;
+    fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>, pattern_name: String) -> i32;
     fn stop(&mut self, handle: i32) -> bool;
     fn stop_all(&mut self) -> bool;
     fn get_next_event(&mut self) -> Option<TkConnectionEvent>;
@@ -236,7 +237,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         exec: |tk, speed, time_sec, _pattern_name, events| {
             tk.vibrate(
                 Speed::new(speed.into()),
-                TkDuration::from_input_float(time_sec),
+                get_duration_from_secs(time_sec),
                 read_input_string(&events),
             )
         },
@@ -245,13 +246,17 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_control(ApiControl {
         name: "vibrate.pattern",
         exec: |tk, _speed, time_sec, pattern_name, events| {
-            tk.vibrate_pattern(
-                TkPattern::Funscript(
-                    TkDuration::from_input_float(time_sec),
-                    String::from(pattern_name),
+            match read_pattern( &pattern_name, true ) {
+                Some(fscript) => tk.vibrate_pattern(
+                    TkPattern::Funscript(
+                        get_duration_from_secs(time_sec),
+                        Arc::new(fscript),
+                    ),
+                    read_input_string(&events),
+                    String::from(pattern_name)
                 ),
-                read_input_string(&events),
-            )
+                None => ERROR_HANDLE,
+            }
         },
         default: ERROR_HANDLE,
     })

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use cxx::{CxxString, CxxVector};
 
 use crate::{settings::TkDeviceSettings, TkPattern, DeviceList};
@@ -16,6 +18,14 @@ pub fn parse_list_string(input: &str) -> Vec<String> {
         }
     }
     list
+}
+
+pub fn get_duration_from_secs(secs: f32) -> Duration {
+    if secs > 0.0 {
+        Duration::from_millis((secs * 1000.0) as u64)
+    } else {
+        Duration::MAX
+    }
 }
 
 pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {

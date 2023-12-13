@@ -8,7 +8,7 @@ mod tests {
     #[test]
     fn vibrate_delayed_command_is_overwritten() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
-        tk.vibrate(Speed::new(33), TkDuration::from_millis(50), vec![]);
+        tk.vibrate(Speed::new(33), Duration::from_millis(50), vec![]);
         _assert_one_event(&mut tk)
     }
 
@@ -23,7 +23,7 @@ mod tests {
     fn process_next_events_after_action_returns_1() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
-        tk.vibrate(Speed::new(22), TkDuration::from_millis(1), vec![]);
+        tk.vibrate(Speed::new(22), Duration::from_millis(1), vec![]);
         _sleep();
         assert_eq!(tk.process_next_events().len(), 1);
     }
@@ -32,8 +32,8 @@ mod tests {
     fn process_next_events_works() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
-        tk.vibrate(Speed::new(10), TkDuration::from_millis(100), vec![]);
-        tk.vibrate(Speed::new(20), TkDuration::from_millis(200), vec![]);
+        tk.vibrate(Speed::new(10), Duration::from_millis(100), vec![]);
+        tk.vibrate(Speed::new(20), Duration::from_millis(200), vec![]);
         _sleep();
         _sleep();
         let events = tk.process_next_events();
@@ -47,7 +47,7 @@ mod tests {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
         _sleep();
         for _ in 1..200 {
-            tk.vibrate(Speed::min(), TkDuration::Timed(Duration::from_micros(1)), vec![]);
+            tk.vibrate(Speed::min(), Duration::from_micros(1), vec![]);
         }
         _sleep();
         assert_eq!(tk.process_next_events().len(), 128);

@@ -17,8 +17,13 @@ use buttplug::{
 };
 use futures::Future;
 
+use settings::PATTERN_PATH;
+
+use std::time::Duration;
 use std::{
     fmt::{self},
+    fs,
+    path::PathBuf,
     sync::{Arc, Mutex},
     time::Instant,
 };
@@ -27,14 +32,16 @@ use tracing::{debug, error, info};
 
 use itertools::Itertools;
 
+use crate::settings;
 use crate::{
     connection::{
-        handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent, TkDeviceStatus,
+        handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent,
+        TkDeviceStatus,
     },
     input::TkParams,
-    pattern::{TkButtplugScheduler, TkPlayerSettings, Speed, TkDuration, get_actuators},
+    pattern::{get_actuators, Speed, TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
-    DeviceList, Telekinesis, TkPattern, TkStatus, Tk,
+    DeviceList, Telekinesis, Tk, TkPattern, TkStatus,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -217,21 +224,21 @@ impl Tk for Telekinesis {
         }
         vec![]
     }
-    
+
     fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus {
         debug!("Getting '{}' connected", device_name);
         if let Some(status) = self.get_device_status(device_name) {
-            return status.status
+            return status.status;
         }
         TkConnectionStatus::NotConnected
     }
 
     // TODO: call scalar
-    fn vibrate(&mut self, speed: Speed, duration: TkDuration, events: Vec<String>) -> i32 {
-        self.vibrate_pattern(TkPattern::Linear(duration, speed), events)
+    fn vibrate(&mut self, speed: Speed, duration: Duration, events: Vec<String>) -> i32 {
+        self.vibrate_pattern(TkPattern::Linear(duration, speed), events, String::from("Linear"))
     }
 
-    fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>) -> i32 {
+    fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>, pattern_name: String) -> i32 {
         info!("Received: Vibrate/Vibrate Pattern");
         let params = TkParams::from_input(events.clone(), pattern, &self.settings.devices);
 
@@ -435,7 +442,7 @@ mod tests {
         for device_name in tk.get_known_device_names() {
             tk.settings_set_enabled(&device_name, true);
         }
-        tk.vibrate(Speed::new(100), TkDuration::from_millis(1), vec![]);
+        tk.vibrate(Speed::new(100), Duration::from_millis(1), vec![]);
 
         // assert
         thread::sleep(Duration::from_millis(500));
@@ -471,7 +478,7 @@ mod tests {
         // act
         tk.vibrate(
             Speed::max(),
-            TkDuration::from_millis(1),
+            Duration::from_millis(1),
             vec![String::from("does not exist")],
         );
         thread::sleep(Duration::from_millis(50));
@@ -491,7 +498,7 @@ mod tests {
         tk.settings_set_enabled("vib2", false);
 
         // act
-        tk.vibrate(Speed::max(), TkDuration::from_millis(1), vec![]);
+        tk.vibrate(Speed::max(), Duration::from_millis(1), vec![]);
         thread::sleep(Duration::from_secs(1));
 
         // assert
@@ -533,7 +540,7 @@ mod tests {
 
         tk.vibrate(
             Speed::max(),
-            TkDuration::from_millis(1),
+            Duration::from_millis(1),
             vec![String::from("selected_event")],
         );
         thread::sleep(Duration::from_secs(1));
@@ -552,7 +559,7 @@ mod tests {
         tk.settings_set_events("vib1", vec![String::from("some event")]);
         tk.vibrate(
             Speed::max(),
-            TkDuration::from_millis(1),
+            Duration::from_millis(1),
             vec![String::from(" SoMe EvEnT    ")],
         );
 
@@ -569,7 +576,7 @@ mod tests {
         tk.settings_set_events("vib1", vec![String::from(" SoMe EvEnT    ")]);
         tk.vibrate(
             Speed::max(),
-            TkDuration::from_millis(1),
+            Duration::from_millis(1),
             vec![String::from("some event")],
         );
 
@@ -629,7 +636,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
-        let handle = tk.vibrate(Speed::max(), TkDuration::Infinite, vec![]);
+        let handle = tk.vibrate(Speed::max(), Duration::MAX, vec![]);
 
         thread::sleep(Duration::from_secs(1));
         call_registry.get_device(1)[0].assert_strenth(1.0);
@@ -648,7 +655,7 @@ mod tests {
         // act
         tk.vibrate(
             Speed::max(),
-            TkDuration::Timed(Duration::from_secs(1)),
+            Duration::from_secs(1),
             vec![],
         );
         thread::sleep(Duration::from_secs(1));
@@ -664,7 +671,7 @@ mod tests {
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
     fn vibrate_pattern_then_cancel() {
-        let (mut tk, handle) = test_pattern("02_Cruel-Tease", TkDuration::from_secs(10));
+        let (mut tk, handle) = test_pattern("02_Cruel-Tease", Duration::from_secs(10));
         thread::sleep(Duration::from_secs(2)); // dont disconnect
         tk.stop(handle);
         thread::sleep(Duration::from_secs(10));
@@ -674,13 +681,13 @@ mod tests {
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
     fn vibrate_pattern_loops() {
-        let (mut tk, handle) = test_pattern("03_Wub-Wub-Wub", TkDuration::from_secs(20));
+        let (mut tk, handle) = test_pattern("03_Wub-Wub-Wub", Duration::from_secs(20));
         thread::sleep(Duration::from_secs(20));
         tk.stop(handle);
         thread::sleep(Duration::from_secs(2));
     }
 
-    fn test_pattern(pattern_name: &str, duration: TkDuration) -> (Telekinesis, i32) {
+    fn test_pattern(pattern_name: &str, duration: Duration) -> (Telekinesis, i32) {
         let mut settings = TkSettings::default();
         settings.pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
@@ -723,7 +730,7 @@ mod tests {
         for device in tk.get_devices() {
             tk.settings.set_enabled(device.name(), true);
         }
-        tk.vibrate(Speed::max(), TkDuration::Infinite, vec![]);
+        tk.vibrate(Speed::max(), Duration::MAX, vec![]);
         thread::sleep(Duration::from_secs(5));
     }
 
