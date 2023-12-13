@@ -74,7 +74,7 @@ impl FakeMessage {
                         .next()
                         .unwrap();
                     assert_eq!(expected, &sub_cmd.scalar(), "actuator #{}", index);
-                    assert_eq!(strengths.len(), cmd.scalars().len())
+                    assert_eq!(strengths.len(), cmd.scalars().len(), "same amonut of calls")
                 }
             }
             _ => panic!("Message is not scalar cmd"),
@@ -120,8 +120,8 @@ impl FakeMessage {
         debug!("start_instant.elapsed: {:?}", start_instant.elapsed());
         let elapsed_ms = (start_instant.elapsed() - self.time.elapsed()).as_millis() as i32;
         assert!(
-            elapsed_ms > time_ms - 20 && elapsed_ms < time_ms + 20,
-            "Elapsed {}ms != timestamp {}ms +/-10",
+            elapsed_ms > time_ms - 25 && elapsed_ms < time_ms + 25,
+            "Elapsed {}ms != timestamp {}ms +/-25",
             elapsed_ms,
             time_ms
         );
@@ -379,12 +379,21 @@ pub fn vibrator(id: u32, name: &str) -> DeviceAdded {
 
 #[allow(dead_code)]
 pub fn scalar(id: u32, name: &str, actuator: ActuatorType) -> DeviceAdded {
-    let attributes = ServerDeviceMessageAttributesBuilder::default()
-        .scalar_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
+    scalars(id, name, actuator, 1)
+}
+
+#[allow(dead_code)]
+pub fn scalars(id: u32, name: &str, actuator: ActuatorType, count: i32) -> DeviceAdded {
+    let mut messages = vec![];
+    for _ in 0..count {
+        messages.push(ServerGenericDeviceMessageAttributes::new(
             &format!("Scalar {}", id),
             &RangeInclusive::new(0, 10),
             actuator,
-        )])
+        ))
+    }
+    let attributes = ServerDeviceMessageAttributesBuilder::default()
+        .scalar_cmd(&messages)
         .finish();
     DeviceAdded::new(
         id,

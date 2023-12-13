@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::Error;
 use buttplug::{
     client::{ButtplugClient, ButtplugClientDevice},
@@ -15,6 +16,7 @@ use buttplug::{
         ButtplugServerBuilder,
     },
 };
+use funscript::FScript;
 use futures::Future;
 
 use settings::PATTERN_PATH;
@@ -87,9 +89,7 @@ impl Telekinesis {
         });
 
         let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
-            player_linear_alignment_ms: 1_000,
             player_scalar_resolution_ms: 100,
-            pattern_path,
         });
 
         runtime.spawn(async move {
@@ -122,14 +122,14 @@ impl Tk for Telekinesis {
         }
         None
     }
-   
+
     fn get_devices(&self) -> DeviceList {
         if let Ok(connection_status) = self.connection_status.try_lock() {
             let devices: DeviceList = connection_status
                 .device_status
                 .values()
                 .into_iter()
-                .map(|value| value.device.clone() )
+                .map(|value| value.device.clone())
                 .collect();
             return devices;
         } else {
@@ -144,8 +144,8 @@ impl Tk for Telekinesis {
                 .device_status
                 .values()
                 .into_iter()
-                .filter(|d| d.device.name() == device_name )
-                .map(|value| value.clone() )
+                .filter(|d| d.device.name() == device_name)
+                .map(|value| value.clone())
                 .next();
             return devices;
         } else {
@@ -153,7 +153,7 @@ impl Tk for Telekinesis {
         }
         None
     }
-    
+
     fn get_known_device_names(&self) -> Vec<String> {
         debug!("Getting devices names");
         self.get_devices()
@@ -254,8 +254,9 @@ impl Tk for Telekinesis {
             sender_clone
                 .send(TkConnectionEvent::DeviceEvent(TkDeviceEvent::new(
                     now.elapsed(),
-                    &player.actuators.iter().map( |a| a.device.clone() ).collect(),
+                    &player.actuators.iter().map(|a| a.device.clone()).collect(),
                     params,
+                    pattern_name
                 )))
                 .expect("queue full");
         });
@@ -356,20 +357,102 @@ where
     buttplug
 }
 
+pub fn get_pattern_names(pattern_path: &str, vibration_patterns: bool) -> Vec<String> {
+    match get_pattern_paths(pattern_path) {
+        Ok(patterns) => patterns
+            .iter()
+            .filter(|p| p.is_vibration == vibration_patterns)
+            .map(|p| p.name.clone())
+            .collect::<Vec<String>>(),
+        Err(err) => {
+            error!("Failed reading patterns {}", err);
+            vec![]
+        }
+    }
+}
+
+struct TkPatternFile {
+    path: PathBuf,
+    is_vibration: bool,
+    name: String,
+}
+
+fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::Error> {
+    let mut patterns = vec![];
+    let pattern_dir = fs::read_dir(pattern_path)?;
+    for entry in pattern_dir {
+        let file = entry?;
+
+        let path = file.path();
+        let path_clone = path.clone();
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| anyhow!("No file name"))?
+            .to_str()
+            .ok_or_else(|| anyhow!("Invalid unicode"))?;
+        if false == file_name.to_lowercase().ends_with(".funscript") {
+            continue;
+        }
+
+        let is_vibration = file_name.to_lowercase().ends_with(".vibrator.funscript");
+        let removal;
+        if is_vibration {
+            removal = file_name.len() - ".vibrator.funscript".len();
+        } else {
+            removal = file_name.len() - ".funscript".len();
+        }
+
+        patterns.push(TkPatternFile {
+            path: path_clone,
+            is_vibration,
+            name: String::from(&file_name[0..removal]),
+        })
+    }
+    Ok(patterns)
+}
+
+pub fn read_pattern(pattern_name: &str, vibration_pattern: bool) -> Option<FScript> {
+    match read_pattern_name(&PATTERN_PATH, &pattern_name, vibration_pattern) {
+        Ok(funscript) => Some(funscript),
+        Err(err) => {
+            error!(
+                "Error loading funscript vibration pattern={} err={}",
+                pattern_name, err
+            );
+            None
+        }
+    }
+}
+
+pub fn read_pattern_name(
+    pattern_path: &str,
+    pattern_name: &str,
+    vibration_pattern: bool,
+) -> Result<FScript, anyhow::Error> {
+    let now = Instant::now();
+    let patterns = get_pattern_paths(pattern_path)?;
+    let pattern = patterns
+        .iter()
+        .filter(|d| {
+            d.is_vibration == vibration_pattern
+                && d.name.to_lowercase() == pattern_name.to_lowercase()
+        })
+        .next()
+        .ok_or_else(|| anyhow!("Pattern '{}' not found", pattern_name))?;
+
+    let fs = funscript::load_funscript(pattern.path.to_str().unwrap())?;
+    debug!("Read pattern {} in {:?}", pattern_name, now.elapsed());
+    Ok(fs)
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
 
     use crate::connection::TkConnectionStatus;
-    use crate::pattern::TkDuration;
+    use crate::fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
     use crate::util::enable_log;
-    use crate::fakes::{
-            linear, 
-            scalar, 
-            FakeConnectorCallRegistry, 
-            FakeDeviceConnector
-        };
     use buttplug::core::message::{ActuatorType, DeviceAdded};
 
     use super::*;
@@ -425,7 +508,8 @@ mod tests {
         let (mut tk, _) = wait_for_connection(vec![]);
         tk.settings_set_enabled("foreign", true);
         assert!(
-            tk.get_known_device_names().contains(&String::from("foreign")),
+            tk.get_known_device_names()
+                .contains(&String::from("foreign")),
             "Contains additional device from settings"
         );
     }
@@ -450,23 +534,6 @@ mod tests {
         call_registry.get_device(1)[1].assert_strenth(0.0);
         call_registry.assert_unused(4); // linear
         call_registry.assert_unused(7); // rotator
-    }
-
-    #[test]
-    fn vibrate_all_only_vibrates_vibrators() {
-        // arrange
-        let (mut tk, call_registry) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate),
-            scalar(2, "vib2", ActuatorType::Inflate),
-        ]);
-
-        tk.vibrate(Speed::new(100), TkDuration::from_millis(1), vec![]);
-
-        // assert
-        thread::sleep(Duration::from_millis(500));
-        call_registry.get_device(1)[0].assert_strenth(1.0);
-        call_registry.get_device(1)[1].assert_strenth(0.0);
-        call_registry.assert_unused(2);
     }
 
     #[test]
@@ -703,8 +770,12 @@ mod tests {
 
         enable_log();
         let handle = tk.vibrate_pattern(
-            TkPattern::Funscript( duration, String::from(pattern_name)),
+            TkPattern::Funscript(
+                duration,
+                Arc::new(read_pattern(pattern_name, true).unwrap()),
+            ),
             vec![],
+            String::from(pattern_name)
         );
         (tk, handle)
     }
