@@ -2,10 +2,7 @@ use buttplug::core::connector::ButtplugConnectorResult;
 use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes};
 use buttplug::core::{
     connector::{ButtplugConnector, ButtplugConnectorError},
-    message::{
-        ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage,
-        ButtplugSpecV3ServerMessage, DeviceAdded,
-    },
+    message::*,
 };
 use buttplug::server::device::configuration::{
     ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes,
@@ -26,7 +23,7 @@ use futures::{future::BoxFuture, FutureExt};
 use std::ops::{DerefMut, RangeInclusive};
 use std::sync::Mutex;
 use std::time::Duration;
-use std::vec;
+use std::{cmp, vec};
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, error, warn};
 
@@ -57,9 +54,28 @@ impl FakeMessage {
             message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
                 cmd.scalars().iter().all(|v| {
                     let actual = v.scalar();
-                    assert_eq!(actual, strength);
+                    assert_eq!(strength, actual);
                     true
                 });
+            }
+            _ => panic!("Message is not scalar cmd"),
+        }
+        self
+    }
+
+    pub fn assert_strengths(&self, strengths: Vec<(u32, f64)>) -> &Self {
+        match self.message.clone() {
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                for (index, expected) in strengths.iter() {
+                    let sub_cmd: &ScalarSubcommand = cmd
+                        .scalars()
+                        .iter()
+                        .filter(|x| &x.index() == index)
+                        .next()
+                        .unwrap();
+                    assert_eq!(expected, &sub_cmd.scalar(), "actuator #{}", index);
+                    assert_eq!(strengths.len(), cmd.scalars().len())
+                }
             }
             _ => panic!("Message is not scalar cmd"),
         }
@@ -70,8 +86,8 @@ impl FakeMessage {
         match self.message.clone() {
             message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
                 cmd.vectors().iter().all(|v| {
-                    let pos = v.position();
-                    assert_eq!(pos, position);
+                    let actual: f64 = v.position();
+                    assert_eq!(position, actual);
                     true
                 });
             }
@@ -117,7 +133,7 @@ impl FakeMessage {
             message::ButtplugSpecV3ClientMessage::RotateCmd(cmd) => {
                 cmd.rotations().iter().all(|v| {
                     let actual = v.speed();
-                    assert_eq!(actual, strength);
+                    assert_eq!(strength, actual);
                     true
                 });
             }
@@ -365,7 +381,7 @@ pub fn vibrator(id: u32, name: &str) -> DeviceAdded {
 pub fn scalar(id: u32, name: &str, actuator: ActuatorType) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
         .scalar_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
-            &format!("Vibrator {}", id),
+            &format!("Scalar {}", id),
             &RangeInclusive::new(0, 10),
             actuator,
         )])
@@ -383,7 +399,7 @@ pub fn scalar(id: u32, name: &str, actuator: ActuatorType) -> DeviceAdded {
 pub fn linear(id: u32, name: &str) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
         .linear_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
-            &format!("Oscillator {}", id),
+            &format!("Position {}", id),
             &RangeInclusive::new(0, 10),
             ActuatorType::Position,
         )])
@@ -444,7 +460,7 @@ pub mod tests {
                 for i in 0..call_registry.get_device(device.index()).len() {
                     let fake_call: FakeMessage =
                         call_registry.get_device(device.index())[i].clone();
-                    
+
                     let s = self.get_value(&fake_call);
                     let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
                     let perc = (s * 100.0).round();
@@ -468,7 +484,7 @@ pub mod tests {
                 }
                 message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
                     cmd.vectors().iter().next().unwrap().position()
-                },
+                }
                 _ => panic!("Message is not supported"),
             }
         }

@@ -226,6 +226,7 @@ impl Tk for Telekinesis {
         TkConnectionStatus::NotConnected
     }
 
+    // TODO: call scalar
     fn vibrate(&mut self, speed: Speed, duration: TkDuration, events: Vec<String>) -> i32 {
         self.vibrate_pattern(TkPattern::Linear(duration, speed), events)
     }
@@ -246,7 +247,7 @@ impl Tk for Telekinesis {
             sender_clone
                 .send(TkConnectionEvent::DeviceEvent(TkDeviceEvent::new(
                     now.elapsed(),
-                    &player.devices.iter().map( |d| d.device.clone() ).collect(),
+                    &player.actuators.iter().map( |a| a.device.clone() ).collect(),
                     params,
                 )))
                 .expect("queue full");
