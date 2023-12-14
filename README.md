@@ -44,14 +44,22 @@ Watch the demo video:
 
 ### Limitations & Support
 
- * Tested on Skyrim SE (v1.5.97.0) and AE (1.6.640.0)
- * VR should work but is untested (if it works for you, message me)
+**Working Game Versions**
+ *    Skyrim SE (v1.5.97.0)
+ *    Skyrim AE (1.6.640.0) and (1.6.1130.0), all AE versions should work.
+   
+**Limited Support**
+ * Skyrim VR (Certain MCM Inputs seem broken, try **Telekinesis.json** for configuring devices as a workaround)
+
+**Unsupported**
+ * Skyrim LE
+
+I do not own Skyrim VR or Skyrim LE and won't be able to test it.
+
+**Limitations**
  * Only supports vibrating devices (for now)
- * See [list of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
+ * [List of toys that might work](https://iostindex.com/?filter0ButtplugSupport=4&filter1Connection=Bluetooth%204%20LE,Bluetooth%202&filter2Features=OutputsVibrators)
 
-### LE Support
-
- * No
 
 ### Migrating from old versions
 
