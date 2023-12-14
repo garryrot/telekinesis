@@ -184,7 +184,6 @@ impl FakeConnectorCallRegistry {
             Some(some) => some.clone(),
             None => Box::new(vec![]),
         };
-        warn!("store_record device_id={:?} {:?}", device_id, cmd);
         bucket.deref_mut().push(cmd);
         calls.deref_mut().insert(device_id, bucket);
     }

@@ -1,11 +1,12 @@
 use buttplug::client::{device, ButtplugClientDevice, ScalarCommand, ScalarValueCommand};
 use buttplug::core::message::ActuatorType;
-use buttplug::util::future;
 use funscript::{FSPoint, FScript};
 use std::collections::HashMap;
 use std::fmt::{self, Display};
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     time::{sleep, Instant},
@@ -283,7 +284,10 @@ impl TkButtplugWorker {
                     TkDeviceAction::Update(actuator, speed) => {
                         let cmd = &ScalarCommand::ScalarMap(HashMap::from([(
                             actuator.index_in_device,
-                            (device_access.get_actual_speed(&actuator, speed).as_float(), actuator.actuator),
+                            (
+                                device_access.get_actual_speed(&actuator, speed).as_float(),
+                                actuator.actuator,
+                            ),
                         )]));
                         actuator
                             .device
@@ -421,67 +425,47 @@ impl TkPatternPlayer {
                 cancellable_wait(duration, &self.cancellation_token).await;
                 self.do_stop(true, self.handle);
                 info!("Linear finished");
-            },
+            }
             TkPattern::Funscript(duration, fscript) => {
-                let actions = &fscript.actions;
-                if actions.len() == 0 || 
-                    actions.iter().all(|x| x.at == 0) {
+                if fscript.actions.len() == 0 || fscript.actions.iter().all(|x| x.at == 0) {
                     return;
                 }
-                
-                let start_timer = Instant::now();
-                let mut dropped = 0;
-                let mut ignored = 0;
-                let mut cancel = false;
-                while !cancel && start_timer.elapsed() < duration {
-                    info!("OUTER {:?} {:?}", start_timer.elapsed(), duration);
-                    let current_start = Instant::now();
-                    let first_speed = Speed::from_fs(&actions[0]);
-                    self.do_scalar(first_speed, false, self.handle);
+                let waiter = self.stop_after(duration);
+                let action_len = fscript.actions.len();
+                let mut started = false;
+                let mut loop_started = Instant::now();
+                let mut i: usize = 0;
+                loop {
+                    let mut j = 1;
+                    while j + i < action_len - 1
+                        && (&fscript.actions[i + j].at - &fscript.actions[i].at)
+                            < self.player_scalar_resolution_ms
+                    {
+                        j += 1;
+                    }
+                    let current = &fscript.actions[i % action_len];
+                    let next = &fscript.actions[(i + j) % action_len];
 
-                    let mut i = 1;
-                    let mut last_speed = first_speed.value as i32;
-
-                    let actions = &fscript.actions;
-                    while i < actions.len() && start_timer.elapsed() < duration {
-                        info!("INNER i={} {:?} {:?}", i, start_timer.elapsed(), duration);
-                        // skip until we have reached a delay of player_scalar_resolution_ms
-                        let mut j = i;
-                        while j + 1 < actions.len() && (actions[j + 1].at - actions[i].at) < self.player_scalar_resolution_ms
-                        {
-                            dropped += 1;
-                            j += 1;
+                    if !started {
+                        self.do_scalar(Speed::from_fs(current), false, self.handle);
+                        started = true;
+                    } else {
+                        self.do_update(Speed::from_fs(current))
+                    }
+                    if let Some(waiting_time) =
+                        Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
+                    {
+                        if false == cancellable_wait(waiting_time, &self.cancellation_token).await {
+                            break;
                         }
-                        i = j;
-
-                        let future_at = Duration::from_millis(actions[i].at as u64);
-                        if current_start.elapsed() < future_at {
-                            let remaining = future_at - current_start.elapsed();
-                            if false == cancellable_wait(remaining, &self.cancellation_token).await
-                            {
-                                cancel = true;
-                                break;
-                            };
-                            let point = &actions[i];
-                            if last_speed != point.pos {
-                                self.do_update(Speed::from_fs(point));
-                                last_speed = point.pos;
-                            } else {
-                                ignored += 1;
-                            }
-                        }
-                        i += 1;
+                    }
+                    i += j;
+                    if (i % action_len) == 0 {
+                        loop_started = Instant::now();
                     }
                 }
+                waiter.abort();
                 self.do_stop(false, self.handle);
-
-                info!(
-                    "Pattern finished {:?} dropped={} ignored={} cancelled={}",
-                    start_timer.elapsed(),
-                    dropped,
-                    ignored,
-                    cancel
-                );
             }
         }
     }
@@ -525,6 +509,14 @@ impl TkPatternPlayer {
                 .unwrap_or_else(|_| error!("queue full"));
         }
     }
+
+    fn stop_after(&self, duration: Duration) -> JoinHandle<()> {
+        let cancellation_clone = self.cancellation_token.clone();
+        Handle::current().spawn(async move {
+            sleep(duration).await;
+            cancellation_clone.cancel();
+        })
+    }
 }
 
 async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> bool {
@@ -543,20 +535,20 @@ mod tests {
     use crate::fakes::tests::get_test_client;
     use crate::fakes::{linear, scalar, scalars, FakeMessage};
     use crate::pattern::TkPattern;
+    use crate::settings::TkSettings;
     use crate::Speed;
-    use crate::util::enable_log;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
 
     use tokio::runtime::Handle;
-    use tokio::task::JoinHandle;
 
     use funscript::{FSPoint, FScript};
     use futures::future::join_all;
 
     use buttplug::client::ButtplugClientDevice;
     use buttplug::core::message::ActuatorType;
+    use tokio::task::JoinHandle;
 
     use super::{get_actuators, TkActuator, TkButtplugScheduler, TkPlayerSettings};
 
@@ -631,7 +623,26 @@ mod tests {
         }
     }
 
-    // Linear Tests
+    /// Linear
+
+    #[tokio::test]
+    async fn test_linear_empty_pattern_finishes_and_does_not_panic() {
+        let client: crate::fakes::tests::ButtplugTestClient =
+            get_test_client(vec![linear(1, "lin1")]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        // act & assert
+        player
+            .play_linear(FScript::default(), Duration::from_millis(1))
+            .await;
+
+        let mut fs = FScript::default();
+        fs.actions.push(FSPoint { pos: 0, at: 0 });
+        fs.actions.push(FSPoint { pos: 0, at: 0 });
+        player
+            .play_linear(FScript::default(), Duration::from_millis(1))
+            .await;
+    }
 
     #[tokio::test]
     async fn test_linear_pattern() {
@@ -660,7 +671,7 @@ mod tests {
             .assert_duration(200)
             .assert_timestamp(200, start);
     }
-    
+
     #[tokio::test]
     async fn test_linear_timing_remains_synced_with_clock() {
         // arrange
@@ -668,15 +679,17 @@ mod tests {
         let client = get_test_client(vec![linear(1, "lin1")]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
         let fscript = get_repeated_pattern(n);
-        
+
         // act
         let start = Instant::now();
-        player.play_linear(get_repeated_pattern(n), get_duration_ms(&fscript)).await;
+        player
+            .play_linear(get_repeated_pattern(n), get_duration_ms(&fscript))
+            .await;
         wait_ms(1).await; // TODO await last
 
         // assert
         client.print_device_calls(start);
-        check_timing( client.get_device_calls(1), n, start);
+        check_timing(client.get_device_calls(1), n, start);
     }
 
     #[tokio::test]
@@ -728,10 +741,28 @@ mod tests {
         );
     }
 
-    // Scalar Tests
+    /// Scalar
 
     #[tokio::test]
-    async fn test_scalar_pattern_actuator_access() {
+    async fn test_scalar_empty_pattern_finishes_and_does_not_panic() {
+        // arrange
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        // act & assert
+        let mut pattern =
+            TkPattern::Funscript(Duration::from_millis(1), Arc::new(FScript::default()));
+        player.play(pattern).await;
+
+        let mut fscript = FScript::default();
+        fscript.actions.push(FSPoint { pos: 0, at: 0 });
+        fscript.actions.push(FSPoint { pos: 0, at: 0 });
+        pattern = TkPattern::Funscript(Duration::from_millis(200), Arc::new(fscript));
+        player.play(pattern).await;
+    }
+
+    #[tokio::test]
+    async fn test_scalar_pattern_actuator_selection() {
         // arrange
         let client = get_test_client(vec![scalars(1, "vib1", ActuatorType::Vibrate, 2)]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
@@ -741,19 +772,21 @@ mod tests {
         let start = Instant::now();
 
         let mut fs1 = FScript::default();
-        fs1.actions = vec![FSPoint { pos: 10, at: 0 }, FSPoint { pos: 20, at: 100 }];
+        fs1.actions.push(FSPoint { pos: 10, at: 0 });
+        fs1.actions.push(FSPoint { pos: 20, at: 100 });
         player
             .play_scalar_on_actuator(
-                TkPattern::Funscript(Duration::from_millis(100), Arc::new(fs1)),
+                TkPattern::Funscript(Duration::from_millis(125), Arc::new(fs1)),
                 actuators[1].clone(),
             )
             .await;
 
         let mut fs2 = FScript::default();
-        fs2.actions = vec![FSPoint { pos: 30, at: 0 }, FSPoint { pos: 40, at: 100 }];
+        fs2.actions.push(FSPoint { pos: 30, at: 0 });
+        fs2.actions.push(FSPoint { pos: 40, at: 100 });
         player
             .play_scalar_on_actuator(
-                TkPattern::Funscript(Duration::from_millis(100), Arc::new(fs2)),
+                TkPattern::Funscript(Duration::from_millis(125), Arc::new(fs2)),
                 actuators[0].clone(),
             )
             .await;
@@ -764,10 +797,8 @@ mod tests {
         let calls = client.get_device_calls(1);
         calls[0].assert_strengths(vec![(1, 0.1)]);
         calls[1].assert_strengths(vec![(1, 0.2)]);
-        calls[2].assert_strengths(vec![(1, 0.0)]);
-        calls[3].assert_strengths(vec![(0, 0.3)]);
-        calls[4].assert_strengths(vec![(0, 0.4)]);
-        calls[5].assert_strengths(vec![(0, 0.0)]);
+        calls[4].assert_strengths(vec![(0, 0.3)]);
+        calls[5].assert_strengths(vec![(0, 0.4)]);
     }
 
     #[tokio::test]
@@ -777,12 +808,12 @@ mod tests {
         let mut player = PlayerTest::setup(&client.created_devices);
 
         // act
-        let start = Instant::now();
         let mut fs = FScript::default();
         fs.actions.push(FSPoint { pos: 100, at: 0 });
         fs.actions.push(FSPoint { pos: 50, at: 50 });
         fs.actions.push(FSPoint { pos: 70, at: 100 });
-        
+
+        let start = Instant::now();
         let pattern = TkPattern::Funscript(Duration::from_millis(125), Arc::new(fs));
         player.play(pattern).await;
         wait_ms(1).await; // TODO await last
@@ -794,24 +825,10 @@ mod tests {
         calls[1].assert_strenth(0.5);
         calls[2].assert_strenth(0.7);
         calls[3].assert_strenth(1.0);
-        calls[4].assert_strenth(0.5);
+        calls[4].assert_strenth(0.0).assert_timestamp(125, start);
         assert_eq!(calls.len(), 5)
-        // TODO: Repeat 1,5x times and abort in middle
     }
 
-    #[tokio::test]
-    async fn test_scalar_pattern_with_duration_0_does_not_block_forever() {
-        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
-        let mut player = PlayerTest::setup(&client.created_devices);
-
-        let mut fscript = FScript::default();
-        fscript.actions.push(FSPoint { pos: 0, at: 0 });
-
-        // act
-        let pattern = TkPattern::Funscript(Duration::from_millis(200), Arc::new(fscript));
-        player.play(pattern).await;
-    }
-    
     #[tokio::test]
     async fn test_scalar_timing_remains_synced_with_clock() {
         // arrange
@@ -822,7 +839,12 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play(TkPattern::Funscript(get_duration_ms(&fscript), Arc::new(fscript))).await;
+        player
+            .play(TkPattern::Funscript(
+                get_duration_ms(&fscript),
+                Arc::new(fscript),
+            ))
+            .await;
         wait_ms(1).await; // TODO await last
 
         // assert
@@ -830,15 +852,47 @@ mod tests {
         check_timing(client.get_device_calls(1), n, start);
     }
 
-    fn check_timing( device_calls: Vec<FakeMessage>, n: usize, start: Instant ) {
-        for i in 0..n-1 {
+    #[tokio::test]
+    async fn test_scalar_points_below_min_resolution() {
+        // arrange
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup_with_settings(
+            &client.created_devices,
+            TkPlayerSettings {
+                player_scalar_resolution_ms: 100,
+            },
+        );
+
+        let mut fs = FScript::default();
+        fs.actions.push(FSPoint { pos: 42, at: 0 });
+        fs.actions.push(FSPoint { pos: 1, at: 1 });
+        fs.actions.push(FSPoint { pos: 1, at: 99 });
+        fs.actions.push(FSPoint { pos: 42, at: 100 });
+
+        // act
+        let start = Instant::now();
+        player
+            .play(TkPattern::Funscript(
+                Duration::from_millis(150),
+                Arc::new(fs),
+            ))
+            .await;
+
+        // assert
+        client.print_device_calls(start);
+        let calls = client.get_device_calls(1);
+        calls[0].assert_strenth(0.42).assert_timestamp(0, start);
+        calls[1].assert_strenth(0.42).assert_timestamp(100, start);
+    }
+
+    fn check_timing(device_calls: Vec<FakeMessage>, n: usize, start: Instant) {
+        for i in 0..n - 1 {
             device_calls[i].assert_timestamp((i * 100) as i32, start);
         }
     }
 
-    fn get_repeated_pattern( n: usize ) -> FScript {
+    fn get_repeated_pattern(n: usize) -> FScript {
         let mut fscript = FScript::default();
-        fscript.actions.push(FSPoint { pos: 0, at: 0 });
         for i in 0..n {
             fscript.actions.push(FSPoint {
                 pos: (i % 100) as i32,
