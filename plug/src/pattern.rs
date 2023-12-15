@@ -395,30 +395,27 @@ impl TkButtplugScheduler {
 }
 
 impl TkPatternPlayer {
-    pub async fn play_linear(&mut self, funscript: FScript, duration: Duration) {
-        let start = Instant::now();
-        while start.elapsed() <= duration {
-            let current_start = Instant::now();
-            for point in &funscript.actions {
-                if start.elapsed() > duration {
-                    break;
-                }
-                if point.at != 0 {
-                    let point_as_float = (point.pos as f64) / 100.0;
-                    let future_at = Duration::from_millis(point.at as u64);
-                    let duration = future_at - current_start.elapsed();
-                    self.do_linear(point_as_float, duration.as_millis() as u32);
-                    trace!("do_linear to {} over {:?}", point_as_float, duration);
-                    if false == cancellable_wait(duration, &self.cancellation_token).await {
-                        break;
-                    };
+    pub async fn play_linear(&mut self, fscript: FScript, duration: Duration) {
+        info!("Playing pattern {:?} (linear)", fscript);
+        if fscript.actions.len() == 0 || fscript.actions.iter().all(|x| x.at == 0) {
+            return;
+        }
+        let waiter = self.stop_after(duration);
+        while ! self.cancellation_token.is_cancelled() {
+            let started = Instant::now();
+            for point in fscript.actions.iter() {
+                let point_as_float = Speed::from_fs(point).as_float();
+                if let Some(waiting_time) = Duration::from_millis(point.at as u64).checked_sub(started.elapsed()) {
+                    self.do_linear(point_as_float, waiting_time.as_millis() as u32);
+                    cancellable_wait(waiting_time, &self.cancellation_token).await;
                 }
             }
         }
+        waiter.abort();
     }
 
     pub async fn play_scalar(&mut self, pattern: TkPattern) {
-        info!("Playing pattern {:?}", pattern);
+        info!("Playing pattern {:?} (scalar)", pattern);
         match pattern {
             TkPattern::Linear(duration, speed) => {
                 self.do_scalar(speed, true, self.handle);
@@ -734,11 +731,8 @@ mod tests {
 
         // assert
         client.print_device_calls(start);
-        assert_eq!(
-            client.get_device_calls(1).len(),
-            1,
-            "Stops after duration ends"
-        );
+        client.get_device_calls(1)[0].assert_position(0.0).assert_duration(400);
+        assert!(start.elapsed().as_millis() < 425, "Stops after duration ends");
     }
 
     /// Scalar
