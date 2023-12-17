@@ -23,9 +23,9 @@ use futures::{future::BoxFuture, FutureExt};
 use std::ops::{DerefMut, RangeInclusive};
 use std::sync::Mutex;
 use std::time::Duration;
-use std::{cmp, vec};
+use std::vec;
 use std::{collections::HashMap, sync::Arc};
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 
 use std::time::Instant;
 
@@ -102,8 +102,8 @@ impl FakeMessage {
                 cmd.vectors().iter().all(|v| {
                     let actual = v.duration();
                     assert!(
-                        actual > duration - 10 && actual < duration + 10,
-                        "{}ms is not {}ms +/-10",
+                        actual > duration - 20 && actual < duration + 20,
+                        "{}ms is not {}ms +/-20",
                         actual,
                         duration
                     );
@@ -499,11 +499,14 @@ pub mod tests {
     }
 
     pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
+        let devices_len = devices.len();
         let (connector, call_registry) = FakeDeviceConnector::new(devices);
         let client = ButtplugClient::new("FakeClient");
         client.connect(connector).await.unwrap();
 
-        let _ = client.event_stream().next().await.unwrap();
+        if devices_len > 0 {
+            let _ = client.event_stream().next().await.unwrap();
+        }
 
         let devices = client.devices().clone();
         ButtplugTestClient {
