@@ -67,6 +67,8 @@ Event OnUpdate()
                 LogError(_ErrorText)
             ElseIf type == "DeviceEvent"
                 LogEvent(evt)
+            ElseIf type == "DeviceError"
+                LogError("Failed controlling device '" + evt[1] + "'. ")
             EndIf
             i += 1
         EndWhile
@@ -226,7 +228,7 @@ EndFunction
 
 Function Notify(string msg)
     { Telekinesis Notification on top left }
-    Debug.Notification("[Tele] " + msg)
+    Debug.Notification("[Tele] " + msg )
 EndFunction
 
 Function Trace(string msg, Int level = 0)
@@ -236,7 +238,7 @@ EndFunction
 
 Function LogError(string msg)
     { Log Telekinesis Error }
-    Notify(msg)
+    Debug.Notification("<font color='##fc3503'> [Tele] " + msg)
     Trace(msg, 2)
 EndFunction
 

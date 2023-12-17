@@ -1,8 +1,8 @@
-use crate::connection::{TkDeviceEvent, TkConnectionEvent, TkConnectionStatus};
+use crate::connection::{TkConnectionEvent, TkConnectionStatus, TkDeviceEvent};
 
 /// Serialized types parsed/read in papyrus, if these change papyrus code has to change
 impl TkDeviceEvent {
-    pub fn serialize_papyrus(&self) -> String {
+    pub fn serialize_papyrus(&self, is_error: bool) -> String {
         let device_list = self
             .devices
             .iter()
@@ -10,9 +10,13 @@ impl TkDeviceEvent {
             .collect::<Vec<String>>()
             .join(",");
         let event_list = self.events.join(",");
+        let mut evt_name = "DeviceEvent";
+        if is_error {
+            evt_name = "DeviceError";
+        }
         format!(
-            "DeviceEvent|Vibrator|{:.1}s|{}|{}%|{}|{}",
-            self.elapsed_sec, self.pattern, self.speed.value, device_list, event_list
+            "{}|Vibrator|{:.1}s|{}|{}%|{}|{}",
+            evt_name, self.elapsed_sec, self.pattern, self.speed.value, device_list, event_list
         )
     }
 }
@@ -22,7 +26,8 @@ impl TkConnectionEvent {
         match self {
             TkConnectionEvent::DeviceAdded(device) => format!("DeviceAdded|{}", device.name()),
             TkConnectionEvent::DeviceRemoved(device) => format!("DeviceRemoved|{}", device.name()),
-            TkConnectionEvent::DeviceEvent(event) => event.serialize_papyrus(),
+            TkConnectionEvent::DeviceEvent(event) => event.serialize_papyrus(false),
+            TkConnectionEvent::DeviceError(event) => event.serialize_papyrus(true),
             TkConnectionEvent::Connected => format!("Connected"),
             TkConnectionEvent::ConnectionFailure => format!("ConnectionFailure"),
         }

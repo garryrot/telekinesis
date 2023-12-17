@@ -28,16 +28,10 @@ pub struct TkDeviceStatus {
 }
 
 impl TkDeviceStatus {
-    pub fn connected(device: &Arc<ButtplugClientDevice>) -> Self {
+    pub fn new(device: &Arc<ButtplugClientDevice>, status: TkConnectionStatus) -> Self {
         TkDeviceStatus {
             device: device.clone(),
-            status: TkConnectionStatus::Connected,
-        }
-    }
-    pub fn not_connected(device: &Arc<ButtplugClientDevice>) -> Self {
-        TkDeviceStatus {
-            device: device.clone(),
-            status: TkConnectionStatus::NotConnected,
+            status
         }
     }
 }
@@ -89,6 +83,7 @@ pub enum TkConnectionEvent {
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
     DeviceEvent(TkDeviceEvent),
+    DeviceError(TkDeviceEvent)
 }
 
 #[derive(Clone, Debug)]
@@ -180,7 +175,7 @@ pub async fn handle_connection(
                 if let Ok(mut connection_status) = connection_status.lock() {
                     connection_status
                         .device_status
-                        .insert(device.index(), TkDeviceStatus::connected(&device));
+                        .insert(device.index(), TkDeviceStatus::new(&device, TkConnectionStatus::Connected));
                 } else {
                     error!("mutex poisoned")
                 }
@@ -192,7 +187,7 @@ pub async fn handle_connection(
                 if let Ok(mut connection_status) = connection_status.lock() {
                     connection_status
                         .device_status
-                        .insert(device.index(), TkDeviceStatus::not_connected(&device));
+                        .insert(device.index(), TkDeviceStatus::new(&device, TkConnectionStatus::Connected));
                 } else {
                     error!("mutex poisoned")
                 }
