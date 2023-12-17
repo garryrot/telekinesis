@@ -146,7 +146,7 @@ Event OnPageReset(String page)
             String name = _DeviceNames[i]
             
             If name != ""
-                String status = Tele_Api.Qry_Str_1("device.connection_status", name)
+                String status = Tele_Api.Qry_Str_1("device.connection.status", name)
                 AddHeaderOption(name)
                 AddTextOption(Key(i, "State"), status, OPTION_FLAG_DISABLED)                
                 AddTextOption(Key(i, "Actions"), Tele_Api.Qry_Lst_1("device.capabilities", name), OPTION_FLAG_DISABLED)
