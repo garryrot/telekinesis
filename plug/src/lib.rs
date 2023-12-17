@@ -28,7 +28,6 @@ mod papyrus;
 mod pattern;
 mod settings;
 pub mod telekinesis;
-mod tests;
 mod util;
 
 /// Methods exposed to as papyrus native functions
