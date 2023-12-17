@@ -40,7 +40,7 @@ use crate::{
     input::TkParams,
     pattern::{get_actuators, Speed, TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
-    DeviceList, Telekinesis, Tk, TkPattern, TkStatus,
+    DeviceList, Telekinesis, TkPattern, TkStatus,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -111,15 +111,15 @@ impl fmt::Debug for Telekinesis {
     }
 }
 
-impl Tk for Telekinesis {
-    fn get_device(&self, device_name: &str) -> Option<Arc<ButtplugClientDevice>> {
+impl Telekinesis {
+    pub fn get_device(&self, device_name: &str) -> Option<Arc<ButtplugClientDevice>> {
         if let Some(status) = self.get_device_status(device_name) {
             return Some(status.device);
         }
         None
     }
 
-    fn get_devices(&self) -> DeviceList {
+    pub fn get_devices(&self) -> DeviceList {
         if let Ok(connection_status) = self.connection_status.try_lock() {
             let devices: DeviceList = connection_status
                 .device_status
@@ -134,7 +134,7 @@ impl Tk for Telekinesis {
         vec![]
     }
 
-    fn get_device_status(&self, device_name: &str) -> Option<TkDeviceStatus> {
+    pub fn get_device_status(&self, device_name: &str) -> Option<TkDeviceStatus> {
         if let Ok(status) = self.connection_status.try_lock() {
             let devices = status
                 .device_status
@@ -150,7 +150,7 @@ impl Tk for Telekinesis {
         None
     }
 
-    fn get_known_device_names(&self) -> Vec<String> {
+    pub fn get_known_device_names(&self) -> Vec<String> {
         debug!("Getting devices names");
         self.get_devices()
             .iter()
@@ -161,7 +161,7 @@ impl Tk for Telekinesis {
             .collect()
     }
 
-    fn connect(settings: TkSettings) -> Result<Telekinesis, Error> {
+    pub fn connect(settings: TkSettings) -> Result<Telekinesis, Error> {
         let settings_clone = settings.clone();
         match settings.connection {
             TkConnectionType::WebSocket(endpoint) => {
@@ -179,7 +179,7 @@ impl Tk for Telekinesis {
         }
     }
 
-    fn scan_for_devices(&self) -> bool {
+    pub fn scan_for_devices(&self) -> bool {
         info!("Sending Command: Scan for devices");
         if let Err(_) = self.command_sender.try_send(TkAction::Scan) {
             error!("Failed to start scan");
@@ -188,7 +188,7 @@ impl Tk for Telekinesis {
         true
     }
 
-    fn stop_scan(&self) -> bool {
+    pub fn stop_scan(&self) -> bool {
         info!("Sending Command: Stop scan");
         if let Err(_) = self.command_sender.try_send(TkAction::StopScan) {
             error!("Failed to stop scan");
@@ -197,7 +197,7 @@ impl Tk for Telekinesis {
         true
     }
 
-    fn get_device_capabilities(&self, name: &str) -> Vec<String> {
+    pub fn get_device_capabilities(&self, name: &str) -> Vec<String> {
         debug!("Getting '{}' capabilities", name);
         // maybe just return all actuator + types + linear + rotate
         if self
@@ -221,7 +221,7 @@ impl Tk for Telekinesis {
         vec![]
     }
 
-    fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus {
+    pub fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus {
         debug!("Getting '{}' connected", device_name);
         if let Some(status) = self.get_device_status(device_name) {
             return status.status;
@@ -230,7 +230,7 @@ impl Tk for Telekinesis {
     }
 
     // TODO: call scalar
-    fn vibrate(&mut self, speed: Speed, duration: Duration, events: Vec<String>) -> i32 {
+    pub fn vibrate(&mut self, speed: Speed, duration: Duration, events: Vec<String>) -> i32 {
         self.vibrate_pattern(
             TkPattern::Linear(duration, speed),
             events,
@@ -238,7 +238,7 @@ impl Tk for Telekinesis {
         )
     }
 
-    fn vibrate_pattern(
+    pub fn vibrate_pattern(
         &mut self,
         pattern: TkPattern,
         events: Vec<String>,
@@ -280,13 +280,13 @@ impl Tk for Telekinesis {
         handle
     }
 
-    fn stop(&mut self, handle: i32) -> bool {
+    pub fn stop(&mut self, handle: i32) -> bool {
         info!("Received: Stop");
         self.scheduler.stop_task(handle);
         true
     }
 
-    fn stop_all(&mut self) -> bool {
+    pub fn stop_all(&mut self) -> bool {
         info!("Received: Stop All");
         self.scheduler.stop_all();
         if let Err(_) = self.command_sender.try_send(TkAction::StopAll) {
@@ -296,14 +296,14 @@ impl Tk for Telekinesis {
         true
     }
 
-    fn disconnect(&mut self) {
+    pub fn disconnect(&mut self) {
         info!("Sending Command: Disconnecting client");
         if let Err(_) = self.command_sender.try_send(TkAction::Disconect) {
             error!("Failed to send disconnect");
         }
     }
 
-    fn get_next_event(&mut self) -> Option<TkConnectionEvent> {
+    pub fn get_next_event(&mut self) -> Option<TkConnectionEvent> {
         if let Ok(msg) = self.connection_events.try_recv() {
             debug!("Get event {:?}", msg);
             return Some(msg);
@@ -311,7 +311,7 @@ impl Tk for Telekinesis {
         None
     }
 
-    fn process_next_events(&mut self) -> Vec<TkConnectionEvent> {
+    pub fn process_next_events(&mut self) -> Vec<TkConnectionEvent> {
         debug!("Polling all events");
         let mut events = vec![];
         while let Some(event) = self.get_next_event() {
@@ -323,7 +323,7 @@ impl Tk for Telekinesis {
         events
     }
 
-    fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
+    pub fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
         info!("Setting '{}'.enabled={}", device_name, enabled);
 
         let mut settings = self.settings.clone();
@@ -331,24 +331,24 @@ impl Tk for Telekinesis {
         self.settings = settings;
     }
 
-    fn settings_set_events(&mut self, device_name: &str, events: Vec<String>) {
+    pub fn settings_set_events(&mut self, device_name: &str, events: Vec<String>) {
         info!("Setting '{}'.events={:?}", device_name, events);
 
         let settings = self.settings.clone();
         self.settings = settings.set_events(device_name, events);
     }
 
-    fn settings_get_events(&self, device_name: &str) -> Vec<String> {
+    pub fn settings_get_events(&self, device_name: &str) -> Vec<String> {
         self.settings.get_events(device_name)
     }
 
-    fn settings_get_enabled(&self, device_name: &str) -> bool {
+    pub fn settings_get_enabled(&self, device_name: &str) -> bool {
         let enabled = self.settings.is_enabled(device_name);
         debug!("Getting setting '{}'.enabled={}", device_name, enabled);
         enabled
     }
 
-    fn get_connection_status(&self) -> TkConnectionStatus {
+    pub fn get_connection_status(&self) -> TkConnectionStatus {
         if let Ok(status) = self.connection_status.try_lock() {
             return status.connection_status.clone();
         }
@@ -470,11 +470,11 @@ pub fn read_pattern_name(
 mod tests {
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
-
     use crate::connection::TkConnectionStatus;
     use crate::fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
     use buttplug::core::message::{ActuatorType, DeviceAdded};
-
+    use crate::telekinesis::in_process_connector;
+    use crate::*;
     use super::*;
 
     macro_rules! assert_timeout {
@@ -853,5 +853,76 @@ mod tests {
         }
 
         (tk, call_registry)
+    }
+
+    #[test]
+    fn vibrate_delayed_command_is_overwritten() {
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        tk.vibrate(Speed::new(33), Duration::from_millis(50), vec![]);
+        _assert_one_event(&mut tk)
+    }
+
+    #[test]
+    fn process_next_events_empty_when_nothing_happens() {
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        _sleep();
+        assert_eq!(tk.process_next_events().len(), 0);
+    }
+
+    #[test]
+    fn process_next_events_after_action_returns_1() {
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        _sleep();
+        tk.vibrate(Speed::new(22), Duration::from_millis(1), vec![]);
+        _sleep();
+        assert_eq!(tk.process_next_events().len(), 1);
+    }
+
+    #[test]
+    fn process_next_events_works() {
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        _sleep();
+        tk.vibrate(Speed::new(10), Duration::from_millis(100), vec![]);
+        tk.vibrate(Speed::new(20), Duration::from_millis(200), vec![]);
+        _sleep();
+        _sleep();
+        let events = tk.process_next_events();
+        assert!(events[0].serialize_papyrus().starts_with("DeviceEvent|Vibrator|0.1"));
+        assert!(events[1].serialize_papyrus().starts_with("DeviceEvent|Vibrator|0.2"));
+    }
+
+    #[test]
+    fn process_next_events_over_128_actions_respects_papyrus_limits_and_does_not_return_more_than_128_events(
+    ) {
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        _sleep();
+        for _ in 1..200 {
+            tk.vibrate(Speed::min(), Duration::from_micros(1), vec![]);
+        }
+        _sleep();
+        assert_eq!(tk.process_next_events().len(), 128);
+    }
+
+    fn _sleep() {
+        thread::sleep(Duration::from_millis(250));
+    }
+
+    fn _assert_one_event(tk: &mut Telekinesis) {
+        _sleep();
+        assert!(tk.get_next_event().is_some(), "Exactly one element exists");
+        assert!(tk.get_next_event().is_none());
+    }
+
+    fn _assert_no_event(tk: &mut Telekinesis) {
+        assert!(tk.get_next_event().is_none());
+    }
+
+    #[test]
+    fn speed_correct_conversion() {
+        assert_eq!(Speed::new(-1000).as_float(), 0.0);
+        assert_eq!(Speed::new(0).as_float(), 0.0);
+        assert_eq!(Speed::new(9).as_float(), 0.09);
+        assert_eq!(Speed::new(100).as_float(), 1.0);
+        assert_eq!(Speed::new(1000).as_float(), 1.0);
     }
 }

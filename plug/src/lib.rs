@@ -65,32 +65,6 @@ mod ffi {
 
 type DeviceList = Vec<Arc<ButtplugClientDevice>>;
 
-/// access to Telekinesis struct from within foreign rust modules and tests
-/// TODO needed?
-pub trait Tk {
-    fn connect(settings: TkSettings) -> Result<Telekinesis, Error>;
-    fn scan_for_devices(&self) -> bool;
-    fn stop_scan(&self) -> bool;
-    fn disconnect(&mut self);
-    fn get_connection_status(&self) -> TkConnectionStatus;
-    fn get_devices(&self) -> DeviceList;
-    fn get_device(&self, device_name: &str) -> Option<Arc<ButtplugClientDevice>>;
-    fn get_device_status(&self, device_name: &str) -> Option<TkDeviceStatus>;
-    fn get_known_device_names(&self) -> Vec<String>;
-    fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus;
-    fn get_device_capabilities(&self, device_name: &str) -> Vec<String>;
-    fn vibrate(&mut self, speed: Speed, duration: Duration, events: Vec<String>) -> i32;
-    fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>, pattern_name: String) -> i32;
-    fn stop(&mut self, handle: i32) -> bool;
-    fn stop_all(&mut self) -> bool;
-    fn get_next_event(&mut self) -> Option<TkConnectionEvent>;
-    fn process_next_events(&mut self) -> Vec<TkConnectionEvent>;
-    fn settings_set_enabled(&mut self, device_name: &str, enabled: bool);
-    fn settings_set_events(&mut self, device_name: &str, events: Vec<String>);
-    fn settings_get_events(&self, device_name: &str) -> Vec<String>;
-    fn settings_get_enabled(&self, device_name: &str) -> bool;
-}
-
 pub struct Telekinesis {
     pub connection_status: Arc<Mutex<TkStatus>>,
     settings: TkSettings,
