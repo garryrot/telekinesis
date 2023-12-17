@@ -68,7 +68,7 @@ Event OnUpdate()
             ElseIf type == "DeviceEvent"
                 LogEvent(evt)
             ElseIf type == "DeviceError"
-                LogError("Failed controlling device '" + evt[1] + "'. ")
+                LogError("Device error: '" + evt[5] + "', check 'Troubleshooting' in MCM")
             EndIf
             i += 1
         EndWhile
@@ -238,7 +238,7 @@ EndFunction
 
 Function LogError(string msg)
     { Log Telekinesis Error }
-    Debug.Notification("<font color='##fc3503'> [Tele] " + msg)
+    Debug.Notification("<font color='#fc3503'>[Tele] " + msg)
     Trace(msg, 2)
 EndFunction
 

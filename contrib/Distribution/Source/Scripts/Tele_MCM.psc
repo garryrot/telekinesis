@@ -472,9 +472,9 @@ Event OnPageReset(String page)
 
     If page == "Troubleshooting"
         SetCursorFillMode(TOP_TO_BOTTOM)
-
         AddTextOptionST("HELP_DEVICE_NOT_CONNECTING", "Device not connecting", "Read below")
         AddTextOptionST("HELP_DEVICE_NOT_VIBRATING", "Device not vibrating", "Read below")
+        AddTextOptionST("HELP_DEVICE_ERRORS", "Device Errors", "Read below")
     EndIf
 EndEvent
 
@@ -1737,6 +1737,18 @@ State HELP_DEVICE_NOT_VIBRATING
         String b = "1. Device is enabled (MCM: Devices Page)\n"
         String c = "2. Device has full battery\n"
         String d = "3. Device works in buttplug.io (test in Intiface app)\n"
+        SetInfoText(a + b + c + d)
+    EndEvent
+EndState
+
+State HELP_DEVICE_ERRORS
+    Event OnSelectST()
+    EndEvent
+    Event OnHighlightST()
+        String a = "Red device errors in the notification pane appear whenever a device connection failed:\n"
+        String b = "1. Try to restart the device, in case it crashed or is in standby\n"
+        String c = "2. Check if the device has enough battery\n"
+        String d = "3. Restart connection in MCM 'General' page"
         SetInfoText(a + b + c + d)
     EndEvent
 EndState
