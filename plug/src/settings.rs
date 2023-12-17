@@ -8,7 +8,7 @@ use tracing::{error, event, info, Level};
 
 use crate::input::sanitize_name_list;
 
-pub static PATTERN_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis\\Patterns";
+pub static DEFAULT_PATTERN_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis\\Patterns";
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
 pub static SETTINGS_FILE: &str = "Telekinesis.json";
 
@@ -62,7 +62,7 @@ impl TkSettings {
             log_level: TkLogLevel::Trace,
             connection: TkConnectionType::InProcess,
             devices: vec![],
-            pattern_path: String::from(PATTERN_PATH)
+            pattern_path: String::from(DEFAULT_PATTERN_PATH)
         }
     }
     pub fn try_read_or_default(settings_path: &str, settings_file: &str) -> Self {
@@ -70,7 +70,7 @@ impl TkSettings {
         match fs::read_to_string(path) {
             Ok(settings_json) => match serde_json::from_str::<TkSettings>(&settings_json) {
                 Ok(mut settings) => {
-                    settings.pattern_path = String::from(PATTERN_PATH);
+                    settings.pattern_path = String::from(DEFAULT_PATTERN_PATH);
                     settings
                 },
                 Err(err) => {

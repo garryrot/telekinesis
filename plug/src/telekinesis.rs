@@ -19,8 +19,6 @@ use buttplug::{
 use funscript::FScript;
 use futures::Future;
 
-use settings::PATTERN_PATH;
-
 use std::time::Duration;
 use std::{
     fmt::{self},
@@ -78,7 +76,6 @@ impl Telekinesis {
         let event_sender_clone = event_sender.clone();
 
         let settings = provided_settings.or(Some(TkSettings::default())).unwrap();
-        let pattern_path = settings.pattern_path.clone();
 
         let connection_status = Arc::new(Mutex::new(TkStatus::new())); // ugly
         let status_clone = connection_status.clone();
@@ -242,7 +239,7 @@ impl Tk for Telekinesis {
         info!("Received: Vibrate/Vibrate Pattern");
         let params = TkParams::from_input(events.clone(), pattern, &self.settings.devices);
 
-        let mut player = self
+        let player = self
             .scheduler
             .create_player(get_actuators(params.filter_devices(self.get_devices())));
         let handle = player.handle;
@@ -250,11 +247,12 @@ impl Tk for Telekinesis {
         let sender_clone = self.event_sender.clone();
         self.runtime.spawn(async move {
             let now = Instant::now();
+            let used_devices = player.actuators.iter().map(|a| a.device.clone()).collect();
             player.play_scalar(params.pattern.clone()).await;
             sender_clone
                 .send(TkConnectionEvent::DeviceEvent(TkDeviceEvent::new(
                     now.elapsed(),
-                    &player.actuators.iter().map(|a| a.device.clone()).collect(),
+                    &used_devices,
                     params,
                     pattern_name
                 )))
@@ -411,8 +409,8 @@ fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::E
     Ok(patterns)
 }
 
-pub fn read_pattern(pattern_name: &str, vibration_pattern: bool) -> Option<FScript> {
-    match read_pattern_name(&PATTERN_PATH, &pattern_name, vibration_pattern) {
+pub fn read_pattern(pattern_path: &str, pattern_name: &str, vibration_pattern: bool) -> Option<FScript> {
+    match read_pattern_name(pattern_path, &pattern_name, vibration_pattern) {
         Ok(funscript) => Some(funscript),
         Err(err) => {
             error!(
@@ -452,7 +450,6 @@ mod tests {
 
     use crate::connection::TkConnectionStatus;
     use crate::fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
-    use crate::util::enable_log;
     use buttplug::core::message::{ActuatorType, DeviceAdded};
 
     use super::*;
@@ -755,10 +752,8 @@ mod tests {
     }
 
     fn test_pattern(pattern_name: &str, duration: Duration) -> (Telekinesis, i32) {
-        let mut settings = TkSettings::default();
-        settings.pattern_path =
-            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
-
+        let settings = TkSettings::default();
+        let pattern_path = String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk =
             Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings))
                 .unwrap();
@@ -768,11 +763,10 @@ mod tests {
         tk.settings
             .set_enabled(tk.get_known_device_names().first().unwrap(), true);
 
-        enable_log();
         let handle = tk.vibrate_pattern(
             TkPattern::Funscript(
                 duration,
-                Arc::new(read_pattern(pattern_name, true).unwrap()),
+                Arc::new(read_pattern( &pattern_path, pattern_name, true).unwrap()),
             ),
             vec![],
             String::from(pattern_name)
@@ -783,7 +777,6 @@ mod tests {
     #[test]
     #[ignore = "Requires intiface to be connected, with a connected device (vibrates it)"]
     fn intiface_test_vibration() {
-        enable_log();
 
         let mut settings = TkSettings::default();
         settings.connection = TkConnectionType::WebSocket(String::from("127.0.0.1:12345"));

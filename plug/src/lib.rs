@@ -9,10 +9,9 @@ use tokio::{
     runtime::Runtime,
     sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender},
 };
-use tracing::{instrument, error};
+use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
-use settings::PATTERN_PATH;
 use telekinesis::{ERROR_HANDLE, read_pattern, get_pattern_names};
 
 use crate::{
@@ -246,7 +245,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_control(ApiControl {
         name: "vibrate.pattern",
         exec: |tk, _speed, time_sec, pattern_name, events| {
-            match read_pattern( &pattern_name, true ) {
+            match read_pattern( &tk.settings.pattern_path, &pattern_name, true ) {
                 Some(fscript) => tk.vibrate_pattern(
                     TkPattern::Funscript(
                         get_duration_from_secs(time_sec),
@@ -323,11 +322,11 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     // patterns
     .def_qry_lst(ApiQryList {
         name: "patterns.vibrator",
-        exec: |_| get_pattern_names(PATTERN_PATH, true),
+        exec: |tk| get_pattern_names(&tk.settings.pattern_path, true),
     })
     .def_qry_lst(ApiQryList {
         name: "patterns.stroker",
-        exec: |_| get_pattern_names(PATTERN_PATH, false),
+        exec: |tk| get_pattern_names(&tk.settings.pattern_path,  false),
     })
 }
 
