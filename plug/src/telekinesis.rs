@@ -32,7 +32,6 @@ use tracing::{debug, error, info};
 
 use itertools::Itertools;
 
-use crate::settings;
 use crate::{
     connection::{
         handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent,
@@ -232,10 +231,19 @@ impl Tk for Telekinesis {
 
     // TODO: call scalar
     fn vibrate(&mut self, speed: Speed, duration: Duration, events: Vec<String>) -> i32 {
-        self.vibrate_pattern(TkPattern::Linear(duration, speed), events, String::from("Linear"))
+        self.vibrate_pattern(
+            TkPattern::Linear(duration, speed),
+            events,
+            String::from("Linear"),
+        )
     }
 
-    fn vibrate_pattern(&mut self, pattern: TkPattern, events: Vec<String>, pattern_name: String) -> i32 {
+    fn vibrate_pattern(
+        &mut self,
+        pattern: TkPattern,
+        events: Vec<String>,
+        pattern_name: String,
+    ) -> i32 {
         info!("Received: Vibrate/Vibrate Pattern");
         let params = TkParams::from_input(events.clone(), pattern, &self.settings.devices);
 
@@ -245,17 +253,28 @@ impl Tk for Telekinesis {
         let handle = player.handle;
 
         let sender_clone = self.event_sender.clone();
+        let connection_status = self.connection_status.clone();
         self.runtime.spawn(async move {
             let now = Instant::now();
             let used_devices = player.actuators.iter().map(|a| a.device.clone()).collect();
-            player.play_scalar(params.pattern.clone()).await;
+            let result = player.play_scalar(params.pattern.clone()).await;
+            let evt = TkDeviceEvent::new(now.elapsed(), &used_devices, params, pattern_name);
+            if let Ok(mut connection_status) = connection_status.lock() {
+                for device in used_devices {
+                    let status = match &result {
+                        Ok(_) => TkConnectionStatus::Connected,
+                        Err(err) => TkConnectionStatus::Failed(err.to_string()),
+                    };
+                    connection_status
+                        .device_status
+                        .insert(device.index(), TkDeviceStatus::new(&device, status));
+                }
+            }
             sender_clone
-                .send(TkConnectionEvent::DeviceEvent(TkDeviceEvent::new(
-                    now.elapsed(),
-                    &used_devices,
-                    params,
-                    pattern_name
-                )))
+                .send(match result {
+                    Ok(_) => TkConnectionEvent::DeviceEvent(evt),
+                    Err(_) => TkConnectionEvent::DeviceError(evt),
+                })
                 .expect("queue full");
         });
         handle
@@ -409,7 +428,11 @@ fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::E
     Ok(patterns)
 }
 
-pub fn read_pattern(pattern_path: &str, pattern_name: &str, vibration_pattern: bool) -> Option<FScript> {
+pub fn read_pattern(
+    pattern_path: &str,
+    pattern_name: &str,
+    vibration_pattern: bool,
+) -> Option<FScript> {
     match read_pattern_name(pattern_path, &pattern_name, vibration_pattern) {
         Ok(funscript) => Some(funscript),
         Err(err) => {
@@ -717,11 +740,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
-        tk.vibrate(
-            Speed::max(),
-            Duration::from_secs(1),
-            vec![],
-        );
+        tk.vibrate(Speed::max(), Duration::from_secs(1), vec![]);
         thread::sleep(Duration::from_secs(1));
 
         call_registry.get_device(1)[0].assert_strenth(1.0);
@@ -753,7 +772,8 @@ mod tests {
 
     fn test_pattern(pattern_name: &str, duration: Duration) -> (Telekinesis, i32) {
         let settings = TkSettings::default();
-        let pattern_path = String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+        let pattern_path =
+            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk =
             Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings))
                 .unwrap();
@@ -766,10 +786,10 @@ mod tests {
         let handle = tk.vibrate_pattern(
             TkPattern::Funscript(
                 duration,
-                Arc::new(read_pattern( &pattern_path, pattern_name, true).unwrap()),
+                Arc::new(read_pattern(&pattern_path, pattern_name, true).unwrap()),
             ),
             vec![],
-            String::from(pattern_name)
+            String::from(pattern_name),
         );
         (tk, handle)
     }
@@ -777,7 +797,6 @@ mod tests {
     #[test]
     #[ignore = "Requires intiface to be connected, with a connected device (vibrates it)"]
     fn intiface_test_vibration() {
-
         let mut settings = TkSettings::default();
         settings.connection = TkConnectionType::WebSocket(String::from("127.0.0.1:12345"));
 
