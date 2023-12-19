@@ -53,11 +53,11 @@ Event OnInit()
     InitEvents()
 EndEvent
 
-Event OnConnected(string eventName, string strArg, float numArg, Form sender)
+Event OnConnected(String eventName, String strArg, Float numArg, Form sender)
     LogDebug("Connected (" + strArg + ")")
 EndEvent
 
-Event OnConnectionError(string eventName, string strArg, float numArg, Form sender)
+Event OnConnectionError(String eventName, String strArg, Float numArg, Form sender)
     If ConnectionType == 0
         _ErrorText = "In-Process Failure"
     ElseIf ConnectionType == 1
@@ -68,23 +68,23 @@ Event OnConnectionError(string eventName, string strArg, float numArg, Form send
     LogError(_ErrorText)
 EndEvent
 
-Event OnDeviceAdded(string eventName, string deviceName, float numArg, Form sender)
+Event OnDeviceAdded(String eventName, String deviceName, Float numArg, Form sender)
     LogConnection("Device '" + deviceName + "' connected")
 EndEvent
 
-Event OnDeviceRemoved(string eventName, string deviceName, float numArg, Form sender)
+Event OnDeviceRemoved(String eventName, String deviceName, Float numArg, Form sender)
     LogConnection("Device '" + deviceName + "' disconnected")
 EndEvent
 
-Event OnDeviceActionStarted(string eventName, string deviceName, float speed, Form sender)
-    LogEvent("Started '" + deviceName + "' at " + (speed * 100) + "%")
+Event OnDeviceActionStarted(String eventName, String description, Float speed, Form sender)
+    LogEvent("Started '" + description + "'")
 EndEvent
 
-Event OnDeviceActionDone(string eventName, string deviceName, float speed, Form sender)
-    LogEvent("Stopped '" + deviceName + "' at " + (speed * 100) + "%")
+Event OnDeviceActionDone(String eventName, String description, Float speed, Form sender)
+    LogEvent("Stopped '" + description + "'")
 EndEvent
 
-Event OnDeviceError(string eventName, string deviceName, float numArg, Form sender)
+Event OnDeviceError(String eventName, String deviceName, Float numArg, Form sender)
     LogError("Device Error: '" + deviceName + "' - check 'Troubleshooting' in MCM")
 EndEvent
 
@@ -239,23 +239,23 @@ EndFunction
 
 ; Logging
 
-Function Notify(string msg)
+Function Notify(String msg)
     { Telekinesis Notification on top left }
     Debug.Notification("[Tele] " + msg )
 EndFunction
 
-Function Trace(string msg, Int level = 0)
+Function Trace(String msg, Int level = 0)
     { Telekinesis log to papyrus log (with `level`) }
     Debug.Trace("[Tele] " + msg, level)
 EndFunction
 
-Function LogError(string msg)
+Function LogError(String msg)
     { Log Telekinesis Error }
     Debug.Notification("<font color='#fc3503'>[Tele] " + msg)
     Trace(msg, 2)
 EndFunction
 
-Function LogConnection(string msg)
+Function LogConnection(String msg)
     { Log Telekinesis Connection Event (connect/disconnect) }
     Trace(msg)
     If LogDeviceConnects
@@ -263,7 +263,7 @@ Function LogConnection(string msg)
     EndIf
 EndFunction
 
-Function LogEvent(string msg)
+Function LogEvent(String msg)
     { Log Telekinesis Event (N devices vibrated, etc.) }
     Trace(msg + " LogDeviceEvents " + LogDeviceEvents)
     If LogDeviceEvents
@@ -271,7 +271,7 @@ Function LogEvent(string msg)
     EndIf
 EndFunction
 
-Function LogDebug(string msg)
+Function LogDebug(String msg)
     { Log Telekinesis debug level event }
     Trace(msg)
     If LogDebugEvents
