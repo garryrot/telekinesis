@@ -475,6 +475,7 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 
     If Sexlab_Animation_Rousing
         _InSexlabScene = True
+        UnregisterForUpdate()
         UpdateRousingControlledSexScene()
     Else 
         HandleVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, _SexlabSceneTags)
@@ -532,12 +533,13 @@ EndFunction
 Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
     TeleDevices.LogDebug("OnOStimStart")
     _InOstimScene = true
+    UnregisterForUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
 
 Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
     TeleDevices.LogDebug("OnOstimEnd")
-
+    
     _InOstimScene = false
     _OstimInSexualScene = false
 
@@ -685,6 +687,7 @@ Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bo
     _LoveName = loveName
     If Toys_Animation_Rousing
         _InToysScene = true
+        UnregisterForUpdate()
         UpdateRousingControlledSexScene()
     Else
         String[] events = GetLoveTags(loveName)
@@ -892,4 +895,10 @@ Int Function HandleVibration(Int deviceSelector, Float duration_sec, Int pattern
     Else
         return TeleDevices.VibrateEvents(linearStrength, duration_sec, events)
     EndIf
+EndFunction
+
+; Version Updates
+
+Function MigrateToV12()
+    UnregisterForUpdate()
 EndFunction

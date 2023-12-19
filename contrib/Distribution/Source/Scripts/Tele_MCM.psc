@@ -20,7 +20,7 @@ String[] _DeviceNames
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 11
+    return 12
 EndFunction
 
 Event OnConfigInit()
@@ -35,12 +35,15 @@ Event OnVersionUpdate(int aVersion)
 
     If CurrentVersion > 0 && CurrentVersion < 10
         ; Update from 1.0.0 Beta
-        InitLocals()
         TeleIntegration.ResetIntegrationSettings()
     EndIf
 
-    If CurrentVersion == 10
+    If CurrentVersion < 12
+        ; Update from 1.1.0
         InitLocals()
+        TeleDevices.LogDebug("Updating event handling")
+        TeleDevices.MigrateToV12()
+        TeleIntegration.MigrateToV12()
     EndIf
 EndEvent
 
@@ -54,7 +57,6 @@ Function InitLocals()
     Pages[5] = "Toys & Love"
     Pages[6] = " OStim"
     Pages[7] = "Skyrim Chain Beasts"
-
     Pages[8] = "Debug"
     Pages[9] = "Troubleshooting"
 
@@ -1745,10 +1747,10 @@ State HELP_DEVICE_ERRORS
     Event OnSelectST()
     EndEvent
     Event OnHighlightST()
-        String a = "Red device errors in the notification pane appear whenever a device connection failed:\n"
-        String b = "1. Try to restart the device, in case it crashed or is in standby\n"
-        String c = "2. Check if the device has enough battery\n"
-        String d = "3. Restart connection in MCM 'General' page"
+        String a = "Red device errors indicate that a device cannot be used:\n"
+        String b = "1. Try to restart the device and check that is has enough battery\n"
+        String c = "2. Check erors in 'My Gymes/Skyrim Special Edition/SKSE/Telekinesis.log'\n"
+        String d = "3. Restart the connection in MCM"
         SetInfoText(a + b + c + d)
     EndEvent
 EndState

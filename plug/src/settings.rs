@@ -1,6 +1,7 @@
 use std::{
     fs::{self},
-    path::PathBuf,
+    path::{PathBuf},
+    fmt::{self, Display}
 };
 
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,16 @@ pub enum TkConnectionType {
     InProcess,
     WebSocket(String),
     Test,
+}
+
+impl Display for TkConnectionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TkConnectionType::InProcess => write!(f, "In-Process"),
+            TkConnectionType::WebSocket(host) => write!(f, "WebSocket {}", host),
+            TkConnectionType::Test => write!(f, "Test"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

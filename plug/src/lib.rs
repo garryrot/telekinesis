@@ -1,18 +1,18 @@
-use anyhow::Error;
 use api::*;
 use buttplug::client::ButtplugClientDevice;
-use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus, TkStatus};
+use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkStatus};
+use ffi::{TkModEvent, TkModEventType};
 use input::get_duration_from_secs;
 use pattern::{Speed, TkButtplugScheduler, TkPattern};
-use std::{sync::{Arc, Mutex}, time::Duration};
+use std::sync::{Arc, Mutex};
 use tokio::{
     runtime::Runtime,
-    sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::Sender,
 };
 use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::{ERROR_HANDLE, read_pattern, get_pattern_names};
+use telekinesis::{get_pattern_names, read_pattern, ERROR_HANDLE};
 
 use crate::{
     input::{parse_list_string, read_input_string},
@@ -38,6 +38,25 @@ mod util;
 ///    functionality and the (rather tedious) `Plugin.cxx <-> Cxx <-> RustFFI` Sandwich
 #[cxx::bridge]
 mod ffi {
+    #[derive(Debug)]
+    pub struct TkModEvent {
+        pub evt_type: TkModEventType,
+        pub str_arg: String,
+        pub num_arg: f64,
+    }
+
+    #[derive(Debug)]
+    pub enum TkModEventType {
+        None,
+        Connected,
+        ConnectionError,
+        DeviceAdded,
+        DeviceRemoved,
+        DeviceError,
+        DeviceActionStarted,
+        DeviceActionDone
+    }
+
     extern "Rust" {
         type TkApi;
         fn tk_new() -> Box<TkApi>;
@@ -59,6 +78,8 @@ mod ffi {
             arg3: &CxxVector<CxxString>,
         ) -> i32;
         fn tk_stop(&mut self, arg0: i32) -> bool;
+        // blocking
+        fn tk_qry_nxt_evt(&mut self) -> Vec<TkModEvent>;
     }
 }
 
@@ -70,8 +91,8 @@ pub struct Telekinesis {
     runtime: Runtime,
     command_sender: Sender<TkAction>,
     scheduler: TkButtplugScheduler,
-    connection_events: UnboundedReceiver<TkConnectionEvent>,
-    event_sender: UnboundedSender<TkConnectionEvent>,
+    connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
+    event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
 }
 
 fn tk_new() -> Box<TkApi> {
@@ -144,9 +165,93 @@ impl TkApi {
     }
 
     #[instrument]
+    fn tk_qry_nxt_evt(&mut self) -> Vec<TkModEvent> {
+        let tele = &self.state();
+        let mut receiver = None;
+        if let Ok(mut guard) = tele.lock() {
+            if let Some(tk) = guard.take() {
+                let evt_receiver = tk.connection_events.clone();
+                guard.replace(tk);
+                receiver = Some(evt_receiver)
+            }
+        }
+        match receiver {
+            Some(receiver) => get_next_events_blocking(receiver),
+            None => vec![],
+        }
+    }
+
+    #[instrument]
     fn tk_destroy(&mut self) {
         self.destroy();
     }
+}
+
+pub fn get_next_events_blocking(
+    connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
+) -> Vec<TkModEvent> {
+    if let Ok(result) = connection_events.recv() {
+        let evt = match result {
+            TkConnectionEvent::Connected(connection_type) => vec![TkModEvent {
+                evt_type: TkModEventType::Connected,
+                str_arg: connection_type,
+                num_arg: 0.0,
+            }],
+            TkConnectionEvent::ConnectionFailure(error) => vec![TkModEvent {
+                evt_type: TkModEventType::ConnectionError,
+                str_arg: error,
+                num_arg: 0.0,
+            }],
+            TkConnectionEvent::DeviceAdded(device) => vec![TkModEvent {
+                evt_type: TkModEventType::DeviceAdded,
+                str_arg: String::from(device.name()),
+                num_arg: 0.0,
+            }],
+            TkConnectionEvent::DeviceRemoved(device) => vec![TkModEvent {
+                evt_type: TkModEventType::DeviceRemoved,
+                str_arg: String::from(device.name()),
+                num_arg: 0.0,
+            }],
+            TkConnectionEvent::ActionStarted(event) => event
+                .devices
+                .iter()
+                .map(|x| {
+                    let name = String::from(x.name());
+                    TkModEvent {
+                        evt_type: TkModEventType::DeviceActionStarted,
+                        str_arg: name,
+                        num_arg: event.speed.as_float(),
+                    }
+                })
+                .collect(),
+            TkConnectionEvent::ActionDone(event) => event
+                .devices
+                .iter()
+                .map(|x| {
+                    let name = String::from(x.name());
+                    TkModEvent {
+                        evt_type: TkModEventType::DeviceActionDone,
+                        str_arg: name,
+                        num_arg: event.speed.as_float(),
+                    }
+                })
+                .collect(),
+            TkConnectionEvent::ActionError(event, _) => event
+                .devices
+                .iter()
+                .map(|x| {
+                    let name = String::from(x.name());
+                    TkModEvent {
+                        evt_type: TkModEventType::DeviceError,
+                        str_arg: name,
+                        num_arg: event.speed.as_float(),
+                    }
+                })
+                .collect(),
+        };
+        return evt;
+    }
+    vec![]
 }
 
 pub fn build_api() -> ApiBuilder<Telekinesis> {
@@ -193,16 +298,6 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "stop_scan",
         exec: |tk| tk.stop_scan(),
     })
-    // status
-    .def_qry_lst(ApiQryList {
-        name: "events",
-        exec: |tk| {
-            tk.process_next_events()
-                .iter()
-                .map(|evt| evt.serialize_papyrus())
-                .collect::<Vec<String>>()
-        },
-    })
     // controls
     .def_control(ApiControl {
         name: "vibrate",
@@ -217,18 +312,17 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     })
     .def_control(ApiControl {
         name: "vibrate.pattern",
-        exec: |tk, _speed, time_sec, pattern_name, events| {
-            match read_pattern( &tk.settings.pattern_path, &pattern_name, true ) {
-                Some(fscript) => tk.vibrate_pattern(
-                    TkPattern::Funscript(
-                        get_duration_from_secs(time_sec),
-                        Arc::new(fscript),
-                    ),
-                    read_input_string(&events),
-                    String::from(pattern_name)
-                ),
-                None => ERROR_HANDLE,
-            }
+        exec: |tk, _speed, time_sec, pattern_name, events| match read_pattern(
+            &tk.settings.pattern_path,
+            &pattern_name,
+            true,
+        ) {
+            Some(fscript) => tk.vibrate_pattern(
+                TkPattern::Funscript(get_duration_from_secs(time_sec), Arc::new(fscript)),
+                read_input_string(&events),
+                String::from(pattern_name),
+            ),
+            None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
     })
@@ -299,7 +393,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     })
     .def_qry_lst(ApiQryList {
         name: "patterns.stroker",
-        exec: |tk| get_pattern_names(&tk.settings.pattern_path,  false),
+        exec: |tk| get_pattern_names(&tk.settings.pattern_path, false),
     })
 }
 

@@ -11,7 +11,7 @@ use tracing::{error, info, span, Level};
 
 use crate::{
     input::TkParams,
-    DeviceList, pattern::Speed,
+    DeviceList, pattern::Speed, settings::TkConnectionType,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,7 +51,7 @@ impl TkStatus {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TkDeviceEvent {
     pub elapsed_sec: f32,
     pub events: Vec<String>,
@@ -78,12 +78,13 @@ impl TkDeviceEvent {
 
 #[derive(Debug)]
 pub enum TkConnectionEvent {
-    Connected,
-    ConnectionFailure,
+    Connected(String),
+    ConnectionFailure(String),
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
-    DeviceEvent(TkDeviceEvent),
-    DeviceError(TkDeviceEvent)
+    ActionStarted(TkDeviceEvent),
+    ActionDone(TkDeviceEvent),
+    ActionError(TkDeviceEvent, String)
 }
 
 #[derive(Clone, Debug)]
@@ -95,15 +96,15 @@ pub enum TkAction {
 }
 
 pub async fn handle_connection(
-    event_sender: tokio::sync::mpsc::UnboundedSender<TkConnectionEvent>,
+    event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
     mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>,
     client: ButtplugClient,
     connection_status: Arc<Mutex<TkStatus>>,
+    type_name: TkConnectionType
 ) {
     let mut buttplug_events = client.event_stream();
     let event_sender_clone = event_sender.clone();
     let queue_full_err = "Event sender full";
-
     let connection_status_clone = connection_status.clone();
     Handle::current().spawn(async move {
         info!("Handling connection commands");
@@ -116,17 +117,17 @@ pub async fn handle_connection(
                     TkAction::Scan => {
                         if let Err(err) = client.start_scanning().await {
                             let error = err.to_string();
-                            error!(error, "Failed scanning for devices.");
+                            error!("Device error {}", error);
                             event_sender_clone
-                                .send(TkConnectionEvent::ConnectionFailure)
+                                .send(TkConnectionEvent::ConnectionFailure(err.to_string()))
                                 .unwrap_or_else(|_| error!(queue_full_err));
                             connection_status_clone
                                 .lock()
                                 .expect("mutex healthy")
-                                .connection_status = TkConnectionStatus::Failed(error);
+                                .connection_status = TkConnectionStatus::Failed(err.to_string());
                         } else {
                             event_sender_clone
-                                .send(TkConnectionEvent::Connected)
+                                .send(TkConnectionEvent::Connected(type_name.to_string()))
                                 .unwrap_or_else(|_| error!(queue_full_err));
                             connection_status_clone
                                 .lock()

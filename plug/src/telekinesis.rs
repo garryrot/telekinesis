@@ -27,7 +27,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
-use tokio::{runtime::Runtime, sync::mpsc::channel, sync::mpsc::unbounded_channel};
+use tokio::{runtime::Runtime, sync::mpsc::channel};
 use tracing::{debug, error, info};
 
 use itertools::Itertools;
@@ -61,6 +61,7 @@ impl Telekinesis {
     pub fn connect_with<T, Fn, Fut>(
         connector_factory: Fn,
         provided_settings: Option<TkSettings>,
+        type_name: TkConnectionType 
     ) -> Result<Telekinesis, anyhow::Error>
     where
         Fn: FnOnce() -> Fut + Send + 'static,
@@ -70,7 +71,7 @@ impl Telekinesis {
     {
         let runtime = Runtime::new()?;
 
-        let (event_sender, event_receiver) = unbounded_channel();
+        let (event_sender, event_receiver) = crossbeam_channel::unbounded();
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
         let event_sender_clone = event_sender.clone();
 
@@ -81,7 +82,7 @@ impl Telekinesis {
         runtime.spawn(async move {
             info!("Starting connection");
             let client = with_connector(connector_factory().await).await;
-            handle_connection(event_sender, command_receiver, client, connection_status).await;
+            handle_connection(event_sender, command_receiver, client, connection_status, type_name).await;
         });
 
         let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
@@ -170,11 +171,13 @@ impl Telekinesis {
                 Telekinesis::connect_with(
                     || async move { new_json_ws_client_connector(&uri) },
                     Some(settings_clone),
+                    TkConnectionType::WebSocket(endpoint)
                 )
             }
             _ => {
                 info!("Connecting In-Process");
-                Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings))
+                Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings), 
+                TkConnectionType::InProcess)
             }
         }
     }
@@ -251,14 +254,19 @@ impl Telekinesis {
             .scheduler
             .create_player(get_actuators(params.filter_devices(self.get_devices())));
         let handle = player.handle;
-
         let sender_clone = self.event_sender.clone();
         let connection_status = self.connection_status.clone();
         self.runtime.spawn(async move {
             let now = Instant::now();
             let used_devices = player.actuators.iter().map(|a| a.device.clone()).collect();
-            let result = player.play_scalar(params.pattern.clone()).await;
-            let evt = TkDeviceEvent::new(now.elapsed(), &used_devices, params, pattern_name);
+
+            let pattern_clone = params.pattern.clone();
+            let mut evt = TkDeviceEvent::new(now.elapsed(), &used_devices, params, pattern_name);
+            sender_clone
+                .send(TkConnectionEvent::ActionStarted(evt.clone()))
+                .expect("queue full");
+            let result = player.play_scalar(pattern_clone).await;
+  
             if let Ok(mut connection_status) = connection_status.lock() {
                 for device in used_devices {
                     let status = match &result {
@@ -270,10 +278,11 @@ impl Telekinesis {
                         .insert(device.index(), TkDeviceStatus::new(&device, status));
                 }
             }
+            evt.elapsed_sec = now.elapsed().as_secs_f32();
             sender_clone
                 .send(match result {
-                    Ok(_) => TkConnectionEvent::DeviceEvent(evt),
-                    Err(_) => TkConnectionEvent::DeviceError(evt),
+                    Ok(_) => TkConnectionEvent::ActionDone(evt),
+                    Err(err) => TkConnectionEvent::ActionError(evt, err.to_string()),
                 })
                 .expect("queue full");
         });
@@ -475,7 +484,6 @@ mod tests {
     use buttplug::core::message::{ActuatorType, DeviceAdded};
     use crate::telekinesis::in_process_connector;
     use crate::*;
-    use super::*;
 
     macro_rules! assert_timeout {
         ($cond:expr, $arg:tt) => {
@@ -541,7 +549,7 @@ mod tests {
         let count = connector.devices.len();
 
         // act
-        let mut tk = Telekinesis::connect_with(|| async move { connector }, None).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { connector }, None, TkConnectionType::Test).unwrap();
         tk.await_connect(count);
         for device_name in tk.get_known_device_names() {
             tk.settings_set_enabled(&device_name, true);
@@ -775,7 +783,7 @@ mod tests {
         let pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk =
-            Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings))
+            Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings), TkConnectionType::Test)
                 .unwrap();
         tk.scan_for_devices();
         tk.await_connect(1);
@@ -845,7 +853,7 @@ mod tests {
         settings.pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk =
-            Telekinesis::connect_with(|| async move { connector }, Some(settings)).unwrap();
+            Telekinesis::connect_with(|| async move { connector }, Some(settings), TkConnectionType::Test).unwrap();
         tk.await_connect(count);
 
         for name in devices_names {
@@ -856,45 +864,33 @@ mod tests {
     }
 
     #[test]
-    fn vibrate_delayed_command_is_overwritten() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
-        tk.vibrate(Speed::new(33), Duration::from_millis(50), vec![]);
-        _assert_one_event(&mut tk)
-    }
-
-    #[test]
     fn process_next_events_empty_when_nothing_happens() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
         _sleep();
         assert_eq!(tk.process_next_events().len(), 0);
     }
 
     #[test]
     fn process_next_events_after_action_returns_1() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
-        _sleep();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
         tk.vibrate(Speed::new(22), Duration::from_millis(1), vec![]);
-        _sleep();
-        assert_eq!(tk.process_next_events().len(), 1);
+        get_next_events_blocking(tk.connection_events.clone());
     }
 
     #[test]
     fn process_next_events_works() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
         _sleep();
         tk.vibrate(Speed::new(10), Duration::from_millis(100), vec![]);
         tk.vibrate(Speed::new(20), Duration::from_millis(200), vec![]);
-        _sleep();
-        _sleep();
-        let events = tk.process_next_events();
-        assert!(events[0].serialize_papyrus().starts_with("DeviceEvent|Vibrator|0.1"));
-        assert!(events[1].serialize_papyrus().starts_with("DeviceEvent|Vibrator|0.2"));
+        get_next_events_blocking(tk.connection_events.clone());
+        get_next_events_blocking(tk.connection_events.clone());
     }
 
     #[test]
     fn process_next_events_over_128_actions_respects_papyrus_limits_and_does_not_return_more_than_128_events(
     ) {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None).unwrap();
+        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
         _sleep();
         for _ in 1..200 {
             tk.vibrate(Speed::min(), Duration::from_micros(1), vec![]);

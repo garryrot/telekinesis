@@ -39,40 +39,53 @@ EndProperty
 String Property WsPort = "12345" Auto
 String Property WsHost = "127.0.0.1" Auto
 
+Function InitEvents()
+    RegisterForModEvent("Tele_Connected", "OnConnected")
+    RegisterForModEvent("Tele_ConnectionError", "OnConnectionError")
+    RegisterForModEvent("Tele_DeviceAdded", "OnDeviceAdded")
+    RegisterForModEvent("Tele_DeviceRemoved", "OnDeviceRemoved")
+    RegisterForModEvent("Tele_DeviceActionStarted", "OnDeviceActionStarted")
+    RegisterForModEvent("Tele_DeviceActionDone", "OnDeviceActionDone")
+    RegisterForModEvent("Tele_DeviceError", "OnDeviceError")
+EndFunction
+
 Event OnInit()
-    RegisterForUpdate(5)
+    InitEvents()
 EndEvent
 
-Event OnUpdate()
-    If Connects()
-        String[] evts = Tele_Api.Qry_Lst("events")
-        Int i = 0
-        While (i < evts.Length)
-            String[] evt = StringUtil.Split(evts[i], "|")
-            String type = evt[0]
-            If type == "DeviceAdded"
-                LogConnection("Device '" + evt[1] + "' connected")
-            ElseIf type == "DeviceRemoved"
-                LogConnection("Device '" + evt[1] + "' disconnected")
-            ElseIf type == "Connected"
-                LogDebug("Connection success")
-            ElseIf type == "ConnectionFailure"
-                If ConnectionType == 0
-                    _ErrorText = "In-Process Failure"
-                ElseIf ConnectionType == 1
-                    _ErrorText = "Intiface Connection Failure. Port: " + WsPort + " Host: " + WsHost
-                Else
-                    _ErrorText = ""
-                EndIf
-                LogError(_ErrorText)
-            ElseIf type == "DeviceEvent"
-                LogEvent(evt)
-            ElseIf type == "DeviceError"
-                LogError("Device error: '" + evt[5] + "', check 'Troubleshooting' in MCM")
-            EndIf
-            i += 1
-        EndWhile
+Event OnConnected(string eventName, string strArg, float numArg, Form sender)
+    LogDebug("Connected (" + strArg + ")")
+EndEvent
+
+Event OnConnectionError(string eventName, string strArg, float numArg, Form sender)
+    If ConnectionType == 0
+        _ErrorText = "In-Process Failure"
+    ElseIf ConnectionType == 1
+        _ErrorText = "Intiface Connection Failure. Port: " + WsPort + " Host: " + WsHost
+    Else
+        _ErrorText = ""
     EndIf
+    LogError(_ErrorText)
+EndEvent
+
+Event OnDeviceAdded(string eventName, string deviceName, float numArg, Form sender)
+    LogConnection("Device '" + deviceName + "' connected")
+EndEvent
+
+Event OnDeviceRemoved(string eventName, string deviceName, float numArg, Form sender)
+    LogConnection("Device '" + deviceName + "' disconnected")
+EndEvent
+
+Event OnDeviceActionStarted(string eventName, string deviceName, float speed, Form sender)
+    LogEvent("Started '" + deviceName + "' at " + (speed * 100) + "%")
+EndEvent
+
+Event OnDeviceActionDone(string eventName, string deviceName, float speed, Form sender)
+    LogEvent("Stopped '" + deviceName + "' at " + (speed * 100) + "%")
+EndEvent
+
+Event OnDeviceError(string eventName, string deviceName, float numArg, Form sender)
+    LogError("Device Error: '" + deviceName + "' - check 'Troubleshooting' in MCM")
 EndEvent
 
 ; Public
@@ -264,4 +277,11 @@ Function LogDebug(string msg)
     If LogDebugEvents
         Notify(msg)
     EndIf
+EndFunction
+
+; Version Updates
+
+Function MigrateToV12()
+    UnregisterForUpdate()
+    InitEvents()
 EndFunction

@@ -21,23 +21,23 @@ impl TkDeviceEvent {
     }
 }
 
-impl TkConnectionEvent {
-    pub fn serialize_papyrus(&self) -> String {
-        match self {
-            TkConnectionEvent::DeviceAdded(device) => format!("DeviceAdded|{}", device.name()),
-            TkConnectionEvent::DeviceRemoved(device) => format!("DeviceRemoved|{}", device.name()),
-            TkConnectionEvent::DeviceEvent(event) => event.serialize_papyrus(false),
-            TkConnectionEvent::DeviceError(event) => event.serialize_papyrus(true),
-            TkConnectionEvent::Connected => format!("Connected"),
-            TkConnectionEvent::ConnectionFailure => format!("ConnectionFailure"),
-        }
-    }
-}
+// impl TkConnectionEvent {
+//     pub fn serialize_papyrus(&self) -> String {
+//         match self {
+//             TkConnectionEvent::DeviceAdded(device) => format!("DeviceAdded|{}", device.name()),
+//             TkConnectionEvent::DeviceRemoved(device) => format!("DeviceRemoved|{}", device.name()),
+//             TkConnectionEvent::DeviceEvent(event) => event.serialize_papyrus(false),
+//             TkConnectionEvent::DeviceError(event) => event.serialize_papyrus(true),
+//             TkConnectionEvent::Connected(Error) => format!("Connected"),
+//             TkConnectionEvent::ConnectionFailure(Error) => format!("ConnectionFailure"),
+//         }
+//     }
+// }
 
 impl TkConnectionStatus {
     pub fn serialize_papyrus(&self) -> String {
         match &self {
-            TkConnectionStatus::Failed(err) => format!("Failed|{:?}", err),
+            TkConnectionStatus::Failed(err) => String::from(err),
             TkConnectionStatus::NotConnected => String::from("Not Connected"),
             TkConnectionStatus::Connected => String::from("Connected"),
         }
