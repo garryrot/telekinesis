@@ -54,24 +54,32 @@ impl TkStatus {
 #[derive(Debug, Clone)]
 pub struct TkDeviceEvent {
     pub elapsed_sec: f32,
-    pub events: Vec<String>,
+    pub tags: Vec<String>,
     pub devices: DeviceList,
     pub speed: Speed,
     pub pattern: String,
+    pub event_type: TkDeviceEventType
+}
+
+#[derive(Debug, Clone)]
+pub enum TkDeviceEventType {
+    Scalar,
+    Linear
 }
 
 impl TkDeviceEvent {
-    pub fn new(elapsed: Duration, devices: &DeviceList, params: TkParams, pattern_name: String) -> Self {
+    pub fn new(elapsed: Duration, devices: &DeviceList, params: TkParams, pattern_name: String, event_type: TkDeviceEventType) -> Self {
         let (speed, pattern) = match params.pattern {
             crate::TkPattern::Linear(_, speed) => (speed, String::from("Linear")),
             crate::TkPattern::Funscript(_, _) => (Speed::max(), pattern_name),
         };
         TkDeviceEvent {
             elapsed_sec: elapsed.as_secs_f32(),
-            events: params.events,
+            tags: params.events,
             devices: devices.clone(),
-            speed: speed,
-            pattern: pattern,
+            speed,
+            pattern,
+            event_type,
         }
     }
 }

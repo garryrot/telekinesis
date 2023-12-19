@@ -32,6 +32,7 @@ use tracing::{debug, error, info};
 
 use itertools::Itertools;
 
+use crate::connection::TkDeviceEventType;
 use crate::{
     connection::{
         handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent,
@@ -261,7 +262,7 @@ impl Telekinesis {
             let used_devices = player.actuators.iter().map(|a| a.device.clone()).collect();
 
             let pattern_clone = params.pattern.clone();
-            let mut evt = TkDeviceEvent::new(now.elapsed(), &used_devices, params, pattern_name);
+            let mut evt = TkDeviceEvent::new(now.elapsed(), &used_devices, params, pattern_name, TkDeviceEventType::Scalar);
             sender_clone
                 .send(TkConnectionEvent::ActionStarted(evt.clone()))
                 .expect("queue full");
@@ -310,26 +311,6 @@ impl Telekinesis {
         if let Err(_) = self.command_sender.try_send(TkAction::Disconect) {
             error!("Failed to send disconnect");
         }
-    }
-
-    pub fn get_next_event(&mut self) -> Option<TkConnectionEvent> {
-        if let Ok(msg) = self.connection_events.try_recv() {
-            debug!("Get event {:?}", msg);
-            return Some(msg);
-        }
-        None
-    }
-
-    pub fn process_next_events(&mut self) -> Vec<TkConnectionEvent> {
-        debug!("Polling all events");
-        let mut events = vec![];
-        while let Some(event) = self.get_next_event() {
-            events.push(event);
-            if events.len() >= 128 {
-                break;
-            }
-        }
-        events
     }
 
     pub fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
@@ -812,7 +793,6 @@ mod tests {
         tk.scan_for_devices();
 
         thread::sleep(Duration::from_secs(5));
-        let _ = tk.process_next_events();
         assert!(matches!(
             tk.connection_status.lock().unwrap().connection_status,
             TkConnectionStatus::Connected
@@ -830,11 +810,9 @@ mod tests {
         let mut settings = TkSettings::default();
         settings.connection = TkConnectionType::WebSocket(String::from("bogushost:6572"));
 
-        let mut tk = Telekinesis::connect(settings).unwrap();
+        let tk = Telekinesis::connect(settings).unwrap();
         tk.scan_for_devices();
         thread::sleep(Duration::from_secs(5));
-        let _ = tk.process_next_events();
-
         match &tk.connection_status.lock().unwrap().connection_status {
             TkConnectionStatus::Failed(err) => {
                 assert!(err.len() > 0);
@@ -864,13 +842,6 @@ mod tests {
     }
 
     #[test]
-    fn process_next_events_empty_when_nothing_happens() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
-        _sleep();
-        assert_eq!(tk.process_next_events().len(), 0);
-    }
-
-    #[test]
     fn process_next_events_after_action_returns_1() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
         tk.vibrate(Speed::new(22), Duration::from_millis(1), vec![]);
@@ -880,45 +851,9 @@ mod tests {
     #[test]
     fn process_next_events_works() {
         let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
-        _sleep();
         tk.vibrate(Speed::new(10), Duration::from_millis(100), vec![]);
         tk.vibrate(Speed::new(20), Duration::from_millis(200), vec![]);
         get_next_events_blocking(tk.connection_events.clone());
         get_next_events_blocking(tk.connection_events.clone());
-    }
-
-    #[test]
-    fn process_next_events_over_128_actions_respects_papyrus_limits_and_does_not_return_more_than_128_events(
-    ) {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
-        _sleep();
-        for _ in 1..200 {
-            tk.vibrate(Speed::min(), Duration::from_micros(1), vec![]);
-        }
-        _sleep();
-        assert_eq!(tk.process_next_events().len(), 128);
-    }
-
-    fn _sleep() {
-        thread::sleep(Duration::from_millis(250));
-    }
-
-    fn _assert_one_event(tk: &mut Telekinesis) {
-        _sleep();
-        assert!(tk.get_next_event().is_some(), "Exactly one element exists");
-        assert!(tk.get_next_event().is_none());
-    }
-
-    fn _assert_no_event(tk: &mut Telekinesis) {
-        assert!(tk.get_next_event().is_none());
-    }
-
-    #[test]
-    fn speed_correct_conversion() {
-        assert_eq!(Speed::new(-1000).as_float(), 0.0);
-        assert_eq!(Speed::new(0).as_float(), 0.0);
-        assert_eq!(Speed::new(9).as_float(), 0.09);
-        assert_eq!(Speed::new(100).as_float(), 1.0);
-        assert_eq!(Speed::new(1000).as_float(), 1.0);
     }
 }

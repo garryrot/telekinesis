@@ -1202,4 +1202,14 @@ mod tests {
         fscript
     }
 
+    // Utils
+
+    #[test]
+    fn speed_correct_conversion() {
+        assert_eq!(Speed::new(-1000).as_float(), 0.0);
+        assert_eq!(Speed::new(0).as_float(), 0.0);
+        assert_eq!(Speed::new(9).as_float(), 0.09);
+        assert_eq!(Speed::new(100).as_float(), 1.0);
+        assert_eq!(Speed::new(1000).as_float(), 1.0);
+    }
 }
