@@ -233,14 +233,14 @@ pub trait Api<T> {
         if let Some(api) = self.get_qry(self.fns().qry_str, qry) {
             return self.try_exec(|tk| (api.exec)(tk), String::from(api.default));
         }
-        self.fail_dispatch(String::from(""))
+        self.fail_dispatch(String::new())
     }
 
     fn exec_qry_str_1(&mut self, qry: &str, arg0: &str) -> String {
         if let Some(api) = self.get_qry(self.fns().qry_str_1, qry) {
             return self.try_exec(|tk| (api.exec)(tk, arg0), String::from(api.default));
         }
-        self.fail_dispatch(String::from(""))
+        self.fail_dispatch(String::new())
     }
 
     fn exec_qry_lst(&mut self, qry: &str) -> Vec<String> {
