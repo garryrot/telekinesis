@@ -14,7 +14,7 @@ use tokio::{
     time::{sleep, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, trace, warn, debug};
 
 type TkButtplugClientResult<T = ()> = Result<T, ButtplugClientError>;
 
@@ -276,32 +276,26 @@ impl TkButtplugWorker {
     /// thread gets priority  on a device is always done in the same thread and
     /// its not necessary to introduce Mutex/etc to handle multithreaded access
     pub async fn run_worker_thread(&mut self) {
-        trace!("Exec run_worker_thread");
 
         // TODO do cleanup of cancelled
         let mut device_counter = ReferenceCounter::new();
         let mut device_access = DeviceAccess::new();
         loop {
             if let Some(next_action) = self.tasks.recv().await {
-                trace!("Exec device action {:?}", next_action);
+                trace!("exec device action {:?}", next_action);
                 match next_action {
                     TkDeviceAction::Start(actuator, speed, priority, handle) => {
                         device_counter.reserve(&actuator);
                         if priority {
                             device_access.record_start(&actuator, handle, speed);
                         }
-                        info!(
-                            "TkDeviceAction::Start start actuator {} {:?}",
-                            handle, speed
-                        );
                         let cmd = &ScalarCommand::ScalarMap(HashMap::from([(
                             actuator.index_in_device,
                             (speed.as_float(), actuator.actuator),
                         )]));
-                        info!("TkDeviceAction::Start end actuator {} {:?}", handle, speed);
                         match actuator.device.scalar(cmd).await {
                             Err(err) => {
-                                error!("Failed to set scalar speed {:?}", err)
+                                error!("failed to set scalar speed {:?}", err)
                             }
                             _ => {}
                         }
@@ -340,7 +334,7 @@ impl TkButtplugWorker {
                                 error!("Failed to stop vibration on actuator {:?}", actuator);
                                 result = Err(error);
                             }
-                            info!("Device stopped {}", actuator.identifier())
+                            debug!("Device stopped {}", actuator.identifier())
                         } else if let Some(remaining_speed) =
                             device_access.get_remaining_speed(&actuator)
                         {
@@ -379,7 +373,7 @@ impl TkButtplugWorker {
                     }
                     TkDeviceAction::StopAll => {
                         device_counter.clear();
-                        info!("Stop all action");
+                        info!("stop all action");
                     }
                 }
             }
@@ -449,7 +443,8 @@ impl TkPatternPlayer {
         fscript: FScript,
         duration: Duration,
     ) -> TkButtplugClientResult {
-        info!("Playing pattern {:?} (linear)", fscript);
+        let handle = self.handle;
+        info!("start pattern {:?} <linear> ({})", fscript, handle);
         let mut last_result = Ok(());
         if fscript.actions.len() == 0 || fscript.actions.iter().all(|x| x.at == 0) {
             return last_result;
@@ -479,23 +474,19 @@ impl TkPatternPlayer {
             }
         }
         waiter.abort();
+        info!("stop pattern ({})", handle);
         last_result
     }
 
     /// Executes the scalar 'fscript' for 'duration' and consumes the player
     pub async fn play_scalar(self, pattern: TkPattern) -> TkButtplugClientResult {
-        info!("Playing pattern {:?} (scalar)", pattern);
-        match pattern {
+        let handle = self.handle;
+        info!("start pattern {:?} <scalar> ({})", pattern, handle);
+        let result = match pattern {
             TkPattern::Linear(duration, speed) => {
-                info!("do_scalar speed {:?} (scalar)", speed);
                 self.do_scalar(speed, true);
                 cancellable_wait(duration, &self.cancellation_token).await;
-
-                let handle = self.handle;
-                info!("do_stop speed {:?} (scalar) {}", duration, handle);
-                let a = self.do_stop(true).await;
-                info!("do_stop speed {:?} done {}", duration, handle);
-                a
+                self.do_stop(true).await
             }
             TkPattern::Funscript(duration, fscript) => {
                 if fscript.actions.len() == 0 || fscript.actions.iter().all(|x| x.at == 0) {
@@ -518,11 +509,9 @@ impl TkPatternPlayer {
                     let next = &fscript.actions[(i + j) % action_len];
 
                     if !started {
-                        info!("do_scalar start {:?}", current);
                         self.do_scalar(Speed::from_fs(current), false);
                         started = true;
                     } else {
-                        info!("do_scalar update {:?}", current);
                         self.do_update(Speed::from_fs(current))
                     }
                     if let Some(waiting_time) =
@@ -540,7 +529,9 @@ impl TkPatternPlayer {
                 waiter.abort();
                 self.do_stop(false).await
             }
-        }
+        };
+        info!("stop pattern ({})", handle);
+        result
     }
 
     fn do_update(&self, speed: Speed) {

@@ -5,14 +5,12 @@ use std::{
 };
 
 use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent};
+use crossbeam_channel::Sender;
 use futures::StreamExt;
 use tokio::runtime::Handle;
-use tracing::{error, info, span, Level};
+use tracing::{debug, error, info, span, Level};
 
-use crate::{
-    input::TkParams,
-    DeviceList, pattern::Speed, settings::TkConnectionType,
-};
+use crate::{input::TkParams, pattern::Speed, settings::TkConnectionType, DeviceList};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TkConnectionStatus {
@@ -31,7 +29,7 @@ impl TkDeviceStatus {
     pub fn new(device: &Arc<ButtplugClientDevice>, status: TkConnectionStatus) -> Self {
         TkDeviceStatus {
             device: device.clone(),
-            status
+            status,
         }
     }
 }
@@ -58,17 +56,23 @@ pub struct TkDeviceEvent {
     pub devices: DeviceList,
     pub speed: Speed,
     pub pattern: String,
-    pub event_type: TkDeviceEventType
+    pub event_type: TkDeviceEventType,
 }
 
 #[derive(Debug, Clone)]
 pub enum TkDeviceEventType {
     Scalar,
-    Linear
+    Linear,
 }
 
 impl TkDeviceEvent {
-    pub fn new(elapsed: Duration, devices: &DeviceList, params: TkParams, pattern_name: String, event_type: TkDeviceEventType) -> Self {
+    pub fn new(
+        elapsed: Duration,
+        devices: &DeviceList,
+        params: TkParams,
+        pattern_name: String,
+        event_type: TkDeviceEventType,
+    ) -> Self {
         let (speed, pattern) = match params.pattern {
             crate::TkPattern::Linear(_, speed) => (speed, String::from("Linear")),
             crate::TkPattern::Funscript(_, _) => (Speed::max(), pattern_name),
@@ -92,7 +96,7 @@ pub enum TkConnectionEvent {
     DeviceRemoved(Arc<ButtplugClientDevice>),
     ActionStarted(TkDeviceEvent),
     ActionDone(TkDeviceEvent),
-    ActionError(TkDeviceEvent, String)
+    ActionError(TkDeviceEvent, String),
 }
 
 #[derive(Clone, Debug)]
@@ -108,15 +112,13 @@ pub async fn handle_connection(
     mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>,
     client: ButtplugClient,
     connection_status: Arc<Mutex<TkStatus>>,
-    type_name: TkConnectionType
+    connection_type: TkConnectionType,
 ) {
     let mut buttplug_events = client.event_stream();
-    let event_sender_clone = event_sender.clone();
-    let queue_full_err = "Event sender full";
-    let connection_status_clone = connection_status.clone();
+    let sender_clone = event_sender.clone();
+    let status_clone = connection_status.clone();
     Handle::current().spawn(async move {
-        info!("Handling connection commands");
-        let _ = span!(Level::INFO, "cmd_handling_thread").entered();
+        let _ = span!(Level::INFO, "connection control").entered();
         loop {
             let next_cmd = command_receiver.recv().await;
             if let Some(cmd) = next_cmd {
@@ -125,32 +127,27 @@ pub async fn handle_connection(
                     TkAction::Scan => {
                         if let Err(err) = client.start_scanning().await {
                             let error = err.to_string();
-                            error!("Device error {}", error);
-                            event_sender_clone
-                                .send(TkConnectionEvent::ConnectionFailure(err.to_string()))
-                                .unwrap_or_else(|_| error!(queue_full_err));
-                            connection_status_clone
-                                .lock()
-                                .expect("mutex healthy")
-                                .connection_status = TkConnectionStatus::Failed(err.to_string());
+                            error!("connection failure {}", error);
+                            try_send_event(
+                                &sender_clone,
+                                TkConnectionEvent::ConnectionFailure(err.to_string()),
+                            );
+                            try_set_status(
+                                &status_clone,
+                                TkConnectionStatus::Failed(err.to_string()),
+                            );
                         } else {
-                            event_sender_clone
-                                .send(TkConnectionEvent::Connected(type_name.to_string()))
-                                .unwrap_or_else(|_| error!(queue_full_err));
-                            connection_status_clone
-                                .lock()
-                                .expect("mutex healthy")
-                                .connection_status = TkConnectionStatus::Connected;
+                            let settings = connection_type.to_string();
+                            info!(settings, "connection success");
+                            try_send_event(&sender_clone, TkConnectionEvent::Connected(settings));
+                            try_set_status(&status_clone, TkConnectionStatus::Connected);
                         }
                     }
                     TkAction::StopScan => {
                         if let Err(err) = client.stop_scanning().await {
                             let error = err.to_string();
-                            error!(error, "Failed to stop scanning for devices.");
-                            connection_status_clone
-                                .lock()
-                                .expect("mutex healthy")
-                                .connection_status = TkConnectionStatus::Failed(error);
+                            error!(error, "failed stop scan");
+                            try_set_status(&status_clone, TkConnectionStatus::Failed(error));
                         }
                     }
                     TkAction::Disconect => {
@@ -158,10 +155,7 @@ pub async fn handle_connection(
                             .disconnect()
                             .await
                             .unwrap_or_else(|_| error!("Failed to disconnect."));
-                        connection_status_clone
-                            .lock()
-                            .expect("mutex healthy")
-                            .connection_status = TkConnectionStatus::NotConnected;
+                        try_set_status(&status_clone, TkConnectionStatus::NotConnected);
                         break;
                     }
                     TkAction::StopAll => {
@@ -172,42 +166,53 @@ pub async fn handle_connection(
                     }
                 }
             } else {
-                info!("Command stream closed");
                 break;
             }
         }
+        info!("stream closed");
     });
 
+    let _ = span!(Level::INFO, "device control").entered();
     while let Some(event) = buttplug_events.next().await {
         match event.clone() {
             ButtplugClientEvent::DeviceAdded(device) => {
-                if let Ok(mut connection_status) = connection_status.lock() {
-                    connection_status
-                        .device_status
-                        .insert(device.index(), TkDeviceStatus::new(&device, TkConnectionStatus::Connected));
-                } else {
-                    error!("mutex poisoned")
-                }
-                event_sender
-                    .send(TkConnectionEvent::DeviceAdded(device))
-                    .expect("queue full");
+                info!("device added {} ({})", device.name(), device.index() );
+                try_set_device_status(&connection_status, &device, TkConnectionStatus::Connected);
+                try_send_event(&event_sender, TkConnectionEvent::DeviceAdded(device));
             }
             ButtplugClientEvent::DeviceRemoved(device) => {
-                if let Ok(mut connection_status) = connection_status.lock() {
-                    connection_status
-                        .device_status
-                        .insert(device.index(), TkDeviceStatus::new(&device, TkConnectionStatus::Connected));
-                } else {
-                    error!("mutex poisoned")
-                }
-                event_sender
-                    .send(TkConnectionEvent::DeviceRemoved(device))
-                    .expect("queue full");
+                info!("device removed {} ({})", device.name(), device.index() );
+                try_set_device_status(&connection_status, &device, TkConnectionStatus::NotConnected);             
+                try_send_event(&event_sender, TkConnectionEvent::DeviceRemoved(device));
             }
             ButtplugClientEvent::Error(err) => {
-                error!("Server error {:?}", err);
+                error!("client error event {:?}", err);
             }
             _ => {}
         };
     }
+}
+
+fn try_set_device_status(connection_status: &Arc<Mutex<TkStatus>>, device: &Arc<ButtplugClientDevice>, status: TkConnectionStatus) {
+    connection_status
+        .lock()
+        .expect("mutex healthy")
+        .device_status
+        .insert(
+            device.index(),
+            TkDeviceStatus::new(&device, status),
+        );
+}
+
+fn try_set_status(connection_status: &Arc<Mutex<TkStatus>>, status: TkConnectionStatus) {
+    connection_status
+        .lock()
+        .expect("mutex healthy")
+        .connection_status = status;
+}
+
+fn try_send_event(sender: &Sender<TkConnectionEvent>, evt: TkConnectionEvent) {
+    sender
+        .try_send(evt)
+        .unwrap_or_else(|_| error!("Event sender full"));
 }

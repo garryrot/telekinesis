@@ -81,9 +81,10 @@ impl Telekinesis {
         let connection_status = Arc::new(Mutex::new(TkStatus::new())); // ugly
         let status_clone = connection_status.clone();
         runtime.spawn(async move {
-            info!("Starting connection");
+            debug!("starting connection handling thread");
             let client = with_connector(connector_factory().await).await;
             handle_connection(event_sender, command_receiver, client, connection_status, type_name).await;
+            debug!("connection handling stopped")
         });
 
         let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
@@ -91,8 +92,9 @@ impl Telekinesis {
         });
 
         runtime.spawn(async move {
+            debug!("starting worker thread");
             worker.run_worker_thread().await;
-            info!("Worker closed")
+            debug!("worked thread stopped")
         });
 
         Ok(Telekinesis {
@@ -153,7 +155,7 @@ impl Telekinesis {
     }
 
     pub fn get_known_device_names(&self) -> Vec<String> {
-        debug!("Getting devices names");
+        debug!("Getting devices names"); // TODO Print devices on each 
         self.get_devices()
             .iter()
             .map(|d| d.name().clone())
@@ -168,7 +170,6 @@ impl Telekinesis {
         match settings.connection {
             TkConnectionType::WebSocket(endpoint) => {
                 let uri = format!("ws://{}", endpoint);
-                info!("Connecting Websocket: {}", uri);
                 Telekinesis::connect_with(
                     || async move { new_json_ws_client_connector(&uri) },
                     Some(settings_clone),
@@ -176,7 +177,6 @@ impl Telekinesis {
                 )
             }
             _ => {
-                info!("Connecting In-Process");
                 Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings), 
                 TkConnectionType::InProcess)
             }
@@ -184,7 +184,7 @@ impl Telekinesis {
     }
 
     pub fn scan_for_devices(&self) -> bool {
-        info!("Sending Command: Scan for devices");
+        info!("start scan for devices");
         if let Err(_) = self.command_sender.try_send(TkAction::Scan) {
             error!("Failed to start scan");
             return false;
@@ -193,7 +193,7 @@ impl Telekinesis {
     }
 
     pub fn stop_scan(&self) -> bool {
-        info!("Sending Command: Stop scan");
+        info!("stop scan");
         if let Err(_) = self.command_sender.try_send(TkAction::StopScan) {
             error!("Failed to stop scan");
             return false;
@@ -202,7 +202,7 @@ impl Telekinesis {
     }
 
     pub fn get_device_capabilities(&self, name: &str) -> Vec<String> {
-        debug!("Getting '{}' capabilities", name);
+        debug!("Getting '{}' capabilities", name); // TODO print debug on each connect
         // maybe just return all actuator + types + linear + rotate
         if self
             .get_devices()
@@ -226,7 +226,7 @@ impl Telekinesis {
     }
 
     pub fn get_device_connection_status(&self, device_name: &str) -> TkConnectionStatus {
-        debug!("Getting '{}' connected", device_name);
+        debug!("Getting '{}' connected", device_name); // TODO print info on each connect
         if let Some(status) = self.get_device_status(device_name) {
             return status.status;
         }
@@ -248,7 +248,7 @@ impl Telekinesis {
         events: Vec<String>,
         pattern_name: String,
     ) -> i32 {
-        info!("Received: Vibrate/Vibrate Pattern");
+        info!("vibrate pattern {:?}", pattern);
         let params = TkParams::from_input(events.clone(), pattern, &self.settings.devices);
 
         let player = self
@@ -291,13 +291,13 @@ impl Telekinesis {
     }
 
     pub fn stop(&mut self, handle: i32) -> bool {
-        info!("Received: Stop");
+        info!("stop handle {}", handle);
         self.scheduler.stop_task(handle);
         true
     }
 
     pub fn stop_all(&mut self) -> bool {
-        info!("Received: Stop All");
+        info!("stop all");
         self.scheduler.stop_all();
         if let Err(_) = self.command_sender.try_send(TkAction::StopAll) {
             error!("Failed to queue stop_all");
@@ -307,23 +307,21 @@ impl Telekinesis {
     }
 
     pub fn disconnect(&mut self) {
-        info!("Sending Command: Disconnecting client");
+        info!("disconnect");
         if let Err(_) = self.command_sender.try_send(TkAction::Disconect) {
             error!("Failed to send disconnect");
         }
     }
 
     pub fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
-        info!("Setting '{}'.enabled={}", device_name, enabled);
-
+        debug!("Setting '{}'.enabled={}", device_name, enabled);
         let mut settings = self.settings.clone();
         settings.set_enabled(device_name, enabled);
         self.settings = settings;
     }
 
     pub fn settings_set_events(&mut self, device_name: &str, events: Vec<String>) {
-        info!("Setting '{}'.events={:?}", device_name, events);
-
+        debug!("Setting '{}'.events={:?}", device_name, events);
         let settings = self.settings.clone();
         self.settings = settings.set_events(device_name, events);
     }
@@ -352,14 +350,8 @@ where
         + 'static,
 {
     let buttplug = ButtplugClient::new("Telekinesis");
-    let bp = buttplug.connect(connector).await;
-    match bp {
-        Ok(_) => {
-            info!("Connected client.")
-        }
-        Err(err) => {
-            error!("Could not connect client. Error: {}.", err);
-        }
+    if let Err(err) = buttplug.connect(connector).await {
+        error!("Could not connect client. Error: {}.", err);
     }
     buttplug
 }
