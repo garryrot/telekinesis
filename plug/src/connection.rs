@@ -1,16 +1,16 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::Duration, fmt::{Display, self}
 };
 
-use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent};
+use buttplug::{client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent}, core::message::ActuatorType};
 use crossbeam_channel::Sender;
 use futures::StreamExt;
 use tokio::runtime::Handle;
 use tracing::{debug, error, info, span, Level};
 
-use crate::{input::TkParams, pattern::Speed, settings::TkConnectionType, DeviceList};
+use crate::{ pattern::{Speed, TkActuator}, settings::TkConnectionType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TkConnectionStatus {
@@ -49,67 +49,47 @@ impl TkStatus {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TkDeviceEvent {
-    pub elapsed_sec: f32,
-    pub tags: Vec<String>,
-    pub devices: DeviceList,
-    pub speed: Speed,
-    pub pattern: String,
-    pub event_type: TkDeviceEventType,
-}
+pub type ActuatorList = Vec<Arc<TkActuator>>;
 
-#[derive(Debug, Clone)]
-pub enum TkDeviceEventType {
-    Scalar,
-    Linear,
-}
-
-impl TkDeviceEvent {
-    pub fn new(
-        elapsed: Duration,
-        devices: &DeviceList,
-        params: TkParams,
-        pattern_name: String,
-        event_type: TkDeviceEventType,
-    ) -> Self {
-        let (speed, pattern) = match params.pattern {
-            crate::TkPattern::Linear(_, speed) => (speed, String::from("Linear")),
-            crate::TkPattern::Funscript(_, _) => (Speed::max(), pattern_name),
-        };
-        TkDeviceEvent {
-            elapsed_sec: elapsed.as_secs_f32(),
-            tags: params.events,
-            devices: devices.clone(),
-            speed,
-            pattern,
-            event_type,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum TkConnectionEvent {
-    Connected(String),
-    ConnectionFailure(String),
-    DeviceAdded(Arc<ButtplugClientDevice>),
-    DeviceRemoved(Arc<ButtplugClientDevice>),
-    ActionStarted(TkDeviceEvent),
-    ActionDone(TkDeviceEvent),
-    ActionError(TkDeviceEvent, String),
-}
-
+/// Global commands on connection level, i.e. connection handling 
+/// or emergency stop
 #[derive(Clone, Debug)]
-pub enum TkAction {
+pub enum TkCommand {
     Scan,
     StopScan,
     StopAll,
     Disconect,
 }
 
+#[derive(Clone, Debug)]
+pub enum Task {
+    Scalar(Speed),
+    Pattern(ActuatorType, String)
+}
+
+impl Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Task::Scalar(speed) => write!(f, "Linear({}%)", speed),
+            Task::Pattern(actuator, pattern) => write!(f, "Pattern({}, {})", actuator, pattern)
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum TkConnectionEvent {
+    Connected(String),
+    ConnectionFailure(String),
+    DeviceAdded(Arc<ButtplugClientDevice>),
+    DeviceRemoved(Arc<ButtplugClientDevice>),
+    ActionStarted(Task, ActuatorList, Vec<String>, i32),
+    ActionDone(Task, Duration, i32),
+    ActionError(Arc<TkActuator>, String),
+}
+
 pub async fn handle_connection(
     event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
-    mut command_receiver: tokio::sync::mpsc::Receiver<TkAction>,
+    mut command_receiver: tokio::sync::mpsc::Receiver<TkCommand>,
     client: ButtplugClient,
     connection_status: Arc<Mutex<TkStatus>>,
     connection_type: TkConnectionType,
@@ -124,7 +104,7 @@ pub async fn handle_connection(
             if let Some(cmd) = next_cmd {
                 info!("Executing command {:?}", cmd);
                 match cmd {
-                    TkAction::Scan => {
+                    TkCommand::Scan => {
                         if let Err(err) = client.start_scanning().await {
                             let error = err.to_string();
                             error!("connection failure {}", error);
@@ -143,14 +123,14 @@ pub async fn handle_connection(
                             try_set_status(&status_clone, TkConnectionStatus::Connected);
                         }
                     }
-                    TkAction::StopScan => {
+                    TkCommand::StopScan => {
                         if let Err(err) = client.stop_scanning().await {
                             let error = err.to_string();
                             error!(error, "failed stop scan");
                             try_set_status(&status_clone, TkConnectionStatus::Failed(error));
                         }
                     }
-                    TkAction::Disconect => {
+                    TkCommand::Disconect => {
                         client
                             .disconnect()
                             .await
@@ -158,7 +138,7 @@ pub async fn handle_connection(
                         try_set_status(&status_clone, TkConnectionStatus::NotConnected);
                         break;
                     }
-                    TkAction::StopAll => {
+                    TkCommand::StopAll => {
                         client
                             .stop_all_devices()
                             .await

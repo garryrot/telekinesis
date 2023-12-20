@@ -51,7 +51,7 @@ namespace Tele {
 void Tele_Event_Thread() {
     while (true) {
         auto list = Tele::tk->tk_qry_nxt_evt();
-        std::vector<BSModEvent> evts;
+        std::vector<SKSEModEvent> evts;
         std::copy(list.begin(), list.end(), std::back_inserter(evts));
         for (int i = 0; i < list.size(); i++) {
             auto eventName = (std::string)evts[i].event_name;

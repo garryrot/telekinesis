@@ -54,7 +54,7 @@ impl TkActuator {
     pub fn identifier(&self) -> String {
         format!(
             "{}.{}[{}]",
-            self.device.index(),
+            self.device.name(),
             self.actuator,
             self.index_in_device
         )
@@ -124,12 +124,6 @@ pub struct Speed {
 pub enum TkPattern {
     Linear(Duration, Speed),
     Funscript(Duration, Arc<FScript>),
-}
-
-#[derive(Clone, Debug)]
-pub struct TkFunscript {
-    pub duration: Duration,
-    pub pattern: String,
 }
 
 struct ReferenceCounter {

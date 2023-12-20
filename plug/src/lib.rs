@@ -1,8 +1,9 @@
 use api::*;
 use buttplug::client::ButtplugClientDevice;
-use connection::{TkAction, TkConnectionEvent, TkConnectionStatus, TkStatus};
-use ffi::BSModEvent;
+use connection::{TkCommand, TkConnectionEvent, TkConnectionStatus, TkStatus};
+use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
+use itertools::Itertools;
 use pattern::{Speed, TkButtplugScheduler, TkPattern};
 use std::sync::{Arc, Mutex};
 use tokio::{runtime::Runtime, sync::mpsc::Sender};
@@ -36,7 +37,7 @@ mod util;
 #[cxx::bridge]
 mod ffi {
     #[derive(Debug)]
-    pub struct BSModEvent {
+    pub struct SKSEModEvent {
         pub event_name: String,
         pub str_arg: String,
         pub num_arg: f64,
@@ -64,32 +65,31 @@ mod ffi {
         ) -> i32;
         fn tk_stop(&mut self, arg0: i32) -> bool;
         // blocking
-        fn tk_qry_nxt_evt(&mut self) -> Vec<BSModEvent>;
+        fn tk_qry_nxt_evt(&mut self) -> Vec<SKSEModEvent>;
     }
 }
 
-type DeviceList = Vec<Arc<ButtplugClientDevice>>;
 pub struct Telekinesis {
     pub connection_status: Arc<Mutex<TkStatus>>,
     settings: TkSettings,
     runtime: Runtime,
-    command_sender: Sender<TkAction>,
+    command_sender: Sender<TkCommand>,
     scheduler: TkButtplugScheduler,
     connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
     event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
 }
 
-impl BSModEvent {
-    pub fn new(event_name: &str, str_arg: &str, num_arg: f64) -> BSModEvent {
-        BSModEvent {
+impl SKSEModEvent {
+    pub fn new(event_name: &str, str_arg: &str, num_arg: f64) -> SKSEModEvent {
+        SKSEModEvent {
             event_name: String::from(event_name),
             str_arg: String::from(str_arg),
-            num_arg: 0.0,
+            num_arg,
         }
     }
 
-    pub fn from(event_name: &str, str_arg: &str) -> BSModEvent {
-        BSModEvent {
+    pub fn from(event_name: &str, str_arg: &str) -> SKSEModEvent {
+        SKSEModEvent {
             event_name: String::from(event_name),
             str_arg: String::from(str_arg),
             num_arg: 0.0,
@@ -169,7 +169,7 @@ impl TkApi {
     /// Return type Vec cause cxx does not support Option
     /// and Result enforces try catch
     #[instrument]
-    fn tk_qry_nxt_evt(&mut self) -> Vec<BSModEvent> {
+    fn tk_qry_nxt_evt(&mut self) -> Vec<SKSEModEvent> {
         let tele = &self.state();
         let mut receiver = None;
         if let Ok(mut guard) = tele.lock() {
@@ -185,8 +185,8 @@ impl TkApi {
                     return vec![evt];
                 }
                 vec![]
-            },
-            None => vec![]
+            }
+            None => vec![],
         }
     }
 
@@ -198,31 +198,36 @@ impl TkApi {
 
 pub fn get_next_events_blocking(
     connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
-) -> Option<BSModEvent> {
+) -> Option<SKSEModEvent> {
     if let Ok(result) = connection_events.recv() {
         let event = match result {
             TkConnectionEvent::Connected(connector) => {
-                BSModEvent::from("Tele_Connected", &connector)
+                SKSEModEvent::from("Tele_Connected", &connector)
             }
             TkConnectionEvent::ConnectionFailure(err) => {
-                BSModEvent::from("Tele_ConnectionError", &err)
+                SKSEModEvent::from("Tele_ConnectionError", &err)
             }
             TkConnectionEvent::DeviceAdded(device) => {
-                BSModEvent::from("Tele_DeviceAdded", device.name())
+                SKSEModEvent::from("Tele_DeviceAdded", device.name())
             }
             TkConnectionEvent::DeviceRemoved(device) => {
-                BSModEvent::from("Tele_DeviceRemoved", device.name())
-            } 
-            TkConnectionEvent::ActionStarted(evt) => {
-                let str_arg = evt.serialize_papyrus();
-                BSModEvent::new("Tele_DeviceActionStarted", &str_arg, evt.speed.as_float())
-            },
-            TkConnectionEvent::ActionDone(evt) => {
-                let str_arg = evt.serialize_papyrus();
-                BSModEvent::new("Tele_DeviceActionDone", &str_arg, evt.speed.as_float())
-            },
-            TkConnectionEvent::ActionError(evt, err) => {
-                BSModEvent::new("Tele_DeviceError", &err, evt.speed.as_float())
+                SKSEModEvent::from("Tele_DeviceRemoved", device.name())
+            }
+            TkConnectionEvent::ActionStarted(task, actuators, tags, handle) => {
+                let str_arg = format!(
+                    "{} {} on ({})",
+                    task,
+                    tags.iter().join(","),
+                    actuators.iter().map(|x| x.identifier()).join(",")
+                );
+                SKSEModEvent::new("Tele_DeviceActionStarted", &str_arg, handle as f64)
+            }
+            TkConnectionEvent::ActionDone(task, duration, handle) => {
+                let str_arg = format!("{} done after {:.1}s", task, duration.as_secs());
+                SKSEModEvent::new("Tele_DeviceActionDone", &str_arg, handle as f64)
+            }
+            TkConnectionEvent::ActionError(_, err) => {
+                SKSEModEvent::new("Tele_DeviceError", &err, 0.0)
             }
         };
         return Some(event);

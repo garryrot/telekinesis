@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use cxx::{CxxString, CxxVector};
 
-use crate::{settings::TkDeviceSettings, TkPattern, DeviceList};
+use crate::{settings::TkDeviceSettings, TkPattern, connection::ActuatorList};
 
 pub fn sanitize_name_list(list: &Vec<String>) -> Vec<String> {
     list.iter()
@@ -47,15 +47,15 @@ pub struct TkParams {
 impl TkParams {
     pub fn filter_devices(
         &self,
-        devices: DeviceList,
-    ) -> DeviceList {
-        devices
+        actuators: ActuatorList,
+    ) -> ActuatorList {
+        actuators
             .iter()
-            .filter(|d| {
-                self.selector.iter().any(|x| x == d.name())
-                    && d.message_attributes().scalar_cmd().is_some()
+            .filter(|a| {
+                self.selector.iter().any(|x| x == a.device.name())
+                    && a.device.message_attributes().scalar_cmd().is_some()
             })
-            .map(|d| d.clone())
+            .map(|a| a.clone())
             .collect()
     }
 

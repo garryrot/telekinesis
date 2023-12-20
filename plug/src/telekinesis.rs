@@ -18,6 +18,7 @@ use buttplug::{
 };
 use funscript::FScript;
 use futures::Future;
+use itertools::Itertools;
 
 use std::time::Duration;
 use std::{
@@ -30,18 +31,17 @@ use std::{
 use tokio::{runtime::Runtime, sync::mpsc::channel};
 use tracing::{debug, error, info};
 
-use itertools::Itertools;
-
-use crate::connection::TkDeviceEventType;
+use crate::connection::ActuatorList;
+use crate::connection::Task;
 use crate::{
     connection::{
-        handle_connection, TkAction, TkConnectionEvent, TkConnectionStatus, TkDeviceEvent,
+        handle_connection, TkCommand, TkConnectionEvent, TkConnectionStatus,
         TkDeviceStatus,
     },
     input::TkParams,
     pattern::{get_actuators, Speed, TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
-    DeviceList, Telekinesis, TkPattern, TkStatus,
+    Telekinesis, TkPattern, TkStatus,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -123,14 +123,14 @@ impl Telekinesis {
         None
     }
 
-    pub fn get_devices(&self) -> DeviceList {
+    pub fn get_devices(&self) -> ActuatorList {
         if let Ok(connection_status) = self.connection_status.try_lock() {
-            let devices: DeviceList = connection_status
+            let devices: ActuatorList = get_actuators(connection_status
                 .device_status
                 .values()
                 .into_iter()
                 .map(|value| value.device.clone())
-                .collect();
+                .collect());
             return devices;
         } else {
             error!("Error accessing device map");
@@ -155,14 +155,13 @@ impl Telekinesis {
     }
 
     pub fn get_known_device_names(&self) -> Vec<String> {
-        debug!("Getting devices names"); // TODO Print devices on each 
-        self.get_devices()
+        debug!("Getting devices names");
+        let connected_devices : Vec<String> = self.get_devices()
             .iter()
-            .map(|d| d.name().clone())
-            .chain(self.settings.devices.iter().map(|d| d.name.clone()))
-            .into_iter()
-            .unique()
-            .collect()
+            .map(|d| d.device.name().clone()).collect();
+
+        let known_devices : Vec<String> = self.settings.devices.iter().map(|d| d.name.clone()).collect();
+        connected_devices.into_iter().chain( known_devices.into_iter() ).unique().collect()
     }
 
     pub fn connect(settings: TkSettings) -> Result<Telekinesis, Error> {
@@ -185,7 +184,7 @@ impl Telekinesis {
 
     pub fn scan_for_devices(&self) -> bool {
         info!("start scan for devices");
-        if let Err(_) = self.command_sender.try_send(TkAction::Scan) {
+        if let Err(_) = self.command_sender.try_send(TkCommand::Scan) {
             error!("Failed to start scan");
             return false;
         }
@@ -194,7 +193,7 @@ impl Telekinesis {
 
     pub fn stop_scan(&self) -> bool {
         info!("stop scan");
-        if let Err(_) = self.command_sender.try_send(TkAction::StopScan) {
+        if let Err(_) = self.command_sender.try_send(TkCommand::StopScan) {
             error!("Failed to stop scan");
             return false;
         }
@@ -207,9 +206,9 @@ impl Telekinesis {
         if self
             .get_devices()
             .iter()
-            .filter(|d| d.name() == name)
-            .any(|device| {
-                if let Some(scalar) = device.message_attributes().scalar_cmd() {
+            .filter(|a| a.device.name() == name)
+            .any(|a| {
+                if let Some(scalar) = a.device.message_attributes().scalar_cmd() {
                     if scalar
                         .iter()
                         .any(|a| *a.actuator_type() == ActuatorType::Vibrate)
@@ -245,31 +244,37 @@ impl Telekinesis {
     pub fn vibrate_pattern(
         &mut self,
         pattern: TkPattern,
-        events: Vec<String>,
+        tags: Vec<String>,
         pattern_name: String,
     ) -> i32 {
         info!("vibrate pattern {:?}", pattern);
-        let params = TkParams::from_input(events.clone(), pattern, &self.settings.devices);
+        let pattern_clone = pattern.clone();
+        let params = TkParams::from_input(tags.clone(), pattern, &self.settings.devices);
 
+        let actuators = self.get_devices();
         let player = self
             .scheduler
-            .create_player(get_actuators(params.filter_devices(self.get_devices())));
+            .create_player(params.filter_devices(actuators));
         let handle = player.handle;
         let sender_clone = self.event_sender.clone();
         let connection_status = self.connection_status.clone();
+
         self.runtime.spawn(async move {
             let now = Instant::now();
-            let used_devices = player.actuators.iter().map(|a| a.device.clone()).collect();
-
-            let pattern_clone = params.pattern.clone();
-            let mut evt = TkDeviceEvent::new(now.elapsed(), &used_devices, params, pattern_name, TkDeviceEventType::Scalar);
+            let devices = player.actuators.iter().map(|a| a.device.clone()).collect::<Vec<Arc<ButtplugClientDevice>>>();
+            let actuators = get_actuators(devices.clone());
+            let pattern_clone: TkPattern = params.pattern.clone();
+            let task = match pattern_clone {
+                TkPattern::Linear(_, speed) => Task::Scalar(speed),
+                TkPattern::Funscript(_, _) => Task::Pattern(ActuatorType::Vibrate, pattern_name),
+            };
             sender_clone
-                .send(TkConnectionEvent::ActionStarted(evt.clone()))
+                .send(TkConnectionEvent::ActionStarted(task.clone(), actuators.clone(), tags, handle))
                 .expect("queue full");
             let result = player.play_scalar(pattern_clone).await;
   
             if let Ok(mut connection_status) = connection_status.lock() {
-                for device in used_devices {
+                for device in devices {
                     let status = match &result {
                         Ok(_) => TkConnectionStatus::Connected,
                         Err(err) => TkConnectionStatus::Failed(err.to_string()),
@@ -279,11 +284,12 @@ impl Telekinesis {
                         .insert(device.index(), TkDeviceStatus::new(&device, status));
                 }
             }
-            evt.elapsed_sec = now.elapsed().as_secs_f32();
             sender_clone
                 .send(match result {
-                    Ok(_) => TkConnectionEvent::ActionDone(evt),
-                    Err(err) => TkConnectionEvent::ActionError(evt, err.to_string()),
+                    Ok(_) => TkConnectionEvent::ActionDone(task, now.elapsed(), handle),
+                    Err(err) => {
+                        TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string())
+                    },
                 })
                 .expect("queue full");
         });
@@ -299,7 +305,7 @@ impl Telekinesis {
     pub fn stop_all(&mut self) -> bool {
         info!("stop all");
         self.scheduler.stop_all();
-        if let Err(_) = self.command_sender.try_send(TkAction::StopAll) {
+        if let Err(_) = self.command_sender.try_send(TkCommand::StopAll) {
             error!("Failed to queue stop_all");
             return false;
         }
@@ -308,7 +314,7 @@ impl Telekinesis {
 
     pub fn disconnect(&mut self) {
         info!("disconnect");
-        if let Err(_) = self.command_sender.try_send(TkAction::Disconect) {
+        if let Err(_) = self.command_sender.try_send(TkCommand::Disconect) {
             error!("Failed to send disconnect");
         }
     }
@@ -790,8 +796,8 @@ mod tests {
             TkConnectionStatus::Connected
         ));
 
-        for device in tk.get_devices() {
-            tk.settings.set_enabled(device.name(), true);
+        for actuator in tk.get_devices() {
+            tk.settings.set_enabled(actuator.device.name(), true);
         }
         tk.vibrate(Speed::max(), Duration::MAX, vec![]);
         thread::sleep(Duration::from_secs(5));
