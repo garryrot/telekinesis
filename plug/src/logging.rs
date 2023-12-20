@@ -25,11 +25,11 @@ pub fn tk_init_logging_stdout() -> bool {
         .with_thread_ids(true)
         .finish();
 
-    if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+    if tracing::subscriber::set_global_default(subscriber).is_err() {
         eprintln!("Setting global tracing subscriber failed.");
         return false;
     }
-    return true;
+    true
 }
 
 pub fn tk_init_logging(file_path: String) -> bool {
@@ -46,9 +46,9 @@ pub fn tk_init_logging(file_path: String) -> bool {
         .with_writer(Mutex::new(file))
         .with_thread_ids(true)
         .finish();
-    if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+    if tracing::subscriber::set_global_default(subscriber).is_err() {
         eprintln!("Setting global tracing subscriber failed.");
         return false;
     }
-    return true;
+    true
 }

@@ -1,5 +1,4 @@
-use crate::{connection::{TkConnectionStatus}, pattern::Speed};
-
+use crate::connection::TkConnectionStatus;
 
 impl TkConnectionStatus {
     pub fn serialize_papyrus(&self) -> String {

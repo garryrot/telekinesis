@@ -492,7 +492,7 @@ impl TkPatternPlayer {
                 loop {
                     let mut j = 1;
                     while j + i < action_len - 1
-                        && (&fscript.actions[i + j].at - &fscript.actions[i].at)
+                        && (fscript.actions[i + j].at - fscript.actions[i].at)
                             < self.player_scalar_resolution_ms
                     {
                         j += 1;
@@ -633,7 +633,7 @@ mod tests {
     }
 
     impl PlayerTest {
-        fn setup(all_devices: &Vec<Arc<ButtplugClientDevice>>) -> Self {
+        fn setup(all_devices: &[Arc<ButtplugClientDevice>]) -> Self {
             PlayerTest::setup_with_settings(
                 all_devices,
                 TkPlayerSettings {
@@ -643,7 +643,7 @@ mod tests {
         }
 
         fn setup_with_settings(
-            all_devices: &Vec<Arc<ButtplugClientDevice>>,
+            all_devices: &[Arc<ButtplugClientDevice>],
             settings: TkPlayerSettings,
         ) -> Self {
             let (scheduler, mut worker) = TkButtplugScheduler::create(settings);
@@ -653,7 +653,7 @@ mod tests {
             PlayerTest {
                 scheduler,
                 handles: vec![],
-                all_devices: all_devices.clone(),
+                all_devices: all_devices.to_owned(),
             }
         }
 

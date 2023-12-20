@@ -1,5 +1,4 @@
 use api::*;
-use buttplug::client::ButtplugClientDevice;
 use connection::{TkCommand, TkConnectionEvent, TkConnectionStatus, TkStatus};
 use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
@@ -286,7 +285,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             tk.vibrate(
                 Speed::new(speed.into()),
                 get_duration_from_secs(time_sec),
-                read_input_string(&events),
+                read_input_string(events),
             )
         },
         default: ERROR_HANDLE,
@@ -295,12 +294,12 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "vibrate.pattern",
         exec: |tk, _speed, time_sec, pattern_name, events| match read_pattern(
             &tk.settings.pattern_path,
-            &pattern_name,
+            pattern_name,
             true,
         ) {
             Some(fscript) => tk.vibrate_pattern(
                 TkPattern::Funscript(get_duration_from_secs(time_sec), Arc::new(fscript)),
-                read_input_string(&events),
+                read_input_string(events),
                 String::from(pattern_name),
             ),
             None => ERROR_HANDLE,

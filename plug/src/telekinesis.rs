@@ -35,8 +35,7 @@ use crate::connection::ActuatorList;
 use crate::connection::Task;
 use crate::{
     connection::{
-        handle_connection, TkCommand, TkConnectionEvent, TkConnectionStatus,
-        TkDeviceStatus,
+        handle_connection, TkCommand, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus,
     },
     input::TkParams,
     pattern::{get_actuators, Speed, TkButtplugScheduler, TkPlayerSettings},
@@ -62,7 +61,7 @@ impl Telekinesis {
     pub fn connect_with<T, Fn, Fut>(
         connector_factory: Fn,
         provided_settings: Option<TkSettings>,
-        type_name: TkConnectionType 
+        type_name: TkConnectionType,
     ) -> Result<Telekinesis, anyhow::Error>
     where
         Fn: FnOnce() -> Fut + Send + 'static,
@@ -83,7 +82,14 @@ impl Telekinesis {
         runtime.spawn(async move {
             debug!("starting connection handling thread");
             let client = with_connector(connector_factory().await).await;
-            handle_connection(event_sender, command_receiver, client, connection_status, type_name).await;
+            handle_connection(
+                event_sender,
+                command_receiver,
+                client,
+                connection_status,
+                type_name,
+            )
+            .await;
             debug!("connection handling stopped")
         });
 
@@ -125,12 +131,14 @@ impl Telekinesis {
 
     pub fn get_devices(&self) -> ActuatorList {
         if let Ok(connection_status) = self.connection_status.try_lock() {
-            let devices: ActuatorList = get_actuators(connection_status
-                .device_status
-                .values()
-                .into_iter()
-                .map(|value| value.device.clone())
-                .collect());
+            let devices: ActuatorList = get_actuators(
+                connection_status
+                    .device_status
+                    .values()
+                    .into_iter()
+                    .map(|value| value.device.clone())
+                    .collect(),
+            );
             return devices;
         } else {
             error!("Error accessing device map");
@@ -143,7 +151,8 @@ impl Telekinesis {
             let devices = status
                 .device_status
                 .values()
-                .into_iter().find(|d| d.device.name() == device_name)
+                .into_iter()
+                .find(|d| d.device.name() == device_name)
                 .cloned();
             return devices;
         } else {
@@ -154,12 +163,12 @@ impl Telekinesis {
 
     pub fn get_known_device_names(&self) -> Vec<String> {
         debug!("Getting devices names");
-        let connected_devices : Vec<String> = self.get_devices()
+        self.get_devices()
             .iter()
-            .map(|d| d.device.name().clone()).collect();
-
-        let known_devices : Vec<String> = self.settings.devices.iter().map(|d| d.name.clone()).collect();
-        connected_devices.into_iter().chain( known_devices.into_iter() ).unique().collect()
+            .map(|d| d.device.name().clone())
+            .chain(self.settings.devices.iter().map(|d| d.name.clone()))
+            .unique()
+            .collect()
     }
 
     pub fn connect(settings: TkSettings) -> Result<Telekinesis, Error> {
@@ -170,13 +179,14 @@ impl Telekinesis {
                 Telekinesis::connect_with(
                     || async move { new_json_ws_client_connector(&uri) },
                     Some(settings_clone),
-                    TkConnectionType::WebSocket(endpoint)
+                    TkConnectionType::WebSocket(endpoint),
                 )
             }
-            _ => {
-                Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings), 
-                TkConnectionType::InProcess)
-            }
+            _ => Telekinesis::connect_with(
+                || async move { in_process_connector() },
+                Some(settings),
+                TkConnectionType::InProcess,
+            ),
         }
     }
 
@@ -200,7 +210,7 @@ impl Telekinesis {
 
     pub fn get_device_capabilities(&self, name: &str) -> Vec<String> {
         debug!("Getting '{}' capabilities", name); // TODO print debug on each connect
-        // maybe just return all actuator + types + linear + rotate
+                                                   // maybe just return all actuator + types + linear + rotate
         if self
             .get_devices()
             .iter()
@@ -258,7 +268,11 @@ impl Telekinesis {
 
         self.runtime.spawn(async move {
             let now = Instant::now();
-            let devices = player.actuators.iter().map(|a| a.device.clone()).collect::<Vec<Arc<ButtplugClientDevice>>>();
+            let devices = player
+                .actuators
+                .iter()
+                .map(|a| a.device.clone())
+                .collect::<Vec<Arc<ButtplugClientDevice>>>();
             let actuators = get_actuators(devices.clone());
             let pattern_clone: TkPattern = params.pattern.clone();
             let task = match pattern_clone {
@@ -266,10 +280,15 @@ impl Telekinesis {
                 TkPattern::Funscript(_, _) => Task::Pattern(ActuatorType::Vibrate, pattern_name),
             };
             sender_clone
-                .send(TkConnectionEvent::ActionStarted(task.clone(), actuators.clone(), tags, handle))
+                .send(TkConnectionEvent::ActionStarted(
+                    task.clone(),
+                    actuators.clone(),
+                    tags,
+                    handle,
+                ))
                 .expect("queue full");
             let result = player.play_scalar(pattern_clone).await;
-  
+
             if let Ok(mut connection_status) = connection_status.lock() {
                 for device in devices {
                     let status = match &result {
@@ -286,7 +305,7 @@ impl Telekinesis {
                     Ok(_) => TkConnectionEvent::ActionDone(task, now.elapsed(), handle),
                     Err(err) => {
                         TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string())
-                    },
+                    }
                 })
                 .expect("queue full");
         });
@@ -451,13 +470,13 @@ pub fn read_pattern_name(
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-    use std::{thread, time::Duration, vec};
     use crate::connection::TkConnectionStatus;
     use crate::fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
-    use buttplug::core::message::{ActuatorType, DeviceAdded};
     use crate::telekinesis::in_process_connector;
     use crate::*;
+    use buttplug::core::message::{ActuatorType, DeviceAdded};
+    use std::time::Instant;
+    use std::{thread, time::Duration, vec};
 
     macro_rules! assert_timeout {
         ($cond:expr, $arg:tt) => {
@@ -523,7 +542,9 @@ mod tests {
         let count = connector.devices.len();
 
         // act
-        let mut tk = Telekinesis::connect_with(|| async move { connector }, None, TkConnectionType::Test).unwrap();
+        let mut tk =
+            Telekinesis::connect_with(|| async move { connector }, None, TkConnectionType::Test)
+                .unwrap();
         tk.await_connect(count);
         for device_name in tk.get_known_device_names() {
             tk.settings_set_enabled(&device_name, true);
@@ -756,9 +777,12 @@ mod tests {
         let settings = TkSettings::default();
         let pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
-        let mut tk =
-            Telekinesis::connect_with(|| async move { in_process_connector() }, Some(settings), TkConnectionType::Test)
-                .unwrap();
+        let mut tk = Telekinesis::connect_with(
+            || async move { in_process_connector() },
+            Some(settings),
+            TkConnectionType::Test,
+        )
+        .unwrap();
         tk.scan_for_devices();
         tk.await_connect(1);
         thread::sleep(Duration::from_secs(2));
@@ -823,8 +847,12 @@ mod tests {
         let mut settings = TkSettings::default();
         settings.pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
-        let mut tk =
-            Telekinesis::connect_with(|| async move { connector }, Some(settings), TkConnectionType::Test).unwrap();
+        let mut tk = Telekinesis::connect_with(
+            || async move { connector },
+            Some(settings),
+            TkConnectionType::Test,
+        )
+        .unwrap();
         tk.await_connect(count);
 
         for name in devices_names {
@@ -836,14 +864,24 @@ mod tests {
 
     #[test]
     fn process_next_events_after_action_returns_1() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
+        let mut tk = Telekinesis::connect_with(
+            || async move { in_process_connector() },
+            None,
+            TkConnectionType::Test,
+        )
+        .unwrap();
         tk.vibrate(Speed::new(22), Duration::from_millis(1), vec![]);
         get_next_events_blocking(tk.connection_events.clone());
     }
 
     #[test]
     fn process_next_events_works() {
-        let mut tk = Telekinesis::connect_with(|| async move { in_process_connector() }, None, TkConnectionType::Test).unwrap();
+        let mut tk = Telekinesis::connect_with(
+            || async move { in_process_connector() },
+            None,
+            TkConnectionType::Test,
+        )
+        .unwrap();
         tk.vibrate(Speed::new(10), Duration::from_millis(100), vec![]);
         tk.vibrate(Speed::new(20), Duration::from_millis(200), vec![]);
         get_next_events_blocking(tk.connection_events.clone());
