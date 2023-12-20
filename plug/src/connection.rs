@@ -19,6 +19,16 @@ pub enum TkConnectionStatus {
     Failed(String),
 }
 
+impl Display for TkConnectionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            TkConnectionStatus::Failed(err) => write!(f, "{}", err),
+            TkConnectionStatus::NotConnected => write!(f, "Not Connected"),
+            TkConnectionStatus::Connected => write!(f, "Connected"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TkDeviceStatus {
     pub status: TkConnectionStatus,

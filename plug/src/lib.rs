@@ -21,14 +21,13 @@ mod connection;
 mod fakes;
 mod input;
 mod logging;
-mod papyrus;
 mod pattern;
 mod settings;
 pub mod telekinesis;
 mod util;
 
 /// Methods exposed to as papyrus native functions
-/// - All ffi methods are non-blocking, triggering an async action somewhere in the future
+/// - All ffi methods except event qry are non-blocking, triggering an async action somewhere in the future
 /// - All error conditions during the function call (i.e. mutex not available) will
 ///   be swallowed and logged to Telekinesis.log
 /// - Uses a an abstract query/command engine to reduce coupling between the mod
@@ -264,9 +263,9 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         default: "Not Connected",
         exec: |tk| {
             if let Ok(status) = tk.connection_status.try_lock() {
-                return status.connection_status.serialize_papyrus();
+                return status.connection_status.to_string();
             }
-            TkConnectionStatus::NotConnected.serialize_papyrus()
+            TkConnectionStatus::NotConnected.to_string()
         },
     })
     // scan
@@ -361,9 +360,9 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         default: "Not Connected",
         exec: |tk, device_name| {
             if let Some(a) = tk.get_device_status(device_name) {
-                return a.status.serialize_papyrus();
+                return a.status.to_string();
             }
-            TkConnectionStatus::NotConnected.serialize_papyrus()
+            TkConnectionStatus::NotConnected.to_string()
         },
     })
     // patterns
