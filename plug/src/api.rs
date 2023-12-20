@@ -122,7 +122,7 @@ pub struct ApiBuilder<T> {
 impl<T> ApiBuilder<T> {
     pub fn new(init: ApiInit<T>) -> ApiBuilder<T> {
         ApiBuilder {
-            init: init,
+            init,
             cmd: vec![],
             cmd_1: vec![],
             cmd_2: vec![],
@@ -202,7 +202,7 @@ pub trait Api<T> {
 
         if cmd_matches(self.destroy().name, cmd) {
             if let Ok(mut guard) = self.state().try_lock() {
-                if let Some(_) = guard.take() {
+                if guard.take().is_some() {
                     let api: ApiCmd0<T> = self.destroy();
                     return self.try_exec(|tk| (api.exec)(tk), false);
                 }
@@ -295,12 +295,7 @@ pub trait Api<T> {
     where
         ApiType: ApiImpl,
     {
-        for q in queries {
-            if cmd_matches(q.name(), name) {
-                return Some(q);
-            }
-        }
-        None
+        queries.into_iter().find(|q| cmd_matches(q.name(), name))
     }
 
     fn try_exec<F, R>(&mut self, func: F, default: R) -> R
@@ -419,20 +414,17 @@ mod tests {
         // enable_log();
         let mut api = TestApi::new();
         assert_eq!(api.exec_qry_str("existing.query"), String::from("foobar"));
-        // assert_eq!(api.exec_control("vibrate", 100, 2.5, "pattern", vec![]), -1);
         api.exec_cmd_0("ctor");
-        assert_eq!(api.exec_cmd_0("non.existing.command"), false);
-        assert_eq!(api.exec_cmd_0("existing.command"), true);
-        assert_eq!(api.exec_cmd_0("Existing.command"), true);
-        assert_eq!(api.exec_cmd_1("non.existing.command", "some_arg"), false);
-        assert_eq!(api.exec_cmd_1("existing.command", "some_arg"), true);
-        assert_eq!(api.exec_cmd_1("existing.command", "some_arg"), true);
+        assert!(! api.exec_cmd_0("non.existing.command"));
+        assert!(api.exec_cmd_0("existing.command"));
+        assert!(api.exec_cmd_0("Existing.command"));
+        assert!(! api.exec_cmd_1("non.existing.command", "some_arg"));
+        assert!(api.exec_cmd_1("existing.command", "some_arg"));
+        assert!(api.exec_cmd_1("existing.command", "some_arg"));
         assert_eq!(api.exec_qry_str("existing.query"), String::from("working"));
         assert_eq!(api.exec_qry_lst("existing.query")[0], "list0");
         assert_eq!(api.exec_qry_lst_1("existing.query", "p")[0], "list1");
-        assert_eq!(api.exec_qry_bool("existing.query"), true);
-        assert_eq!(api.exec_qry_bool_1("existing.query", "something"), true);
-        // assert_eq!(api.exec_control("vibrate", 100, 2.5, "pattern", vec![]), 1);
-        // assert_eq!(api.exec_control("move", 100, 2.5, "pattern", vec![]), 2);
+        assert!(api.exec_qry_bool("existing.query"));
+        assert!(api.exec_qry_bool_1("existing.query", "something"));
     }
 }

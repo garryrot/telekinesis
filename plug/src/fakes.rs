@@ -31,7 +31,7 @@ use std::time::Instant;
 
 #[derive(Clone)]
 pub struct FakeConnectorCallRegistry {
-    pub actions: Arc<Mutex<HashMap<u32, Box<Vec<FakeMessage>>>>>,
+    pub actions: Arc<Mutex<HashMap<u32, Vec<FakeMessage>>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -70,8 +70,7 @@ impl FakeMessage {
                     let sub_cmd: &ScalarSubcommand = cmd
                         .scalars()
                         .iter()
-                        .filter(|x| &x.index() == index)
-                        .next()
+                        .find(|x| &x.index() == index)
                         .unwrap();
                     assert_eq!(expected, &sub_cmd.scalar(), "actuator #{}", index);
                     assert_eq!(strengths.len(), cmd.scalars().len(), "same amonut of calls")
@@ -182,15 +181,15 @@ impl FakeConnectorCallRegistry {
         let device_id = get_value(imp, "DeviceIndex").parse().unwrap();
         let mut bucket = match calls.get(&device_id) {
             Some(some) => some.clone(),
-            None => Box::new(vec![]),
+            None => vec![],
         };
-        bucket.deref_mut().push(cmd);
+        bucket.push(cmd);
         calls.deref_mut().insert(device_id, bucket);
     }
 
     pub fn get_device(&self, device_id: u32) -> Vec<FakeMessage> {
         match self.actions.lock().unwrap().get(&device_id) {
-            Some(some) => *some.clone(),
+            Some(some) => some.clone(),
             None => vec![],
         }
     }
@@ -212,8 +211,8 @@ impl FakeDeviceConnector {
     pub fn new(devices: Vec<DeviceAdded>) -> (Self, FakeConnectorCallRegistry) {
         let (server_outbound_sender, _) = channel(256);
         let connector = FakeDeviceConnector {
-            devices: devices,
-            server_outbound_sender: server_outbound_sender,
+            devices,
+            server_outbound_sender,
             call_registry: FakeConnectorCallRegistry::default(),
         };
         let calls = connector.get_call_registry();
@@ -259,7 +258,7 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
     ) -> BoxFuture<'static, Result<(), ButtplugConnectorError>> {
         let devices = self.devices.clone();
         let send = message_sender.clone();
-        self.server_outbound_sender = message_sender.clone();
+        self.server_outbound_sender = message_sender;
         async move {
             async_manager::spawn(async move {
                 // assure that other thread has registered listener when the test devices
@@ -361,7 +360,7 @@ where
 #[allow(dead_code)]
 pub fn vibrator(id: u32, name: &str) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
-        .scalar_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
+        .scalar_cmd(&[ServerGenericDeviceMessageAttributes::new(
             &format!("Vibrator {}", id),
             &RangeInclusive::new(0, 10),
             ActuatorType::Vibrate,
@@ -406,7 +405,7 @@ pub fn scalars(id: u32, name: &str, actuator: ActuatorType, count: i32) -> Devic
 #[allow(dead_code)]
 pub fn linear(id: u32, name: &str) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
-        .linear_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
+        .linear_cmd(&[ServerGenericDeviceMessageAttributes::new(
             &format!("Position {}", id),
             &RangeInclusive::new(0, 10),
             ActuatorType::Position,
@@ -424,7 +423,7 @@ pub fn linear(id: u32, name: &str) -> DeviceAdded {
 #[allow(dead_code)]
 pub fn rotate(id: u32, name: &str) -> DeviceAdded {
     let attributes = ServerDeviceMessageAttributesBuilder::default()
-        .rotate_cmd(&vec![ServerGenericDeviceMessageAttributes::new(
+        .rotate_cmd(&[ServerGenericDeviceMessageAttributes::new(
             &format!("Rotator {}", id),
             &RangeInclusive::new(0, 10),
             ActuatorType::Rotate,
@@ -450,9 +449,7 @@ pub mod tests {
     impl ButtplugTestClient {
         pub fn get_device(&self, device_id: u32) -> Arc<ButtplugClientDevice> {
             self.created_devices
-                .iter()
-                .filter(|d| d.index() == device_id)
-                .next()
+                .iter().find(|d| d.index() == device_id)
                 .unwrap()
                 .clone()
         }
@@ -508,9 +505,9 @@ pub mod tests {
             let _ = client.event_stream().next().await.unwrap();
         }
 
-        let devices = client.devices().clone();
+        let devices = client.devices();
         ButtplugTestClient {
-            client: client,
+            client,
             call_registry,
             created_devices: devices,
         }
@@ -549,9 +546,7 @@ pub mod tests {
         assert_eq!(
             client
                 .created_devices
-                .iter()
-                .filter(|d| d.index() == 1)
-                .next()
+                .iter().find(|d| d.index() == 1)
                 .unwrap()
                 .name(),
             "eins"
@@ -560,8 +555,7 @@ pub mod tests {
             client
                 .created_devices
                 .iter()
-                .filter(|d| d.index() == 2)
-                .next()
+                .find(|d| d.index() == 2)
                 .unwrap()
                 .name(),
             "zwei"
@@ -570,8 +564,7 @@ pub mod tests {
             client
                 .created_devices
                 .iter()
-                .filter(|d| d.index() == 3)
-                .next()
+                .find(|d| d.index() == 3)
                 .unwrap()
                 .name(),
             "drei"

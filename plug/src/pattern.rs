@@ -68,7 +68,7 @@ pub fn get_actuators(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<Arc<TkActua
             for (idx, scalar_cmd) in scalar_cmd.iter().enumerate() {
                 actuators.push(Arc::new(TkActuator {
                     device: device.clone(),
-                    actuator: scalar_cmd.actuator_type().clone(),
+                    actuator: *scalar_cmd.actuator_type(),
                     index_in_device: idx as u32,
                 }))
             }
@@ -180,7 +180,7 @@ impl ReferenceCounter {
         trace!(
             "Reserved device={} ref-count={}",
             actuator.identifier(),
-            self.current_references(&actuator)
+            self.current_references(actuator)
         )
     }
     pub fn release(&mut self, actuator: &Arc<TkActuator>) {
@@ -197,7 +197,7 @@ impl ReferenceCounter {
         trace!(
             "Released device={} ref-count={}",
             actuator.identifier(),
-            self.current_references(&actuator)
+            self.current_references(actuator)
         )
     }
 
@@ -228,7 +228,7 @@ impl DeviceAccess {
         self.device_actions
             .entry(actuator.device.index())
             .and_modify(|bag| bag.push((handle, action)))
-            .or_insert(vec![(handle, action)]);
+            .or_insert_with(|| vec![(handle, action)]);
     }
 
     pub fn record_stop(&mut self, actuator: &Arc<TkActuator>, handle: i32) {
@@ -287,11 +287,9 @@ impl TkButtplugWorker {
                             actuator.index_in_device,
                             (speed.as_float(), actuator.actuator),
                         )]));
-                        match actuator.device.scalar(cmd).await {
-                            Err(err) => {
-                                error!("failed to set scalar speed {:?}", err)
-                            }
-                            _ => {}
+
+                        if let Err(err) = actuator.device.scalar(cmd).await {
+                            error!("failed to set scalar speed {:?}", err)
                         }
                     }
                     TkDeviceAction::Update(actuator, speed) => {
@@ -440,7 +438,7 @@ impl TkPatternPlayer {
         let handle = self.handle;
         info!("start pattern {:?} <linear> ({})", fscript, handle);
         let mut last_result = Ok(());
-        if fscript.actions.len() == 0 || fscript.actions.iter().all(|x| x.at == 0) {
+        if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
             return last_result;
         }
         let waiter = self.stop_after(duration);
@@ -483,7 +481,7 @@ impl TkPatternPlayer {
                 self.do_stop(true).await
             }
             TkPattern::Funscript(duration, fscript) => {
-                if fscript.actions.len() == 0 || fscript.actions.iter().all(|x| x.at == 0) {
+                if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
                     return Ok(());
                 }
                 let waiter = self.stop_after(duration);
@@ -511,7 +509,7 @@ impl TkPatternPlayer {
                     if let Some(waiting_time) =
                         Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
                     {
-                        if false == cancellable_wait(waiting_time, &self.cancellation_token).await {
+                        if !(cancellable_wait(waiting_time, &self.cancellation_token).await) {
                             break;
                         }
                     }
@@ -598,12 +596,12 @@ impl TkPatternPlayer {
 async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> bool {
     tokio::select! {
         _ = cancel.cancelled() => {
-            return false;
+            false
         }
         _ = sleep(duration) => {
-            return true;
+            true
         }
-    };
+    }
 }
 
 #[cfg(test)]

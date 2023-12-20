@@ -1,7 +1,7 @@
 use std::{
+    fmt::{self, Display},
     fs::{self},
-    path::{PathBuf},
-    fmt::{self, Display}
+    path::PathBuf,
 };
 
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ pub static DEFAULT_PATTERN_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis\\Patte
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
 pub static SETTINGS_FILE: &str = "Telekinesis.json";
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum TkConnectionType {
     InProcess,
     WebSocket(String),
@@ -46,7 +46,7 @@ pub struct TkSettings {
     pub connection: TkConnectionType,
     pub devices: Vec<TkDeviceSettings>,
     #[serde(skip)]
-    pub pattern_path: String
+    pub pattern_path: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -59,7 +59,7 @@ pub struct TkDeviceSettings {
 impl TkDeviceSettings {
     pub fn from_name(name: &str) -> TkDeviceSettings {
         TkDeviceSettings {
-            name: name.clone().into(),
+            name: name.into(),
             enabled: false,
             events: vec![],
         }
@@ -73,7 +73,7 @@ impl TkSettings {
             log_level: TkLogLevel::Trace,
             connection: TkConnectionType::InProcess,
             devices: vec![],
-            pattern_path: String::from(DEFAULT_PATTERN_PATH)
+            pattern_path: String::from(DEFAULT_PATTERN_PATH),
         }
     }
     pub fn try_read_or_default(settings_path: &str, settings_file: &str) -> Self {
@@ -83,7 +83,7 @@ impl TkSettings {
                 Ok(mut settings) => {
                     settings.pattern_path = String::from(DEFAULT_PATTERN_PATH);
                     settings
-                },
+                }
                 Err(err) => {
                     error!("Settings path '{}' could not be parsed. Error: {}. Using default configuration.", settings_path, err);
                     TkSettings::default()
@@ -94,7 +94,7 @@ impl TkSettings {
                 TkSettings::default()
             }
         }
-    }  
+    }
     pub fn try_write(&self, settings_path: &str, settings_file: &str) -> bool {
         let json = serde_json::to_string_pretty(self).expect("Always serializable");
         let _ = fs::create_dir_all(settings_path);
@@ -103,16 +103,12 @@ impl TkSettings {
         event!(Level::INFO, filename=?filename, settings=?self, "Storing settings");
         if let Err(err) = fs::write(filename, json) {
             error!("Writing to file failed. Error: {}.", err);
-            return false
+            return false;
         }
         true
     }
     pub fn get_enabled_devices(&self) -> Vec<TkDeviceSettings> {
-        self.devices
-            .iter()
-            .filter(|d| d.enabled)
-            .map(|d| d.clone())
-            .collect()
+        self.devices.iter().filter(|d| d.enabled).cloned().collect()
     }
     pub fn add(&mut self, device_name: &str) {
         if self.devices.iter().any(|d| d.name == device_name) {
@@ -221,7 +217,7 @@ mod tests {
 
         // Act
         println!("{}", path);
-        let settings = TkSettings::try_read_or_default(_tmp_dir.path().to_str().unwrap(), &file);
+        let settings = TkSettings::try_read_or_default(_tmp_dir.path().to_str().unwrap(), file);
         assert_eq!(settings.devices.len(), 3);
     }
 
@@ -287,7 +283,7 @@ mod tests {
     fn is_enabled_false() {
         let mut settings = TkSettings::default();
         settings.add("a");
-        assert!(settings.is_enabled("a") == false);
+        assert!(!settings.is_enabled("a"));
     }
 
     #[test]
@@ -295,7 +291,7 @@ mod tests {
         let mut settings = TkSettings::default();
         settings.add("a");
         settings.set_enabled("a", true);
-        assert!(settings.is_enabled("a") == true);
+        assert!(settings.is_enabled("a"));
     }
 
     #[test]
@@ -323,10 +319,10 @@ mod tests {
         if let TkConnectionType::WebSocket(endpoint) = settings.connection {
             assert_eq!(endpoint, "3.44.33.6:12345")
         } else {
-            assert!(false)
+            panic!()
         }
     }
-        
+
     #[test]
     fn set_valid_websocket_endpoint_hostname() {
         let mut settings = TkSettings::default();
@@ -335,7 +331,7 @@ mod tests {
         if let TkConnectionType::WebSocket(endpoint) = settings.connection {
             assert_eq!(endpoint, "localhost:12345")
         } else {
-            assert!(false)
+            panic!()
         }
     }
 
@@ -347,7 +343,6 @@ mod tests {
         let path = file_path.to_str().unwrap();
         assert_ok!(fs::write(file_path.clone(), content));
 
-        (path.clone().into(), tmp_path)
+        (path.into(), tmp_path)
     }
 }
-

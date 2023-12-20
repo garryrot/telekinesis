@@ -76,9 +76,9 @@ impl Telekinesis {
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
         let event_sender_clone = event_sender.clone();
 
-        let settings = provided_settings.or(Some(TkSettings::default())).unwrap();
+        let settings = provided_settings.unwrap_or_else(TkSettings::default);
 
-        let connection_status = Arc::new(Mutex::new(TkStatus::new())); // ugly
+        let connection_status = Arc::new(Mutex::new(TkStatus::default())); // ugly
         let status_clone = connection_status.clone();
         runtime.spawn(async move {
             debug!("starting connection handling thread");
@@ -98,12 +98,12 @@ impl Telekinesis {
         });
 
         Ok(Telekinesis {
-            command_sender: command_sender,
+            command_sender,
             connection_events: event_receiver,
-            runtime: runtime,
-            settings: settings,
+            runtime,
+            settings,
             connection_status: status_clone,
-            scheduler: scheduler,
+            scheduler,
             event_sender: event_sender_clone,
         })
     }
@@ -143,10 +143,8 @@ impl Telekinesis {
             let devices = status
                 .device_status
                 .values()
-                .into_iter()
-                .filter(|d| d.device.name() == device_name)
-                .map(|value| value.clone())
-                .next();
+                .into_iter().find(|d| d.device.name() == device_name)
+                .cloned();
             return devices;
         } else {
             error!("Error accessing device map");
@@ -184,7 +182,7 @@ impl Telekinesis {
 
     pub fn scan_for_devices(&self) -> bool {
         info!("start scan for devices");
-        if let Err(_) = self.command_sender.try_send(TkCommand::Scan) {
+        if self.command_sender.try_send(TkCommand::Scan).is_err() {
             error!("Failed to start scan");
             return false;
         }
@@ -193,7 +191,7 @@ impl Telekinesis {
 
     pub fn stop_scan(&self) -> bool {
         info!("stop scan");
-        if let Err(_) = self.command_sender.try_send(TkCommand::StopScan) {
+        if self.command_sender.try_send(TkCommand::StopScan).is_err() {
             error!("Failed to stop scan");
             return false;
         }
@@ -248,7 +246,6 @@ impl Telekinesis {
         pattern_name: String,
     ) -> i32 {
         info!("vibrate pattern {:?}", pattern);
-        let pattern_clone = pattern.clone();
         let params = TkParams::from_input(tags.clone(), pattern, &self.settings.devices);
 
         let actuators = self.get_devices();
@@ -305,7 +302,7 @@ impl Telekinesis {
     pub fn stop_all(&mut self) -> bool {
         info!("stop all");
         self.scheduler.stop_all();
-        if let Err(_) = self.command_sender.try_send(TkCommand::StopAll) {
+        if self.command_sender.try_send(TkCommand::StopAll).is_err() {
             error!("Failed to queue stop_all");
             return false;
         }
@@ -314,7 +311,7 @@ impl Telekinesis {
 
     pub fn disconnect(&mut self) {
         info!("disconnect");
-        if let Err(_) = self.command_sender.try_send(TkCommand::Disconect) {
+        if self.command_sender.try_send(TkCommand::Disconect).is_err() {
             error!("Failed to send disconnect");
         }
     }
@@ -395,17 +392,16 @@ fn get_pattern_paths(pattern_path: &str) -> Result<Vec<TkPatternFile>, anyhow::E
             .ok_or_else(|| anyhow!("No file name"))?
             .to_str()
             .ok_or_else(|| anyhow!("Invalid unicode"))?;
-        if false == file_name.to_lowercase().ends_with(".funscript") {
+        if !file_name.to_lowercase().ends_with(".funscript") {
             continue;
         }
 
         let is_vibration = file_name.to_lowercase().ends_with(".vibrator.funscript");
-        let removal;
-        if is_vibration {
-            removal = file_name.len() - ".vibrator.funscript".len();
+        let removal = if is_vibration {
+            file_name.len() - ".vibrator.funscript".len()
         } else {
-            removal = file_name.len() - ".funscript".len();
-        }
+            file_name.len() - ".funscript".len()
+        };
 
         patterns.push(TkPatternFile {
             path: path_clone,
@@ -421,7 +417,7 @@ pub fn read_pattern(
     pattern_name: &str,
     vibration_pattern: bool,
 ) -> Option<FScript> {
-    match read_pattern_name(pattern_path, &pattern_name, vibration_pattern) {
+    match read_pattern_name(pattern_path, pattern_name, vibration_pattern) {
         Ok(funscript) => Some(funscript),
         Err(err) => {
             error!(
@@ -442,11 +438,10 @@ pub fn read_pattern_name(
     let patterns = get_pattern_paths(pattern_path)?;
     let pattern = patterns
         .iter()
-        .filter(|d| {
+        .find(|d| {
             d.is_vibration == vibration_pattern
                 && d.name.to_lowercase() == pattern_name.to_lowercase()
         })
-        .next()
         .ok_or_else(|| anyhow!("Pattern '{}' not found", pattern_name))?;
 
     let fs = funscript::load_funscript(pattern.path.to_str().unwrap())?;
@@ -813,7 +808,7 @@ mod tests {
         thread::sleep(Duration::from_secs(5));
         match &tk.connection_status.lock().unwrap().connection_status {
             TkConnectionStatus::Failed(err) => {
-                assert!(err.len() > 0);
+                assert!(!err.is_empty());
             }
             _ => todo!(),
         };

@@ -8,18 +8,18 @@ use buttplug::{client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEven
 use crossbeam_channel::Sender;
 use futures::StreamExt;
 use tokio::runtime::Handle;
-use tracing::{debug, error, info, span, Level};
+use tracing::{error, info, span, Level};
 
 use crate::{ pattern::{Speed, TkActuator}, settings::TkConnectionType};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TkConnectionStatus {
     NotConnected,
     Connected,
     Failed(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TkDeviceStatus {
     pub status: TkConnectionStatus,
     pub device: Arc<ButtplugClientDevice>,
@@ -41,7 +41,7 @@ pub struct TkStatus {
 }
 
 impl TkStatus {
-    pub fn new() -> Self {
+    pub fn default() -> Self {
         TkStatus {
             connection_status: TkConnectionStatus::NotConnected,
             device_status: HashMap::new(),
@@ -180,7 +180,7 @@ fn try_set_device_status(connection_status: &Arc<Mutex<TkStatus>>, device: &Arc<
         .device_status
         .insert(
             device.index(),
-            TkDeviceStatus::new(&device, status),
+            TkDeviceStatus::new(device, status),
         );
 }
 
