@@ -90,7 +90,7 @@ impl Telekinesis {
                 type_name,
             )
             .await;
-            debug!("connection handling stopped")
+            debug!("connection handling stopped");
         });
 
         let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
@@ -100,7 +100,7 @@ impl Telekinesis {
         runtime.spawn(async move {
             debug!("starting worker thread");
             worker.run_worker_thread().await;
-            debug!("worked thread stopped")
+            debug!("worked thread stopped");
         });
 
         Ok(Telekinesis {
@@ -342,7 +342,7 @@ impl Telekinesis {
         self.settings = settings;
     }
 
-    pub fn settings_set_events(&mut self, device_name: &str, events: Vec<String>) {
+    pub fn settings_set_events(&mut self, device_name: &str, events: &[String]) {
         debug!("Setting '{}'.events={:?}", device_name, events);
         let settings = self.settings.clone();
         self.settings = settings.set_events(device_name, events);
@@ -602,8 +602,8 @@ mod tests {
     #[test]
     fn events_get() {
         let empty: Vec<String> = vec![];
-        let one_event: Vec<String> = vec![String::from("evt2")];
-        let two_events: Vec<String> = vec![String::from("evt2"), String::from("evt3")];
+        let one_event = &[String::from("evt2")];
+        let two_events = &[String::from("evt2"), String::from("evt3")];
 
         let (mut tk, _) = wait_for_connection(vec![
             scalar(1, "vib1", ActuatorType::Vibrate),
@@ -611,8 +611,8 @@ mod tests {
             scalar(3, "vib3", ActuatorType::Vibrate),
         ]);
 
-        tk.settings_set_events("vib2", one_event.clone());
-        tk.settings_set_events("vib3", two_events.clone());
+        tk.settings_set_events("vib2", one_event);
+        tk.settings_set_events("vib3", two_events);
 
         assert_eq!(tk.settings_get_events("vib1"), empty);
         assert_eq!(tk.settings_get_events("vib2"), one_event);
@@ -625,8 +625,8 @@ mod tests {
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
         ]);
-        tk.settings_set_events("vib1", vec![String::from("selected_event")]);
-        tk.settings_set_events("vib2", vec![String::from("bogus")]);
+        tk.settings_set_events("vib1", &[String::from("selected_event")]);
+        tk.settings_set_events("vib2", &[String::from("bogus")]);
 
         tk.vibrate(
             Speed::max(),
@@ -646,7 +646,7 @@ mod tests {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
         tk.settings_set_enabled("vib1", true);
-        tk.settings_set_events("vib1", vec![String::from("some event")]);
+        tk.settings_set_events("vib1", &[String::from("some event")]);
         tk.vibrate(
             Speed::max(),
             Duration::from_millis(1),
@@ -663,7 +663,7 @@ mod tests {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
         tk.settings_set_enabled("vib1", true);
-        tk.settings_set_events("vib1", vec![String::from(" SoMe EvEnT    ")]);
+        tk.settings_set_events("vib1", &[String::from(" SoMe EvEnT    ")]);
         tk.vibrate(
             Speed::max(),
             Duration::from_millis(1),
@@ -871,7 +871,7 @@ mod tests {
         )
         .unwrap();
         tk.vibrate(Speed::new(22), Duration::from_millis(1), vec![]);
-        get_next_events_blocking(tk.connection_events.clone());
+        get_next_events_blocking(&tk.connection_events);
     }
 
     #[test]
@@ -884,7 +884,7 @@ mod tests {
         .unwrap();
         tk.vibrate(Speed::new(10), Duration::from_millis(100), vec![]);
         tk.vibrate(Speed::new(20), Duration::from_millis(200), vec![]);
-        get_next_events_blocking(tk.connection_events.clone());
-        get_next_events_blocking(tk.connection_events.clone());
+        get_next_events_blocking(&tk.connection_events);
+        get_next_events_blocking(&tk.connection_events);
     }
 }

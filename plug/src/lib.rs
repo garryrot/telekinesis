@@ -174,12 +174,12 @@ impl TkApi {
             if let Some(tk) = guard.take() {
                 let evt_receiver = tk.connection_events.clone();
                 guard.replace(tk);
-                receiver = Some(evt_receiver)
+                receiver = Some(evt_receiver);
             }
         }
         match receiver {
             Some(receiver) => {
-                if let Some(evt) = get_next_events_blocking(receiver) {
+                if let Some(evt) = get_next_events_blocking(&receiver) {
                     return vec![evt];
                 }
                 vec![]
@@ -195,7 +195,7 @@ impl TkApi {
 }
 
 pub fn get_next_events_blocking(
-    connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
+    connection_events: &crossbeam_channel::Receiver<TkConnectionEvent>,
 ) -> Option<SKSEModEvent> {
     if let Ok(result) = connection_events.recv() {
         let event = match result {
@@ -218,11 +218,11 @@ pub fn get_next_events_blocking(
                     tags.iter().join(","),
                     actuators.iter().map(|x| x.identifier()).join(",")
                 );
-                SKSEModEvent::new("Tele_DeviceActionStarted", &str_arg, handle as f64)
+                SKSEModEvent::new("Tele_DeviceActionStarted", &str_arg, f64::from(handle))
             }
             TkConnectionEvent::ActionDone(task, duration, handle) => {
                 let str_arg = format!("{} done after {:.1}s", task, duration.as_secs());
-                SKSEModEvent::new("Tele_DeviceActionDone", &str_arg, handle as f64)
+                SKSEModEvent::new("Tele_DeviceActionDone", &str_arg, f64::from(handle))
             }
             TkConnectionEvent::ActionError(_, err) => {
                 SKSEModEvent::new("Tele_DeviceError", &err, 0.0)
@@ -306,11 +306,11 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         default: ERROR_HANDLE,
     })
     .def_stop(ApiStop {
-        exec: |tk: &mut Telekinesis, handle| tk.stop(handle),
+        exec: Telekinesis::stop,
     })
     .def_cmd(ApiCmd0 {
         name: "stop_all",
-        exec: |tk| tk.stop_all(),
+        exec: Telekinesis::stop_all,
     })
     // settings
     .def_cmd(ApiCmd0 {
@@ -347,7 +347,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_cmd2(ApiCmd2 {
         name: "device.settings.events",
         exec: |tk, device_name, events| {
-            tk.settings_set_events(device_name, parse_list_string(events));
+            tk.settings_set_events(device_name, &parse_list_string(events));
             true
         },
     })

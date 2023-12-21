@@ -570,7 +570,7 @@ impl TkPatternPlayer {
     }
 
     async fn do_linear(&mut self, pos: f64, duration_ms: u32) -> TkButtplugClientResult {
-        for actuator in self.actuators.iter() {
+        for actuator in &self.actuators {
             self.action_sender
                 .send(TkDeviceAction::Move(
                     actuator.clone(),

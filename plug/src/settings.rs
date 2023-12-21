@@ -114,10 +114,10 @@ impl TkSettings {
         if self.devices.iter().any(|d| d.name == device_name) {
             return;
         }
-        self.devices.push(TkDeviceSettings::from_name(device_name))
+        self.devices.push(TkDeviceSettings::from_name(device_name));
     }
 
-    pub fn set_events(mut self, device_name: &str, events: Vec<String>) -> Self {
+    pub fn set_events(mut self, device_name: &str, events: &[String]) -> Self {
         self.assure_exists(device_name);
         let evts: Vec<String> = sanitize_name_list(&events);
         self.devices = self
