@@ -1,9 +1,10 @@
 use api::*;
-use connection::{TkCommand, TkConnectionEvent, TkConnectionStatus, TkStatus};
+use buttplug::core::message::ActuatorType;
+use connection::{TkCommand, TkConnectionEvent, TkConnectionStatus, TkStatus, Task};
 use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
 use itertools::Itertools;
-use pattern::{Speed, TkButtplugScheduler, TkPattern};
+use pattern::{Speed, TkButtplugScheduler};
 use std::sync::{Arc, Mutex};
 use tokio::{runtime::Runtime, sync::mpsc::Sender};
 use tracing::instrument;
@@ -282,9 +283,10 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "vibrate",
         exec: |tk, speed, time_sec, _pattern_name, events| {
             tk.vibrate(
-                Speed::new(speed.into()),
+                Task::Scalar(Speed::new(speed.into())),
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
+                None
             )
         },
         default: ERROR_HANDLE,
@@ -296,10 +298,11 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             pattern_name,
             true,
         ) {
-            Some(fscript) => tk.vibrate_pattern(
-                TkPattern::Funscript(get_duration_from_secs(time_sec), Arc::new(fscript)),
+            Some(fscript) => tk.vibrate(
+                Task::Pattern(ActuatorType::Vibrate, pattern_name.into()),
+                get_duration_from_secs(time_sec),
                 read_input_string(events),
-                String::from(pattern_name),
+                Some(fscript)
             ),
             None => ERROR_HANDLE,
         },

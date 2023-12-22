@@ -120,12 +120,6 @@ pub struct Speed {
     pub value: u16,
 }
 
-#[derive(Clone, Debug)]
-pub enum TkPattern {
-    Linear(Duration, Speed),
-    Funscript(Duration, Arc<FScript>),
-}
-
 struct ReferenceCounter {
     access_list: HashMap<String, u32>,
 }
@@ -470,59 +464,55 @@ impl TkPatternPlayer {
         last_result
     }
 
-    /// Executes the scalar 'fscript' for 'duration' and consumes the player
-    pub async fn play_scalar(self, pattern: TkPattern) -> TkButtplugClientResult {
-        let handle = self.handle;
-        info!("start pattern {:?} <scalar> ({})", pattern, handle);
-        let result = match pattern {
-            TkPattern::Linear(duration, speed) => {
-                self.do_scalar(speed, true);
-                cancellable_wait(duration, &self.cancellation_token).await;
-                self.do_stop(true).await
+    pub async fn play_scalar_pattern(self, duration: Duration, fscript: FScript) -> TkButtplugClientResult {
+        if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
+            return Ok(());
+        }
+        info!("start pattern {}(ms) for {:?} <scalar> ({})", fscript.actions.last().unwrap().at, duration, self.handle);
+        let waiter = self.stop_after(duration);
+        let action_len = fscript.actions.len();
+        let mut started = false;
+        let mut loop_started = Instant::now();
+        let mut i: usize = 0;
+        loop {
+            let mut j = 1;
+            while j + i < action_len - 1
+                && (fscript.actions[i + j].at - fscript.actions[i].at)
+                    < self.player_scalar_resolution_ms
+            {
+                j += 1;
             }
-            TkPattern::Funscript(duration, fscript) => {
-                if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
-                    return Ok(());
-                }
-                let waiter = self.stop_after(duration);
-                let action_len = fscript.actions.len();
-                let mut started = false;
-                let mut loop_started = Instant::now();
-                let mut i: usize = 0;
-                loop {
-                    let mut j = 1;
-                    while j + i < action_len - 1
-                        && (fscript.actions[i + j].at - fscript.actions[i].at)
-                            < self.player_scalar_resolution_ms
-                    {
-                        j += 1;
-                    }
-                    let current = &fscript.actions[i % action_len];
-                    let next = &fscript.actions[(i + j) % action_len];
+            let current = &fscript.actions[i % action_len];
+            let next = &fscript.actions[(i + j) % action_len];
 
-                    if !started {
-                        self.do_scalar(Speed::from_fs(current), false);
-                        started = true;
-                    } else {
-                        self.do_update(Speed::from_fs(current))
-                    }
-                    if let Some(waiting_time) =
-                        Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
-                    {
-                        if !(cancellable_wait(waiting_time, &self.cancellation_token).await) {
-                            break;
-                        }
-                    }
-                    i += j;
-                    if (i % action_len) == 0 {
-                        loop_started = Instant::now();
-                    }
-                }
-                waiter.abort();
-                self.do_stop(false).await
+            if !started {
+                self.do_scalar(Speed::from_fs(current), false);
+                started = true;
+            } else {
+                self.do_update(Speed::from_fs(current))
             }
-        };
-        info!("stop pattern ({})", handle);
+            if let Some(waiting_time) =
+                Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
+            {
+                if !(cancellable_wait(waiting_time, &self.cancellation_token).await) {
+                    break;
+                }
+            }
+            i += j;
+            if (i % action_len) == 0 {
+                loop_started = Instant::now();
+            }
+        }
+        waiter.abort();
+        self.do_stop(false).await
+    }
+
+    /// Executes the scalar 'fscript' for 'duration' and consumes the player
+    pub async fn play_scalar(self, duration: Duration, speed: Speed) -> TkButtplugClientResult {
+        let handle = self.handle;
+        self.do_scalar(speed, true);
+        cancellable_wait(duration, &self.cancellation_token).await;
+        let result = self.do_stop(true).await;
         result
     }
 
@@ -608,7 +598,6 @@ async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> boo
 mod tests {
     use crate::fakes::tests::get_test_client;
     use crate::fakes::{linear, scalar, scalars, FakeMessage};
-    use crate::pattern::TkPattern;
     use crate::Speed;
     use std::sync::Arc;
     use std::thread;
@@ -657,32 +646,43 @@ mod tests {
             }
         }
 
-        fn play_background_on(&mut self, pattern: TkPattern, actuators: Vec<Arc<TkActuator>>) {
+        fn play_background_on(&mut self, duration: Duration, speed: Speed, actuators: Vec<Arc<TkActuator>>) {
             let player = self.scheduler.create_player(actuators);
             self.handles.push(Handle::current().spawn(async move {
-                player.play_scalar(pattern).await.unwrap();
+                player.play_scalar(duration, speed).await.unwrap();
             }));
         }
 
-        fn play_background(&mut self, pattern: TkPattern) {
+        fn play_background(&mut self, duration: Duration, speed: Speed) {
             let player = self
                 .scheduler
                 .create_player(get_actuators(self.all_devices.clone()));
             self.handles.push(Handle::current().spawn(async move {
-                player.play_scalar(pattern).await.unwrap();
-            }));
+                player.play_scalar(duration, speed).await.unwrap();
+            }))
         }
 
-        async fn play(&mut self, pattern: TkPattern) {
-            let player = self
+        async fn play(&mut self, duration: Duration, speed: Speed) {
+            let player: super::TkPatternPlayer = self
                 .scheduler
                 .create_player(get_actuators(self.all_devices.clone()));
-            player.play_scalar(pattern).await.unwrap();
+            player.play_scalar(duration, speed).await.unwrap();
         }
 
-        async fn play_scalar_on_actuator(&mut self, pattern: TkPattern, actuator: Arc<TkActuator>) {
+        async fn play_scalar_pattern(&mut self, duration: Duration, fscript: FScript) {
+            let player: super::TkPatternPlayer = self
+                .scheduler
+                .create_player(get_actuators(self.all_devices.clone()));
+            player.play_scalar_pattern(duration, fscript).await.unwrap();
+        }
+
+        // async fn await_last(&mut self) {
+        //     self.handles.last().await;
+        // }
+
+        async fn play_scalar_on_actuator(&mut self, duration: Duration, fscript: FScript, actuator: Arc<TkActuator>) {
             let player = self.scheduler.create_player(vec![actuator]);
-            player.play_scalar(pattern).await.unwrap();
+            player.play_scalar_pattern(duration, fscript).await.unwrap();
         }
 
         async fn play_linear(&mut self, funscript: FScript, duration: Duration) {
@@ -712,7 +712,7 @@ mod tests {
         assert!(
             timeout(
                 Duration::from_secs(1),
-                player.play(TkPattern::Linear(Duration::from_millis(50), Speed::max())),
+                player.play(Duration::from_millis(50), Speed::max()),
             )
             .await
             .is_ok(),
@@ -855,15 +855,14 @@ mod tests {
         let mut player = PlayerTest::setup(&client.created_devices);
 
         // act & assert
-        let mut pattern =
-            TkPattern::Funscript(Duration::from_millis(1), Arc::new(FScript::default()));
-        player.play(pattern).await;
+        let duration = Duration::from_millis(1);
+        let fscript = FScript::default();
+        player.play_scalar_pattern(duration, fscript).await;
 
         let mut fscript = FScript::default();
         fscript.actions.push(FSPoint { pos: 0, at: 0 });
         fscript.actions.push(FSPoint { pos: 0, at: 0 });
-        pattern = TkPattern::Funscript(Duration::from_millis(200), Arc::new(fscript));
-        player.play(pattern).await;
+        player.play_scalar_pattern(Duration::from_millis(200), fscript).await;
     }
 
     #[tokio::test]
@@ -881,7 +880,8 @@ mod tests {
         fs1.actions.push(FSPoint { pos: 20, at: 100 });
         player
             .play_scalar_on_actuator(
-                TkPattern::Funscript(Duration::from_millis(125), Arc::new(fs1)),
+                Duration::from_millis(125), 
+                fs1,
                 actuators[1].clone(),
             )
             .await;
@@ -891,7 +891,8 @@ mod tests {
         fs2.actions.push(FSPoint { pos: 40, at: 100 });
         player
             .play_scalar_on_actuator(
-                TkPattern::Funscript(Duration::from_millis(125), Arc::new(fs2)),
+                Duration::from_millis(125),
+                fs2,
                 actuators[0].clone(),
             )
             .await;
@@ -918,8 +919,7 @@ mod tests {
         fs.actions.push(FSPoint { pos: 70, at: 100 });
 
         let start = Instant::now();
-        let pattern = TkPattern::Funscript(Duration::from_millis(125), Arc::new(fs));
-        player.play(pattern).await;
+        player.play_scalar_pattern(Duration::from_millis(125), fs).await;
 
         // assert
         client.print_device_calls(start);
@@ -943,10 +943,7 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play(TkPattern::Funscript(
-                get_duration_ms(&fscript),
-                Arc::new(fscript),
-            ))
+            .play_scalar_pattern(get_duration_ms(&fscript), fscript)
             .await;
 
         // assert
@@ -974,10 +971,7 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play(TkPattern::Funscript(
-                Duration::from_millis(150),
-                Arc::new(fs),
-            ))
+            .play_scalar_pattern(Duration::from_millis(150), fs)
             .await;
 
         // assert
@@ -1002,16 +996,12 @@ mod tests {
         // act
         let start = Instant::now();
 
-        player.play_background(TkPattern::Linear(
-            Duration::from_millis(500),
-            Speed::new(50),
-        ));
+        player.play_background(Duration::from_millis(500),Speed::new(50));
         wait_ms(100).await;
         player
-            .play(TkPattern::Linear(
-                Duration::from_millis(100),
+            .play(                Duration::from_millis(100),
                 Speed::new(100),
-            ))
+            )
             .await;
         player.finish_background().await;
 
@@ -1037,14 +1027,14 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background(TkPattern::Linear(Duration::from_secs(3), Speed::new(20)));
+        player.play_background(Duration::from_secs(3), Speed::new(20));
         wait_ms(250).await;
 
-        player.play_background(TkPattern::Linear(Duration::from_secs(2), Speed::new(40)));
+        player.play_background(Duration::from_secs(2), Speed::new(40));
         wait_ms(250).await;
 
         player
-            .play(TkPattern::Linear(Duration::from_secs(1), Speed::new(80)))
+            .play(Duration::from_secs(1), Speed::new(80))
             .await;
         player.finish_background().await;
 
@@ -1073,14 +1063,14 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background(TkPattern::Linear(Duration::from_secs(3), Speed::new(20)));
+        player.play_background(Duration::from_secs(3), Speed::new(20));
         wait_ms(250).await;
 
-        player.play_background(TkPattern::Linear(Duration::from_secs(1), Speed::new(40)));
+        player.play_background(Duration::from_secs(1), Speed::new(40));
         wait_ms(250).await;
 
         player
-            .play(TkPattern::Linear(Duration::from_secs(1), Speed::new(80)))
+            .play(Duration::from_secs(1), Speed::new(80))
             .await;
         thread::sleep(Duration::from_secs(2));
         player.finish_background().await;
@@ -1116,13 +1106,13 @@ mod tests {
         }
 
         let start = Instant::now();
-        player.play_background(TkPattern::Linear(Duration::from_secs(1), Speed::new(99)));
+        player.play_background(Duration::from_secs(1), Speed::new(99));
         wait_ms(250).await;
         player
-            .play(TkPattern::Funscript(
+            .play_scalar_pattern(
                 Duration::from_secs(3),
-                Arc::new(fscript),
-            ))
+                fscript,
+            )
             .await;
 
         // assert
@@ -1142,11 +1132,11 @@ mod tests {
         // act
         let start = Instant::now();
         player.play_background_on(
-            TkPattern::Linear(Duration::from_millis(300), Speed::new(99)),
+            Duration::from_millis(300), Speed::new(99),
             get_actuators(vec![client.get_device(1)]),
         );
         player.play_background_on(
-            TkPattern::Linear(Duration::from_millis(200), Speed::new(88)),
+            Duration::from_millis(200), Speed::new(88),
             get_actuators(vec![client.get_device(2)]),
         );
 

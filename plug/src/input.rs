@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use cxx::{CxxString, CxxVector};
 
-use crate::{settings::TkDeviceSettings, TkPattern, connection::ActuatorList};
+use crate::{settings::TkDeviceSettings, connection::{ActuatorList, Task}};
 
 pub fn sanitize_name_list(list: &[String]) -> Vec<String> {
     list.iter()
@@ -40,7 +40,7 @@ pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {
 #[derive(Clone, Debug)]
 pub struct TkParams {
     pub selector: Vec<String>,
-    pub pattern: TkPattern,
+    pub task: Task,
     pub events: Vec<String>
 }
 
@@ -61,7 +61,7 @@ impl TkParams {
 
     pub fn from_input(
         events: Vec<String>,
-        pattern: TkPattern,
+        task: Task,
         devices: &[TkDeviceSettings],
     ) -> Self {
         let event_names = sanitize_name_list(&events);
@@ -75,7 +75,7 @@ impl TkParams {
             .collect();
         TkParams {
             selector: device_names,
-            pattern,
+            task,
             events
         }
     }
