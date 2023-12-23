@@ -747,9 +747,9 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
         // act
-        tk.vibrate( Task::Scalar(Speed::max()), Duration::from_secs(1), vec![], None);
         thread::sleep(Duration::from_secs(1));
-
+        tk.vibrate(Task::Scalar(Speed::max()), Duration::from_secs(1), vec![], None);
+        thread::sleep(Duration::from_secs(2));
         call_registry.get_device(1)[0].assert_strenth(1.0);
         tk.stop_all();
 
