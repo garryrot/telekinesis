@@ -655,7 +655,7 @@ mod tests {
             player.play_scalar_pattern(duration, fscript).await.unwrap();
         }
 
-        fn play(&mut self, duration: Duration, speed: Speed, actuators: Option<Vec<Arc<TkActuator>>>) {
+        fn play_scalar(&mut self, duration: Duration, speed: Speed, actuators: Option<Vec<Arc<TkActuator>>>) {
             let actuators = match actuators {
                 Some(actuators) => actuators,
                 None => get_actuators(self.all_devices.clone()),
@@ -668,10 +668,6 @@ mod tests {
             }));
         }
 
-        async fn await_last(&mut self) {
-            let _ = self.handles.pop().unwrap().await;
-        }
-
         async fn play_linear(&mut self, funscript: FScript, duration: Duration) {
             let player = self
                 .scheduler
@@ -679,7 +675,11 @@ mod tests {
             player.play_linear(funscript, duration).await.unwrap();
         }
 
-        async fn finish_background(self) {
+        async fn await_last(&mut self) {
+            let _ = self.handles.pop().unwrap().await;
+        }
+
+        async fn await_all(self) {
             join_all(self.handles).await;
         }
     }
@@ -696,7 +696,7 @@ mod tests {
         fs.actions.push(FSPoint { pos: 2, at: 20 });
         
         // act & assert
-        player.play(Duration::from_millis(50), Speed::max(), None);
+        player.play_scalar(Duration::from_millis(50), Speed::max(), None);
         assert!(
             timeout(
                 Duration::from_secs(1),
@@ -983,10 +983,10 @@ mod tests {
         // act
         let start = Instant::now();
 
-        player.play(Duration::from_millis(500),Speed::new(50), None);
+        player.play_scalar(Duration::from_millis(500),Speed::new(50), None);
         wait_ms(100).await;
-        player.play(Duration::from_millis(100), Speed::new(100), None);
-        player.finish_background().await;
+        player.play_scalar(Duration::from_millis(100), Speed::new(100), None);
+        player.await_all().await;
 
         // assert
         client.print_device_calls(start);
@@ -1010,15 +1010,15 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play(Duration::from_secs(3), Speed::new(20), None);
+        player.play_scalar(Duration::from_secs(3), Speed::new(20), None);
         wait_ms(250).await;
 
-        player.play(Duration::from_secs(2), Speed::new(40), None);
+        player.play_scalar(Duration::from_secs(2), Speed::new(40), None);
         wait_ms(250).await;
 
         player
-            .play(Duration::from_secs(1), Speed::new(80), None);
-        player.finish_background().await;
+            .play_scalar(Duration::from_secs(1), Speed::new(80), None);
+        player.await_all().await;
 
         // assert
         client.print_device_calls(start);
@@ -1045,17 +1045,17 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play(Duration::from_secs(3), Speed::new(20), None);
+        player.play_scalar(Duration::from_secs(3), Speed::new(20), None);
         wait_ms(250).await;
 
-        player.play(Duration::from_secs(1), Speed::new(40), None);
+        player.play_scalar(Duration::from_secs(1), Speed::new(40), None);
         wait_ms(250).await;
 
         player
-            .play(Duration::from_secs(1), Speed::new(80), None);
+            .play_scalar(Duration::from_secs(1), Speed::new(80), None);
         player.await_last().await;
         thread::sleep(Duration::from_secs(2));
-        player.finish_background().await;
+        player.await_all().await;
 
         // assert
         client.print_device_calls(start);
@@ -1088,7 +1088,7 @@ mod tests {
         }
 
         let start = Instant::now();
-        player.play(Duration::from_secs(1), Speed::new(99), None);
+        player.play_scalar(Duration::from_secs(1), Speed::new(99), None);
         wait_ms(250).await;
         player
             .play_scalar_pattern(
@@ -1114,18 +1114,18 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play(
+        player.play_scalar(
             Duration::from_millis(300), 
             Speed::new(99),
             Some(get_actuators(vec![client.get_device(1)])),
         );
-        player.play(
+        player.play_scalar(
             Duration::from_millis(200), 
             Speed::new(88),
             Some(get_actuators(vec![client.get_device(2)])),
         );
 
-        player.finish_background().await;
+        player.await_all().await;
 
         // assert
         client.print_device_calls(start);
