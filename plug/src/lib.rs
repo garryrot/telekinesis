@@ -6,11 +6,10 @@ use input::get_duration_from_secs;
 use itertools::Itertools;
 use pattern::{Speed, TkButtplugScheduler};
 use std::sync::{Arc, Mutex};
-use tokio::{runtime::Runtime, sync::mpsc::Sender};
 use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::{get_pattern_names, read_pattern, ERROR_HANDLE};
+use telekinesis::{get_pattern_names, read_pattern, ERROR_HANDLE, Telekinesis};
 
 use crate::{
     input::{parse_list_string, read_input_string},
@@ -27,12 +26,18 @@ mod settings;
 pub mod telekinesis;
 mod util;
 
-/// Methods exposed to as papyrus native functions
-/// - All ffi methods except event qry are non-blocking, triggering an async action somewhere in the future
-/// - All error conditions during the function call (i.e. mutex not available) will
-///   be swallowed and logged to Telekinesis.log
+#[derive(Debug)]
+pub struct TkApi {
+    pub state: Arc<Mutex<Option<Telekinesis>>>,
+}
+
+/// Methods exposed as papyrus native functions
 /// - Uses a an abstract query/command engine to reduce coupling between the mod
 ///    functionality and the (rather tedious) `Plugin.cxx <-> Cxx <-> RustFFI` Sandwich
+///    basically, I don't want to change 5 method signatures whenever one of those methods changes
+/// - All ffi methods except  are non-blocking, triggering an async action somewhere in the future
+/// - All error conditions during the function call (i.e. mutex not available) will
+///   be swallowed and logged to Telekinesis.log
 #[cxx::bridge]
 mod ffi {
     #[derive(Debug)]
@@ -68,16 +73,6 @@ mod ffi {
     }
 }
 
-pub struct Telekinesis {
-    pub connection_status: Arc<Mutex<TkStatus>>,
-    settings: TkSettings,
-    runtime: Runtime,
-    command_sender: Sender<TkCommand>,
-    scheduler: TkButtplugScheduler,
-    connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
-    event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
-}
-
 impl SKSEModEvent {
     pub fn new(event_name: &str, str_arg: &str, num_arg: f64) -> SKSEModEvent {
         SKSEModEvent {
@@ -100,6 +95,25 @@ fn tk_new() -> Box<TkApi> {
     Box::new(TkApi {
         state: Arc::new(Mutex::new(None)),
     })
+}
+
+impl Api<Telekinesis> for TkApi {
+    fn state(&mut self) -> Arc<Mutex<Option<Telekinesis>>> {
+        self.state.clone()
+    }
+
+    fn fns(&self) -> ApiBuilder<Telekinesis> {
+        build_api()
+    }
+    fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
+        ApiCmd0 {
+            name: "disconnect",
+            exec: |tk| {
+                tk.disconnect();
+                true
+            },
+        }
+    }
 }
 
 impl TkApi {
@@ -165,8 +179,9 @@ impl TkApi {
         self.exec_stop(arg0)
     }
 
-    /// Return type Vec cause cxx does not support Option
-    /// and Result enforces try catch
+    /// Return type Vec cause cxx crate does not support Option
+    /// and Result enforces try catch with some weird template
+    /// I don't wanna get into
     #[instrument]
     fn tk_qry_nxt_evt(&mut self) -> Vec<SKSEModEvent> {
         let tele = &self.state();
@@ -379,26 +394,3 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     })
 }
 
-#[derive(Debug)]
-pub struct TkApi {
-    pub state: Arc<Mutex<Option<Telekinesis>>>,
-}
-
-impl Api<Telekinesis> for TkApi {
-    fn state(&mut self) -> Arc<Mutex<Option<Telekinesis>>> {
-        self.state.clone()
-    }
-
-    fn fns(&self) -> ApiBuilder<Telekinesis> {
-        build_api()
-    }
-    fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
-        ApiCmd0 {
-            name: "disconnect",
-            exec: |tk| {
-                tk.disconnect();
-                true
-            },
-        }
-    }
-}

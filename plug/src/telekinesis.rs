@@ -29,6 +29,7 @@ use std::{
     time::Instant,
 };
 use tokio::{runtime::Runtime, sync::mpsc::channel};
+use tokio::sync::mpsc::Sender;
 use tracing::{debug, error, info};
 
 use crate::connection::ActuatorList;
@@ -38,9 +39,9 @@ use crate::{
         handle_connection, TkCommand, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus,
     },
     input::TkParams,
-    pattern::{get_actuators, Speed, TkButtplugScheduler, TkPlayerSettings},
+    pattern::{get_actuators, TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
-    Telekinesis, TkStatus,
+    TkStatus,
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -55,6 +56,16 @@ pub fn in_process_connector(
                 .expect("Could not create in-process-server."), // TODO log error instead of panic
         )
         .finish()
+}
+
+pub struct Telekinesis {
+    pub connection_status: Arc<Mutex<TkStatus>>,
+    pub settings: TkSettings,
+    pub connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
+    runtime: Runtime,
+    command_sender: Sender<TkCommand>,
+    scheduler: TkButtplugScheduler,
+    event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
 }
 
 impl Telekinesis {
@@ -441,7 +452,7 @@ pub fn read_pattern_name(
     vibration_pattern: bool,
 ) -> Result<FScript, anyhow::Error> {
     let now = Instant::now();
-    let patterns = get_pattern_paths(pattern_path)?;
+    let patterns: Vec<TkPatternFile> = get_pattern_paths(pattern_path)?;
     let pattern = patterns
         .iter()
         .find(|d| {
@@ -464,6 +475,8 @@ mod tests {
     use buttplug::core::message::{ActuatorType, DeviceAdded};
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
+
+    use super::Telekinesis;
 
     macro_rules! assert_timeout {
         ($cond:expr, $arg:tt) => {

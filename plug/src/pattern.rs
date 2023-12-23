@@ -509,11 +509,9 @@ impl TkPatternPlayer {
 
     /// Executes the scalar 'fscript' for 'duration' and consumes the player
     pub async fn play_scalar(self, duration: Duration, speed: Speed) -> TkButtplugClientResult {
-        let handle = self.handle;
         self.do_scalar(speed, true);
         cancellable_wait(duration, &self.cancellation_token).await;
-        let result = self.do_stop(true).await;
-        result
+        self.do_stop(true).await
     }
 
     fn do_update(&self, speed: Speed) {
@@ -646,43 +644,32 @@ mod tests {
             }
         }
 
-        fn play_background_on(&mut self, duration: Duration, speed: Speed, actuators: Vec<Arc<TkActuator>>) {
-            let player = self.scheduler.create_player(actuators);
+        async fn play_scalar_pattern(&mut self, duration: Duration, fscript: FScript, actuators: Option<Vec<Arc<TkActuator>>>) {
+            let actuators = match actuators {
+                Some(actuators) => actuators,
+                None => get_actuators(self.all_devices.clone()),
+            };
+            let player: super::TkPatternPlayer = self
+                .scheduler
+                .create_player(actuators);
+            player.play_scalar_pattern(duration, fscript).await.unwrap();
+        }
+
+        fn play(&mut self, duration: Duration, speed: Speed, actuators: Option<Vec<Arc<TkActuator>>>) {
+            let actuators = match actuators {
+                Some(actuators) => actuators,
+                None => get_actuators(self.all_devices.clone()),
+            };
+            let player = self
+                .scheduler
+                .create_player(actuators);
             self.handles.push(Handle::current().spawn(async move {
                 player.play_scalar(duration, speed).await.unwrap();
             }));
         }
 
-        fn play_background(&mut self, duration: Duration, speed: Speed) {
-            let player = self
-                .scheduler
-                .create_player(get_actuators(self.all_devices.clone()));
-            self.handles.push(Handle::current().spawn(async move {
-                player.play_scalar(duration, speed).await.unwrap();
-            }))
-        }
-
-        async fn play(&mut self, duration: Duration, speed: Speed) {
-            let player: super::TkPatternPlayer = self
-                .scheduler
-                .create_player(get_actuators(self.all_devices.clone()));
-            player.play_scalar(duration, speed).await.unwrap();
-        }
-
-        async fn play_scalar_pattern(&mut self, duration: Duration, fscript: FScript) {
-            let player: super::TkPatternPlayer = self
-                .scheduler
-                .create_player(get_actuators(self.all_devices.clone()));
-            player.play_scalar_pattern(duration, fscript).await.unwrap();
-        }
-
-        // async fn await_last(&mut self) {
-        //     self.handles.last().await;
-        // }
-
-        async fn play_scalar_on_actuator(&mut self, duration: Duration, fscript: FScript, actuator: Arc<TkActuator>) {
-            let player = self.scheduler.create_player(vec![actuator]);
-            player.play_scalar_pattern(duration, fscript).await.unwrap();
+        async fn await_last(&mut self) {
+            let _ = self.handles.pop().unwrap().await;
         }
 
         async fn play_linear(&mut self, funscript: FScript, duration: Duration) {
@@ -709,10 +696,11 @@ mod tests {
         fs.actions.push(FSPoint { pos: 2, at: 20 });
         
         // act & assert
+        player.play(Duration::from_millis(50), Speed::max(), None);
         assert!(
             timeout(
                 Duration::from_secs(1),
-                player.play(Duration::from_millis(50), Speed::max()),
+                player.await_last(),
             )
             .await
             .is_ok(),
@@ -847,7 +835,6 @@ mod tests {
     }
 
     /// Scalar
-
     #[tokio::test]
     async fn test_scalar_empty_pattern_finishes_and_does_not_panic() {
         // arrange
@@ -857,12 +844,12 @@ mod tests {
         // act & assert
         let duration = Duration::from_millis(1);
         let fscript = FScript::default();
-        player.play_scalar_pattern(duration, fscript).await;
+        player.play_scalar_pattern(duration, fscript, None).await;
 
         let mut fscript = FScript::default();
         fscript.actions.push(FSPoint { pos: 0, at: 0 });
         fscript.actions.push(FSPoint { pos: 0, at: 0 });
-        player.play_scalar_pattern(Duration::from_millis(200), fscript).await;
+        player.play_scalar_pattern(Duration::from_millis(200), fscript, None).await;
     }
 
     #[tokio::test]
@@ -879,10 +866,10 @@ mod tests {
         fs1.actions.push(FSPoint { pos: 10, at: 0 });
         fs1.actions.push(FSPoint { pos: 20, at: 100 });
         player
-            .play_scalar_on_actuator(
+            .play_scalar_pattern(
                 Duration::from_millis(125), 
                 fs1,
-                actuators[1].clone(),
+                Some(vec![actuators[1].clone()]),
             )
             .await;
 
@@ -890,10 +877,10 @@ mod tests {
         fs2.actions.push(FSPoint { pos: 30, at: 0 });
         fs2.actions.push(FSPoint { pos: 40, at: 100 });
         player
-            .play_scalar_on_actuator(
+            .play_scalar_pattern(
                 Duration::from_millis(125),
                 fs2,
-                actuators[0].clone(),
+                Some(vec![actuators[0].clone()]),
             )
             .await;
 
@@ -919,7 +906,7 @@ mod tests {
         fs.actions.push(FSPoint { pos: 70, at: 100 });
 
         let start = Instant::now();
-        player.play_scalar_pattern(Duration::from_millis(125), fs).await;
+        player.play_scalar_pattern(Duration::from_millis(125), fs, None).await;
 
         // assert
         client.print_device_calls(start);
@@ -943,7 +930,7 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play_scalar_pattern(get_duration_ms(&fscript), fscript)
+            .play_scalar_pattern(get_duration_ms(&fscript), fscript, None)
             .await;
 
         // assert
@@ -971,7 +958,7 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play_scalar_pattern(Duration::from_millis(150), fs)
+            .play_scalar_pattern(Duration::from_millis(150), fs, None)
             .await;
 
         // assert
@@ -996,13 +983,9 @@ mod tests {
         // act
         let start = Instant::now();
 
-        player.play_background(Duration::from_millis(500),Speed::new(50));
+        player.play(Duration::from_millis(500),Speed::new(50), None);
         wait_ms(100).await;
-        player
-            .play(                Duration::from_millis(100),
-                Speed::new(100),
-            )
-            .await;
+        player.play(Duration::from_millis(100), Speed::new(100), None);
         player.finish_background().await;
 
         // assert
@@ -1027,15 +1010,14 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background(Duration::from_secs(3), Speed::new(20));
+        player.play(Duration::from_secs(3), Speed::new(20), None);
         wait_ms(250).await;
 
-        player.play_background(Duration::from_secs(2), Speed::new(40));
+        player.play(Duration::from_secs(2), Speed::new(40), None);
         wait_ms(250).await;
 
         player
-            .play(Duration::from_secs(1), Speed::new(80))
-            .await;
+            .play(Duration::from_secs(1), Speed::new(80), None);
         player.finish_background().await;
 
         // assert
@@ -1063,15 +1045,15 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background(Duration::from_secs(3), Speed::new(20));
+        player.play(Duration::from_secs(3), Speed::new(20), None);
         wait_ms(250).await;
 
-        player.play_background(Duration::from_secs(1), Speed::new(40));
+        player.play(Duration::from_secs(1), Speed::new(40), None);
         wait_ms(250).await;
 
         player
-            .play(Duration::from_secs(1), Speed::new(80))
-            .await;
+            .play(Duration::from_secs(1), Speed::new(80), None);
+        player.await_last().await;
         thread::sleep(Duration::from_secs(2));
         player.finish_background().await;
 
@@ -1106,12 +1088,13 @@ mod tests {
         }
 
         let start = Instant::now();
-        player.play_background(Duration::from_secs(1), Speed::new(99));
+        player.play(Duration::from_secs(1), Speed::new(99), None);
         wait_ms(250).await;
         player
             .play_scalar_pattern(
                 Duration::from_secs(3),
                 fscript,
+                None
             )
             .await;
 
@@ -1131,13 +1114,15 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_background_on(
-            Duration::from_millis(300), Speed::new(99),
-            get_actuators(vec![client.get_device(1)]),
+        player.play(
+            Duration::from_millis(300), 
+            Speed::new(99),
+            Some(get_actuators(vec![client.get_device(1)])),
         );
-        player.play_background_on(
-            Duration::from_millis(200), Speed::new(88),
-            get_actuators(vec![client.get_device(2)]),
+        player.play(
+            Duration::from_millis(200), 
+            Speed::new(88),
+            Some(get_actuators(vec![client.get_device(2)])),
         );
 
         player.finish_background().await;
