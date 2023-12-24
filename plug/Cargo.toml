@@ -1,40 +1,6 @@
-[package]
-name = "plug"
-version = "1.2.0"
-edition = "2021"
-
-[profile.release]
-opt-level = "z"
-lto = true
-strip = true
-codegen-units = 1
-
-[lib]
-name = "telekinesis_plug"
-crate-type = ["staticlib", "rlib"]
-
-[dependencies]
-bp_scheduler = { path = "./bp_scheduler" }
-bp_fakes = { path = "./bp_fakes" }
-crossbeam-channel = " 0.5.1"
-lazy_static = "1.4.0"
-anyhow = "1.0.68"
-buttplug = "7.1.2"
-futures = "0.3.25"
-tokio = { version = "1.23.0", features = ["full", "sync"] }
-tracing = "0.1.37"
-tracing-subscriber = "0.3.16"
-cxx = "1.0.95"
-tokio-test = "0.4.2"
-serde = "1.0.164"
-serde_json = "1.0.99"
-itertools = "0.11.0"
-funscript = "0.5.3"
-tokio-util = "0.7.8"
-
-[dev-dependencies]
-nonparallel = "0.1.0"
-tempfile = "3.7.0"
-
-[build-dependencies]
-cxx-build = "1.0"
+[workspace]
+members = [
+    "bp_fakes",
+    "bp_scheduler",
+    "tele"
+]
