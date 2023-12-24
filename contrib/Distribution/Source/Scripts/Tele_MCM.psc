@@ -465,7 +465,8 @@ Event OnPageReset(String page)
 
         AddHeaderOption("Logging")
         AddToggleOptionST("OPTION_LOG_CONNECTS", "Device connects/disconnects", TeleDevices.LogDeviceConnects)
-        AddToggleOptionST("OPTION_LOG_EVENTS", "Device events (Vibrations, etc.)", TeleDevices.LogDeviceEvents)
+        AddToggleOptionST("OPTION_LOG_EVENTS", "Device Starts Moving", TeleDevices.LogDeviceEvents)
+        AddToggleOptionST("OPTION_LOG_EVENTS_ENDS", "Device Stops Moving", TeleDevices.LogDeviceEvents)
         AddToggleOptionST("OPTION_LOG_DEBUG", "Other messages", TeleDevices.LogDebugEvents)
 
         AddHeaderOption("Spells")
@@ -1641,6 +1642,21 @@ State OPTION_LOG_CONNECTS
     EndEvent
 EndState
 
+State OPTION_LOG_EVENTS_ENDS
+    Event OnSelectST()
+        TeleDevices.LogDeviceEventEnd = !TeleDevices.LogDeviceEventEnd
+        SetToggleOptionValueST(TeleDevices.LogDeviceEventEnd)
+    EndEvent
+    
+    Event OnDefaultST()
+        SetToggleOptionValueST(TeleDevices.LogDeviceEventEnd)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Show notification when device stops moving (vibration etc.)")
+    EndEvent
+EndState
+
 State OPTION_LOG_EVENTS
     Event OnSelectST()
         TeleDevices.LogDeviceEvents = !TeleDevices.LogDeviceEvents
@@ -1652,7 +1668,7 @@ State OPTION_LOG_EVENTS
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Show notification when a device event (Vibration etc.) occurs")
+        SetInfoText("Show notification when device starts moving (vibration etc.)")
     EndEvent
 EndState
 
@@ -1671,7 +1687,6 @@ State OPTION_LOG_DEBUG
         SetInfoText("Show internal debug notifications")
     EndEvent
 EndState
-
 
 State ACTION_ADD_SPELLS_TO_PLAYER
     Event OnSelectST()

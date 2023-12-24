@@ -51,7 +51,7 @@ pub struct TkActuator {
 
 impl Display for TkActuator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}({})[{}].{}", self.device.name(), self.device.index(), self.index_in_device, self.actuator)
+        write!(f, "{}[{}].{}", self.device.name(), self.index_in_device, self.actuator)
     }
 }
 

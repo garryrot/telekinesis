@@ -387,10 +387,8 @@ Bool Property Chainbeasts_Vibrate
     Function Set(Bool enable)
         _Chainbeasts_Vibrate = enable
         If enable
-            TeleDevices.LogDebug("Enabled Chainbeasts Vibrate")
             RegisterForModEvent("SCB_VibeEvent", "OnSCB_VibeEvent")
         Else
-            TeleDevices.LogDebug("Disabled Chainbeasts Vibrate")
             UnregisterForModEvent("SCB_VibeEvent")
         EndIf
     EndFunction
@@ -449,7 +447,7 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     ; TODO Also use strength for patterns, once pattern strength is supported
     Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
     _DeviousDevicesVibrateHandle = HandleVibration(DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events)
-	TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
+	; TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form sender)
@@ -466,7 +464,6 @@ EndEvent
 
 Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	If !hasPlayer
-		TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
     sslThreadController controller = (Sexlab as SexLabFramework).GetController(threadID)
@@ -484,7 +481,6 @@ EndEvent
 
 Event OnSexlabAnimationEnd(int _, bool hasPlayer)
 	If !hasPlayer
-        TeleDevices.LogDebug("Animation on Non-Player")
 		return
 	EndIf
 	_InSexlabScene = False
@@ -493,12 +489,12 @@ EndEvent
 
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
 	TeleDevices.Vibrate(Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0))
-    TeleDevices.LogDebug("OnDeviceActorOrgasm")
+    ; TeleDevices.LogDebug("OnDeviceActorOrgasm")
 EndEvent
 
 Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
 	TeleDevices.Vibrate(Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0))
-    TeleDevices.LogDebug("OnDeviceEdgedActor")
+    ; TeleDevices.LogDebug("OnDeviceEdgedActor")
 EndEvent
 
 ; OStim 
@@ -531,14 +527,14 @@ Bool Function OstimPlayerIsPenetrated(String sceneID, Int playerTarget, Int play
 EndFunction
 
 Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
-    TeleDevices.LogDebug("OnOStimStart")
+    ; TeleDevices.LogDebug("OnOStimStart")
     _InOstimScene = true
     UnregisterForUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
 
 Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
-    TeleDevices.LogDebug("OnOstimEnd")
+    ; TeleDevices.LogDebug("OnOstimEnd")
     
     _InOstimScene = false
     _OstimInSexualScene = false
@@ -553,7 +549,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     If OThread.GetScene(0) != sceneID
         return
     EndIf
-    TeleDevices.LogDebug("OnOStimSceneChanged")
+    ; TeleDevices.LogDebug("OnOStimSceneChanged")
 
     Int playerActorIndex = -1
     Int playerTargetIndex = -1
@@ -650,26 +646,26 @@ Event OnToysPulsate(string eventName, string argString, float argNum, form sende
     String[] events = new String[1]
     events[0] = Toys_Vibrate_Event
     HandleVibration(Toys_Vibrate_DeviceSelector, duration, Toys_Vibrate_Pattern, Toys_Vibrate_Funscript, Toys_Vibrate_Linear_Strength, events)
-	TeleDevices.LogDebug("ToysPulsate")
+	; TeleDevices.LogDebug("ToysPulsate")
 EndEvent
 
 Int _ToysFondleHandle = -1
 Event OnToysFondleStart(string eventName, string argString, float argNum, form sender)
     ; Fondle started - successfully increased rousing
 	_ToysFondleHandle = TeleDevices.Vibrate(40, -1)
-	TeleDevices.LogDebug("ToysFondleStart")
+	; TeleDevices.LogDebug("ToysFondleStart")
 EndEvent
 
 Event OnToysFondleEnd(string eventName, string argString, float argNum, form sender)
     ; Fondle animation has ended (no player controls locking). Anim duration is 10 to 18 seconds.
 	TeleDevices.StopHandle(_ToysFondleHandle)
-	TeleDevices.LogDebug("ToysFondleEnd")
+	; TeleDevices.LogDebug("ToysFondleEnd")
 EndEvent
 
 Event OnToysSquirt(string eventName, string argString, float argNum, form sender)
      ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
 	TeleDevices.Vibrate(100, 12.0)
-	TeleDevices.LogDebug("ToysSquirt")
+	; TeleDevices.LogDebug("ToysSquirt")
 EndEvent
 
 String _LoveName
@@ -680,7 +676,7 @@ Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bo
     ; 	- event is sent for Player-less scenes. The param PlayerInScene will be false
     ; 	**Custom Parameters** Event <callbackName>(string LoveName, Bool PlayerInScene, int NumStages, Bool PlayerConsent, Form ActInPos1, Form ActInPos2, Form ActInPos3, Form ActInPos4, Form ActInPos5)
     If ! playerInScene
-        TeleDevices.LogDebug("Not the player")
+        ; TeleDevices.LogDebug("Not the player")
         return
     EndIf
 
@@ -694,7 +690,7 @@ Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bo
         _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, Toys_Animation_Pattern, Toys_Animation_Funscript, Toys_Animation_Linear_Strength, events)
     EndIf
 
-    TeleDevices.LogDebug("OnToysLoveSceneInfo LoveName=" + LoveName + " PlayerInScene + " + PlayerInScene + " Stages: " + NumStages + " PlayerConsent: " + PlayerConsent)
+    ; TeleDevices.LogDebug("OnToysLoveSceneInfo LoveName=" + LoveName + " PlayerInScene + " + PlayerInScene + " Stages: " + NumStages + " PlayerConsent: " + PlayerConsent)
 EndEvent
 
 String[] Function GetLoveTags(String loveName)
@@ -717,44 +713,44 @@ EndFunction
 Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
     _InToysScene = false
     TeleDevices.StopHandle(_ToysSceneVibrationHandle)
-	TeleDevices.LogDebug("OnToysSceneEnd")
+	; TeleDevices.LogDebug("OnToysSceneEnd")
 EndEvent
 
 Event OnToysClimax(string eventName, string argString, float argNum, form sender)
     ; Simultaneous Orgasm. Both player & NPC have climaxed. This can happen multiple times. Sent in addition to other climax events. This event always first
 	TeleDevices.Vibrate(80, 5)
-	TeleDevices.LogDebug("OnToysClimax")
+	; TeleDevices.LogDebug("OnToysClimax")
 EndEvent
 
 Event OnToysClimaxSimultaneous(string eventName, string argString, float argNum, form sender)
 	TeleDevices.Vibrate(100, 7)
-	TeleDevices.LogDebug("OnToysClimaxSimultaneous")
+	; TeleDevices.LogDebug("OnToysClimaxSimultaneous")
 EndEvent
 
 Event OnToysDenied(string eventName, string argString, float argNum, form sender)
 	TeleDevices.Vibrate(0, 7)
-	TeleDevices.LogDebug("OnToysDenied")
+	; TeleDevices.LogDebug("OnToysDenied")
 EndEvent
 
 Event OnToysVaginalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Vaginal"
     TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
- 	TeleDevices.LogDebug("OnToysVaginalPenetration")
+ 	; TeleDevices.LogDebug("OnToysVaginalPenetration")
 EndEvent
 
 Event OnToysAnalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Anal"
     TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
- 	TeleDevices.LogDebug("OnToysAnalPenetration")
+ 	; TeleDevices.LogDebug("OnToysAnalPenetration")
 EndEvent
 
 Event OnToysOralPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Oral"
     TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
- 	TeleDevices.LogDebug("OnToysOralPenetration")
+ 	; TeleDevices.LogDebug("OnToysOralPenetration")
 EndEvent
 
 ; Skyrim Chain Beasts Events
@@ -763,7 +759,7 @@ Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender
     String[] evts = new String[1]
     evts[0] = Chainbeasts_Vibrate_Event
     HandleVibration(Chainbeasts_Vibrate_DeviceSelector, 3, Chainbeasts_Vibrate_Pattern, Chainbeasts_Vibrate_Funscript, Chainbeasts_Vibrate_Linear_Strength, evts)
-	TeleDevices.LogDebug("OnSCB_VibeEvent")
+	; TeleDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent
 
 ; Publics
@@ -847,7 +843,6 @@ Function UpdateRousingControlledSexScene()
         Int oldHandle = _ToysSceneVibrationHandle
         _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, 5, 0, Toys_Animation_Funscript, rousing, evts)
         TeleDevices.StopHandle(oldHandle)
-        TeleDevices.LogDebug("UpdatingToysScene Rousing=" + rousing)
         RegisterForSingleUpdate(2)
 
         ; Prevent lingering vibrations if scene finishes during handler
@@ -859,7 +854,6 @@ Function UpdateRousingControlledSexScene()
         Int oldHandle = _SexlabSceneVibrationHandle
         _SexlabSceneVibrationHandle = HandleVibration(Sexlab_Animation_DeviceSelector, 5, 0, Sexlab_Animation_Funscript, arousal, _SexlabSceneTags)
         TeleDevices.StopHandle(oldHandle)
-        TeleDevices.LogDebug("UpdatingSexlabScene Arousal=" + arousal)
         RegisterForSingleUpdate(2)
 
         If ! _InSexlabScene

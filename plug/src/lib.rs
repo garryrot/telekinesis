@@ -229,9 +229,9 @@ pub fn get_next_events_blocking(
             }
             TkConnectionEvent::ActionStarted(task, actuators, tags, handle) => {
                 let str_arg = format!(
-                    "{} {} on ({})",
+                    "{}{} on ({})",
                     task,
-                    tags.iter().join(","),
+                    if !tags.is_empty() { format!(" {}", tags.iter().join(",")) } else { String::from("") },
                     actuators.iter().map(|x| x.identifier()).join(",")
                 );
                 SKSEModEvent::new("Tele_DeviceActionStarted", &str_arg, f64::from(handle))

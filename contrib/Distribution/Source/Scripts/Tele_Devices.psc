@@ -22,6 +22,7 @@ EndProperty
 
 Bool Property LogDeviceConnects = true Auto
 Bool Property LogDeviceEvents = false Auto
+Bool Property LogDeviceEventEnd = false Auto
 Bool Property LogDebugEvents = false Auto
 
 Bool Property ScanningForDevices = false Auto
@@ -77,11 +78,21 @@ Event OnDeviceRemoved(String eventName, String deviceName, Float numArg, Form se
 EndEvent
 
 Event OnDeviceActionStarted(String eventName, String description, Float speed, Form sender)
-    LogEvent("Started '" + description + "'")
+    If (LogDebugEvents)
+        Trace(description)
+        If LogDeviceEvents
+            Notify(description)
+        EndIf
+    EndIf
 EndEvent
 
 Event OnDeviceActionDone(String eventName, String description, Float speed, Form sender)
-    LogEvent("Stopped '" + description + "'")
+    If (LogDeviceEventEnd)
+        Trace(description)
+        If LogDeviceEvents
+            Notify(description)
+        EndIf
+    EndIf
 EndEvent
 
 Event OnDeviceError(String eventName, String deviceName, Float numArg, Form sender)
@@ -259,14 +270,6 @@ Function LogConnection(String msg)
     { Log Telekinesis Connection Event (connect/disconnect) }
     Trace(msg)
     If LogDeviceConnects
-        Notify(msg)
-    EndIf
-EndFunction
-
-Function LogEvent(String msg)
-    { Log Telekinesis Event (N devices vibrated, etc.) }
-    Trace(msg + " LogDeviceEvents " + LogDeviceEvents)
-    If LogDeviceEvents
         Notify(msg)
     EndIf
 EndFunction
