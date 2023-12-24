@@ -1,16 +1,13 @@
-use buttplug::core::connector::ButtplugConnectorResult;
-use buttplug::core::message::{ActuatorType, ClientDeviceMessageAttributes};
-use buttplug::core::{
-    connector::{ButtplugConnector, ButtplugConnectorError},
+use buttplug::{core::{
+    connector::{ButtplugConnector, ButtplugConnectorError, ButtplugConnectorResult},
     message::*,
-};
+    message::{ActuatorType, ClientDeviceMessageAttributes},
+    message::{self, ButtplugMessage, DeviceList},
+    message::{ButtplugMessageSpecVersion, ServerInfo},
+}, client::{ButtplugClient, ButtplugClientDevice}};
+use buttplug::util::async_manager;
 use buttplug::server::device::configuration::{
     ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes,
-};
-use buttplug::{
-    core::message::{self, ButtplugMessage, DeviceList},
-    core::message::{ButtplugMessageSpecVersion, ServerInfo},
-    util::async_manager,
 };
 
 use tokio::sync::mpsc::channel;
@@ -19,7 +16,7 @@ use tokio::{sync::mpsc::Sender, time::sleep};
 use serde::Serialize;
 use serde_json::{self, Value};
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future::BoxFuture, FutureExt, StreamExt};
 use std::ops::{DerefMut, RangeInclusive};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -438,80 +435,82 @@ pub fn rotate(id: u32, name: &str) -> DeviceAdded {
     )
 }
 
+pub struct ButtplugTestClient {
+    pub client: ButtplugClient,
+    pub call_registry: FakeConnectorCallRegistry,
+    pub created_devices: Vec<Arc<ButtplugClientDevice>>,
+}
+
+pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
+    let devices_len = devices.len();
+    let (connector, call_registry) = FakeDeviceConnector::new(devices);
+    let client = ButtplugClient::new("FakeClient");
+    client.connect(connector).await.unwrap();
+
+    if devices_len > 0 {
+        let _ = client.event_stream().next().await.unwrap();
+    }
+
+    let devices = client.devices();
+    ButtplugTestClient {
+        client,
+        call_registry,
+        created_devices: devices,
+    }
+}
+
+impl ButtplugTestClient {
+    pub fn get_device(&self, device_id: u32) -> Arc<ButtplugClientDevice> {
+        self.created_devices
+            .iter().find(|d| d.index() == device_id)
+            .unwrap()
+            .clone()
+    }
+
+    pub fn get_device_calls(&self, device_id: u32) -> Vec<FakeMessage> {
+        self.call_registry.get_device(device_id)
+    }
+
+    pub fn print_device_calls(&self, test_start: Instant) {
+        for device in &self.created_devices {
+            println!("Device: {}", device.index());
+            let call_registry = &self.call_registry;
+            for i in 0..call_registry.get_device(device.index()).len() {
+                let fake_call: FakeMessage =
+                    call_registry.get_device(device.index())[i].clone();
+
+                let s = self.get_value(&fake_call);
+                let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
+                let perc = (s * 100.0).round();
+                println!(
+                    " {:02} @{:04} ms {percent:>3}% {empty:=>width$}",
+                    i,
+                    t,
+                    percent = perc as i32,
+                    empty = "",
+                    width = (perc / 5.0).floor() as usize
+                );
+            }
+            println!();
+        }
+    }
+
+    fn get_value(&self, fake: &FakeMessage) -> f64 {
+        match fake.message.clone() {
+            message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
+                cmd.scalars().iter().next().unwrap().scalar()
+            }
+            message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
+                cmd.vectors().iter().next().unwrap().position()
+            }
+            _ => panic!("Message is not supported"),
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
-    pub struct ButtplugTestClient {
-        pub client: ButtplugClient,
-        pub call_registry: FakeConnectorCallRegistry,
-        pub created_devices: Vec<Arc<ButtplugClientDevice>>,
-    }
-
-    impl ButtplugTestClient {
-        pub fn get_device(&self, device_id: u32) -> Arc<ButtplugClientDevice> {
-            self.created_devices
-                .iter().find(|d| d.index() == device_id)
-                .unwrap()
-                .clone()
-        }
-
-        pub fn get_device_calls(&self, device_id: u32) -> Vec<FakeMessage> {
-            self.call_registry.get_device(device_id)
-        }
-
-        pub fn print_device_calls(&self, test_start: Instant) {
-            for device in &self.created_devices {
-                println!("Device: {}", device.index());
-                let call_registry = &self.call_registry;
-                for i in 0..call_registry.get_device(device.index()).len() {
-                    let fake_call: FakeMessage =
-                        call_registry.get_device(device.index())[i].clone();
-
-                    let s = self.get_value(&fake_call);
-                    let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
-                    let perc = (s * 100.0).round();
-                    println!(
-                        " {:02} @{:04} ms {percent:>3}% {empty:=>width$}",
-                        i,
-                        t,
-                        percent = perc as i32,
-                        empty = "",
-                        width = (perc / 5.0).floor() as usize
-                    );
-                }
-                println!();
-            }
-        }
-
-        fn get_value(&self, fake: &FakeMessage) -> f64 {
-            match fake.message.clone() {
-                message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
-                    cmd.scalars().iter().next().unwrap().scalar()
-                }
-                message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
-                    cmd.vectors().iter().next().unwrap().position()
-                }
-                _ => panic!("Message is not supported"),
-            }
-        }
-    }
-
-    pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
-        let devices_len = devices.len();
-        let (connector, call_registry) = FakeDeviceConnector::new(devices);
-        let client = ButtplugClient::new("FakeClient");
-        client.connect(connector).await.unwrap();
-
-        if devices_len > 0 {
-            let _ = client.event_stream().next().await.unwrap();
-        }
-
-        let devices = client.devices();
-        ButtplugTestClient {
-            client,
-            call_registry,
-            created_devices: devices,
-        }
-    }
+   
 
     use buttplug::{
         client::{

@@ -4,13 +4,14 @@ use std::{
     time::Duration, fmt::{Display, self}
 };
 
+use bp_scheduler::{Actuator, Speed};
 use buttplug::{client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent}, core::message::ActuatorType};
 use crossbeam_channel::Sender;
 use futures::StreamExt;
 use tokio::runtime::Handle;
 use tracing::{error, info, span, Level};
 
-use crate::{ pattern::{Speed, TkActuator}, settings::TkConnectionType};
+use crate::settings::TkConnectionType;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TkConnectionStatus {
@@ -59,7 +60,7 @@ impl TkStatus {
     }
 }
 
-pub type ActuatorList = Vec<Arc<TkActuator>>;
+pub type ActuatorList = Vec<Arc<Actuator>>;
 
 /// Global commands on connection level, i.e. connection handling 
 /// or emergency stop
@@ -94,7 +95,7 @@ pub enum TkConnectionEvent {
     DeviceRemoved(Arc<ButtplugClientDevice>),
     ActionStarted(Task, ActuatorList, Vec<String>, i32),
     ActionDone(Task, Duration, i32),
-    ActionError(Arc<TkActuator>, String),
+    ActionError(Arc<Actuator>, String),
 }
 
 pub async fn handle_connection(

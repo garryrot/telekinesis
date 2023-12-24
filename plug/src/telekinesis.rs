@@ -1,5 +1,8 @@
 use anyhow::anyhow;
 use anyhow::Error;
+use bp_scheduler::ButtplugScheduler;
+use bp_scheduler::PlayerSettings;
+use bp_scheduler::get_actuators;
 use buttplug::{
     client::{ButtplugClient, ButtplugClientDevice},
     core::{
@@ -39,7 +42,6 @@ use crate::{
         handle_connection, TkCommand, TkConnectionEvent, TkConnectionStatus, TkDeviceStatus,
     },
     input::TkParams,
-    pattern::{get_actuators, TkButtplugScheduler, TkPlayerSettings},
     settings::{TkConnectionType, TkSettings},
     TkStatus,
 };
@@ -64,7 +66,7 @@ pub struct Telekinesis {
     pub connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
     runtime: Runtime,
     command_sender: Sender<TkCommand>,
-    scheduler: TkButtplugScheduler,
+    scheduler: ButtplugScheduler,
     event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
 }
 
@@ -81,13 +83,9 @@ impl Telekinesis {
             + 'static,
     {
         let runtime = Runtime::new()?;
-
         let (event_sender, event_receiver) = crossbeam_channel::unbounded();
         let (command_sender, command_receiver) = channel(256); // we handle them immediately
         let event_sender_clone = event_sender.clone();
-
-        let settings = provided_settings.unwrap_or_else(TkSettings::default);
-
         let connection_status = Arc::new(Mutex::new(TkStatus::default())); // ugly
         let status_clone = connection_status.clone();
         runtime.spawn(async move {
@@ -104,7 +102,7 @@ impl Telekinesis {
             debug!("connection handling stopped");
         });
 
-        let (scheduler, mut worker) = TkButtplugScheduler::create(TkPlayerSettings {
+        let (scheduler, mut worker) = ButtplugScheduler::create(PlayerSettings {
             player_scalar_resolution_ms: 100,
         });
 
@@ -118,7 +116,7 @@ impl Telekinesis {
             command_sender,
             connection_events: event_receiver,
             runtime,
-            settings,
+            settings: provided_settings.unwrap_or_else(TkSettings::default),
             connection_status: status_clone,
             scheduler,
             event_sender: event_sender_clone,
@@ -258,7 +256,7 @@ impl Telekinesis {
         tags: Vec<String>,
         fscript: Option<FScript>
     ) -> i32 {
-        info!("vibrate pattern {:?}", task);
+        info!("vibrate {:?}", task);
         let task_clone = task.clone();
         let params = TkParams::from_input(tags.clone(), task.clone(), &self.settings.devices);
 
@@ -282,11 +280,11 @@ impl Telekinesis {
                 .expect("queue full");
 
             let result = match task {
-                Task::Scalar(speed) => 
-                    player.play_scalar(duration, speed).await,
+                Task::Scalar(speed) => player.play_scalar(duration, speed).await,
                 Task::Pattern(_, _) =>
                     player.play_scalar_pattern(duration, fscript.unwrap()).await
             };
+            info!("done");
             if let Ok(mut connection_status) = connection_status.lock() {
                 for actuator in &actuators {
                     let status = match &result {
@@ -469,7 +467,7 @@ pub fn read_pattern_name(
 #[cfg(test)]
 mod tests {
     use crate::connection::TkConnectionStatus;
-    use crate::fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
+    use bp_fakes::{scalar, FakeDeviceConnector, linear, FakeConnectorCallRegistry};
     use crate::telekinesis::in_process_connector;
     use crate::*;
     use buttplug::core::message::{ActuatorType, DeviceAdded};

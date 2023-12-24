@@ -1,4 +1,4 @@
-use buttplug::client::{ButtplugClientDevice, ButtplugClientError, LinearCommand, ScalarCommand, device};
+use buttplug::client::{ButtplugClientDevice, ButtplugClientError, LinearCommand, ScalarCommand};
 use buttplug::core::message::ActuatorType;
 use funscript::{FSPoint, FScript};
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ use tokio::{
     time::{sleep, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
 
 type ButtplugClientResult<T = ()> = Result<T, ButtplugClientError>;
 
@@ -538,20 +538,22 @@ async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> boo
 
 #[cfg(test)]
 mod tests {
-    use crate::fakes::tests::get_test_client;
-    use crate::fakes::{linear, scalar, scalars, FakeMessage};
+    use bp_fakes::get_test_client;
+    use bp_fakes::FakeMessage;
+    use bp_fakes::*;
+
     use crate::Speed;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
-
-    use tokio::runtime::Handle;
 
     use funscript::{FSPoint, FScript};
     use futures::future::join_all;
 
     use buttplug::client::ButtplugClientDevice;
     use buttplug::core::message::ActuatorType;
+
+    use tokio::runtime::Handle;
     use tokio::task::JoinHandle;
     use tokio::time::timeout;
 
@@ -638,7 +640,7 @@ mod tests {
     #[tokio::test]
     async fn test_no_devices_does_not_block() {
         // arrange
-        let client: crate::fakes::tests::ButtplugTestClient = get_test_client(vec![]).await;
+        let client = get_test_client(vec![]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
 
         let mut fs: FScript = FScript::default();
@@ -666,7 +668,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_linear_empty_pattern_finishes_and_does_not_panic() {
-        let client: crate::fakes::tests::ButtplugTestClient =
+        let client =
             get_test_client(vec![linear(1, "lin1")]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
 

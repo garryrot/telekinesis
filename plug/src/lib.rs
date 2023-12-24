@@ -1,10 +1,10 @@
 use api::*;
+use bp_scheduler::Speed;
 use buttplug::core::message::ActuatorType;
-use connection::{TkCommand, TkConnectionEvent, TkConnectionStatus, TkStatus, Task};
+use connection::{TkConnectionEvent, TkConnectionStatus, TkStatus, Task};
 use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
 use itertools::Itertools;
-use pattern::{Speed, TkButtplugScheduler};
 use std::sync::{Arc, Mutex};
 use tracing::instrument;
 
@@ -18,10 +18,8 @@ use crate::{
 
 mod api;
 mod connection;
-mod fakes;
 mod input;
 mod logging;
-mod pattern;
 mod settings;
 pub mod telekinesis;
 mod util;
