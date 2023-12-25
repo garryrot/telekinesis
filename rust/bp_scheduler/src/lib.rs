@@ -184,7 +184,7 @@ mod tests {
             let player = self
                 .scheduler
                 .create_player(get_actuators(self.all_devices.clone()));
-            player.play_linear(funscript, duration).await.unwrap();
+            player.play_linear(duration, funscript).await.unwrap();
         }
 
         async fn await_last(&mut self) {

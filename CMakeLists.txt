@@ -86,8 +86,8 @@ target_include_directories(${PROJECT_NAME}
 add_dependencies(${PROJECT_NAME} ${RUST_LIBRARY})
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
-        debug "${CMAKE_SOURCE_DIR}/plug/target/debug/${RUST_LIBRARY}.lib"
-        optimized "${CMAKE_SOURCE_DIR}/plug/target/release/${RUST_LIBRARY}.lib"
+        debug "${CMAKE_SOURCE_DIR}/rust/target/debug/${RUST_LIBRARY}.lib"
+        optimized "${CMAKE_SOURCE_DIR}/rust/target/release/${RUST_LIBRARY}.lib"
         ${STATIC_LINK_LIBS}
         ryml::ryml)
  

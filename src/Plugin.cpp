@@ -1,7 +1,7 @@
 #include <stddef.h>
 
-#include "../plug/target/cxxbridge/plug/src/lib.rs.h"
-#include "../plug/target/cxxbridge/plug/src/logging.rs.h"
+#include "../rust/target/cxxbridge/plug/src/lib.rs.h"
+#include "../rust/target/cxxbridge/plug/src/logging.rs.h"
 #include <thread>
 #include <chrono>
 #include <stdlib.h>     //for using the function sleep

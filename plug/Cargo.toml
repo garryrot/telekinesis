@@ -1,6 +1,0 @@
-[workspace]
-members = [
-    "bp_fakes",
-    "bp_scheduler",
-    "tele"
-]

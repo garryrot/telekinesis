@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "bp_fakes",
+    "bp_scheduler",
+    "tele"
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1

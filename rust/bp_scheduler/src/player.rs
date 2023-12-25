@@ -27,8 +27,8 @@ impl PatternPlayer {
     /// Executes the linear 'fscript' for 'duration' and consumes the player
     pub async fn play_linear(
         mut self,
-        fscript: FScript,
         duration: Duration,
+        fscript: FScript,
     ) -> ButtplugClientResult {
         let handle = self.handle;
         info!("start pattern {:?} <linear> ({})", fscript, handle);

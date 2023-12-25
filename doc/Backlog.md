@@ -1,4 +1,4 @@
-# Feature Backlock
+# Feature Backlog
 
 ## Bugfixes / Improvements
 
