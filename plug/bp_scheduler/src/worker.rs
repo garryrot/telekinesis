@@ -1,11 +1,13 @@
-use buttplug::client::LinearCommand;
+use buttplug::client::{LinearCommand, ButtplugClientError};
 use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::{info, trace};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{access::DeviceAccess, actuator::Actuator, speed::Speed, ButtplugClientResult};
+use crate::{access::DeviceAccess, actuator::Actuator, speed::Speed};
+
+pub type ButtplugClientResult<T = ()> = Result<T, ButtplugClientError>;
 
 /// Process the queue of all device actions from all player threads
 ///

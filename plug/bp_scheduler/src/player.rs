@@ -10,8 +10,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, trace};
 
-use crate::{ButtplugClientResult, cancellable_wait, actuator::Actuator, speed::Speed, worker::WorkerTask};
-
+use crate::{cancellable_wait, actuator::Actuator, speed::Speed, worker::{WorkerTask, ButtplugClientResult}};
 
 /// Pattern executor that can be passed to a sub-thread
 pub struct PatternPlayer {

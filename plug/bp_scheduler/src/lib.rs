@@ -18,8 +18,6 @@ mod access;
 mod player;
 mod worker;
 
-type ButtplugClientResult<T = ()> = Result<T, ButtplugClientError>;
-
 pub struct ButtplugScheduler {
     worker_task_sender: UnboundedSender<WorkerTask>,
     settings: PlayerSettings,
@@ -32,11 +30,6 @@ pub struct PlayerSettings {
 }
 
 impl ButtplugScheduler {
-    fn get_next_handle(&mut self) -> i32 {
-        self.last_handle += 1;
-        self.last_handle
-    }
-
     pub fn create(settings: PlayerSettings) -> (ButtplugScheduler, ButtplugWorker) {
         let (worker_task_sender, task_receiver) = unbounded_channel::<WorkerTask>();
         (
@@ -48,6 +41,11 @@ impl ButtplugScheduler {
             },
             ButtplugWorker { task_receiver },
         )
+    }
+
+    fn get_next_handle(&mut self) -> i32 {
+        self.last_handle += 1;
+        self.last_handle
     }
 
     pub fn stop_task(&mut self, handle: i32) {
