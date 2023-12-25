@@ -38,16 +38,16 @@ pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {
 }
 
 #[derive(Clone, Debug)]
-pub struct TkParams {
+pub struct TkParams<'a> {
     pub selector: Vec<String>,
-    pub task: Task,
+    pub task: &'a Task,
     pub events: Vec<String>
 }
 
-impl TkParams {
+impl<'a> TkParams<'a> {
     pub fn filter_devices(
         &self,
-        actuators: ActuatorList,
+        actuators: &ActuatorList,
     ) -> ActuatorList {
         actuators
             .iter()
@@ -61,7 +61,7 @@ impl TkParams {
 
     pub fn from_input(
         events: Vec<String>,
-        task: Task,
+        task: &'a Task,
         devices: &[TkDeviceSettings],
     ) -> Self {
         let event_names = sanitize_name_list(&events);

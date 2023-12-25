@@ -306,13 +306,13 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     })
     .def_control(ApiControl {
         name: "vibrate.pattern",
-        exec: |tk, _speed, time_sec, pattern_name, events| match read_pattern(
+        exec: |tk, speed, time_sec, pattern_name, events| match read_pattern(
             &tk.settings.pattern_path,
             pattern_name,
             true,
         ) {
             Some(fscript) => tk.vibrate(
-                Task::Pattern(ActuatorType::Vibrate, pattern_name.into()),
+                Task::Pattern(Speed::new(speed.into()), ActuatorType::Vibrate, pattern_name.into()),
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
                 Some(fscript)

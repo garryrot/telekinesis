@@ -25,6 +25,11 @@ impl Speed {
             value: percentage as u16,
         }
     }
+    pub fn multiply(&self, other: &Speed) -> Speed {
+        let this = self.as_float();
+        let other_f = other.as_float();
+        Speed::new((this * other_f * 100.0).round() as i64) 
+    }
     pub fn from_fs(point: &FSPoint) -> Speed {
         Speed::new(point.pos.into())
     }

@@ -31,7 +31,6 @@ impl PatternPlayer {
         fscript: FScript,
     ) -> ButtplugClientResult {
         let handle = self.handle;
-        info!("start pattern {:?} <linear> ({})", fscript, handle);
         let mut last_result = Ok(());
         if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
             return last_result;
@@ -70,16 +69,11 @@ impl PatternPlayer {
         self,
         duration: Duration,
         fscript: FScript,
+        speed: Speed,
     ) -> ButtplugClientResult {
         if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
             return Ok(());
         }
-        info!(
-            "start pattern {}(ms) for {:?} <scalar> ({})",
-            fscript.actions.last().unwrap().at,
-            duration,
-            self.handle
-        );
         let waiter = self.stop_after(duration);
         let action_len = fscript.actions.len();
         let mut started = false;
@@ -97,10 +91,10 @@ impl PatternPlayer {
             let next = &fscript.actions[(i + j) % action_len];
 
             if !started {
-                self.do_scalar(Speed::from_fs(current), false);
+                self.do_scalar(Speed::from_fs(current).multiply(&speed), false);
                 started = true;
             } else {
-                self.do_update(Speed::from_fs(current))
+                self.do_update(Speed::from_fs(current).multiply(&speed))
             }
             if let Some(waiting_time) =
                 Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
@@ -149,7 +143,6 @@ impl PatternPlayer {
     }
 
     async fn do_stop(mut self, is_not_pattern: bool) -> ButtplugClientResult {
-        trace!("do_stop");
         for actuator in self.actuators.iter() {
             trace!("do_stop actuator {:?}", actuator);
             self.action_sender

@@ -1,8 +1,8 @@
 use actuator::Actuator;
 use buttplug::client::ButtplugClientError;
 use player::PatternPlayer;
-use worker::{ButtplugWorker, WorkerTask};
 use std::collections::HashMap;
+use worker::{ButtplugWorker, WorkerTask};
 
 use std::{sync::Arc, time::Duration};
 use tokio::{
@@ -12,10 +12,10 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
-pub mod actuator;
-pub mod speed;
 mod access;
+pub mod actuator;
 mod player;
+pub mod speed;
 mod worker;
 
 pub struct ButtplugScheduler {
@@ -98,11 +98,11 @@ async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> boo
 
 #[cfg(test)]
 mod tests {
+    use crate::actuator::get_actuators;
+    use crate::speed::Speed;
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
     use bp_fakes::*;
-    use crate::actuator::get_actuators;
-    use crate::speed::Speed;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -154,6 +154,7 @@ mod tests {
             &mut self,
             duration: Duration,
             fscript: FScript,
+            speed: Speed,
             actuators: Option<Vec<Arc<Actuator>>>,
         ) {
             let actuators = match actuators {
@@ -161,7 +162,10 @@ mod tests {
                 None => get_actuators(self.all_devices.clone()),
             };
             let player: super::PatternPlayer = self.scheduler.create_player(actuators);
-            player.play_scalar_pattern(duration, fscript).await.unwrap();
+            player
+                .play_scalar_pattern(duration, fscript, speed)
+                .await
+                .unwrap();
         }
 
         fn play_scalar(
@@ -352,13 +356,15 @@ mod tests {
         // act & assert
         let duration = Duration::from_millis(1);
         let fscript = FScript::default();
-        player.play_scalar_pattern(duration, fscript, None).await;
+        player
+            .play_scalar_pattern(duration, fscript, Speed::max(), None)
+            .await;
 
         let mut fscript = FScript::default();
         fscript.actions.push(FSPoint { pos: 0, at: 0 });
         fscript.actions.push(FSPoint { pos: 0, at: 0 });
         player
-            .play_scalar_pattern(Duration::from_millis(200), fscript, None)
+            .play_scalar_pattern(Duration::from_millis(200), fscript, Speed::max(), None)
             .await;
     }
 
@@ -379,6 +385,7 @@ mod tests {
             .play_scalar_pattern(
                 Duration::from_millis(125),
                 fs1,
+                Speed::max(),
                 Some(vec![actuators[1].clone()]),
             )
             .await;
@@ -390,6 +397,7 @@ mod tests {
             .play_scalar_pattern(
                 Duration::from_millis(125),
                 fs2,
+                Speed::max(),
                 Some(vec![actuators[0].clone()]),
             )
             .await;
@@ -417,7 +425,7 @@ mod tests {
 
         let start = Instant::now();
         player
-            .play_scalar_pattern(Duration::from_millis(125), fs, None)
+            .play_scalar_pattern(Duration::from_millis(125), fs, Speed::max(), None)
             .await;
 
         // assert
@@ -442,7 +450,7 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play_scalar_pattern(get_duration_ms(&fscript), fscript, None)
+            .play_scalar_pattern(get_duration_ms(&fscript), fscript, Speed::max(), None)
             .await;
 
         // assert
@@ -470,7 +478,7 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play_scalar_pattern(Duration::from_millis(150), fs, None)
+            .play_scalar_pattern(Duration::from_millis(150), fs, Speed::max(), None)
             .await;
 
         // assert
@@ -478,6 +486,31 @@ mod tests {
         let calls = client.get_device_calls(1);
         calls[0].assert_strenth(0.42).assert_timestamp(0, start);
         calls[1].assert_strenth(0.42).assert_timestamp(100, start);
+    }
+
+    #[tokio::test]
+    async fn test_scalar_speed_control() {
+        // arrange
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        let mut fs = FScript::default();
+        fs.actions.push(FSPoint { pos: 100, at: 0 });
+        fs.actions.push(FSPoint { pos: 70, at: 25 });
+        fs.actions.push(FSPoint { pos: 0, at: 50 });
+
+        // act
+        let start = Instant::now();
+        player
+            .play_scalar_pattern(Duration::from_millis(50), fs, Speed::new(10), None)
+            .await;
+
+        // assert
+        client.print_device_calls(start);
+        let calls = client.get_device_calls(1);
+        calls[0].assert_strenth(0.1);
+        calls[1].assert_strenth(0.07);
+        calls[2].assert_strenth(0.0);
     }
 
     // Concurrency Tests
@@ -601,7 +634,7 @@ mod tests {
         player.play_scalar(Duration::from_secs(1), Speed::new(99), None);
         wait_ms(250).await;
         player
-            .play_scalar_pattern(Duration::from_secs(3), fscript, None)
+            .play_scalar_pattern(Duration::from_secs(3), fscript, Speed::max(), None)
             .await;
 
         // assert

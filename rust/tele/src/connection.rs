@@ -75,14 +75,14 @@ pub enum TkCommand {
 #[derive(Clone, Debug)]
 pub enum Task {
     Scalar(Speed),
-    Pattern(ActuatorType, String)
+    Pattern(Speed, ActuatorType, String)
 }
 
 impl Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Task::Scalar(speed) => write!(f, "Linear({}%)", speed),
-            Task::Pattern(actuator, pattern) => write!(f, "Pattern({}, {})", actuator, pattern)
+            Task::Pattern(speed, actuator, pattern) => write!(f, "Pattern({}, {}, {})", speed, actuator, pattern)
         }
     }
 }
