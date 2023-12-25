@@ -1,34 +1,27 @@
-use buttplug::client::{ButtplugClientDevice, ButtplugClientError, LinearCommand, ScalarCommand};
-use buttplug::core::message::ActuatorType;
-use funscript::{FSPoint, FScript};
+use actuator::Actuator;
+use buttplug::client::ButtplugClientError;
+use player::PatternPlayer;
+use worker::{ButtplugWorker, WorkerTask};
 use std::collections::HashMap;
-use std::fmt::{self, Display};
-use tokio::runtime::Handle;
-use tokio::task::JoinHandle;
 
 use std::{sync::Arc, time::Duration};
 use tokio::{
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    time::{sleep, Instant},
+    sync::mpsc::{unbounded_channel, UnboundedSender},
+    time::sleep,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace};
+use tracing::error;
+
+pub mod actuator;
+pub mod speed;
+mod access;
+mod player;
+mod worker;
 
 type ButtplugClientResult<T = ()> = Result<T, ButtplugClientError>;
 
-/// Pattern executor that can be passed to a sub-thread
-pub struct PatternPlayer {
-    pub actuators: Vec<Arc<Actuator>>,
-    pub action_sender: UnboundedSender<DeviceAction>,
-    pub result_sender: UnboundedSender<ButtplugClientResult>,
-    pub result_receiver: UnboundedReceiver<ButtplugClientResult>,
-    pub player_scalar_resolution_ms: i32,
-    pub handle: i32,
-    pub cancellation_token: CancellationToken,
-}
-
 pub struct ButtplugScheduler {
-    device_action_sender: UnboundedSender<DeviceAction>,
+    worker_task_sender: UnboundedSender<WorkerTask>,
     settings: PlayerSettings,
     cancellation_tokens: HashMap<i32, CancellationToken>,
     last_handle: i32,
@@ -38,269 +31,6 @@ pub struct PlayerSettings {
     pub player_scalar_resolution_ms: i32,
 }
 
-pub struct ButtplugWorker {
-    tasks: UnboundedReceiver<DeviceAction>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Actuator {
-    pub device: Arc<ButtplugClientDevice>,
-    pub actuator: ActuatorType,
-    pub index_in_device: u32,
-}
-
-impl Display for Actuator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}[{}].{}", self.device.name(), self.index_in_device, self.actuator)
-    }
-}
-
-impl Actuator {
-    pub fn identifier(&self) -> String {
-        self.to_string()
-    }
-}
-
-pub fn get_actuators(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<Arc<Actuator>> {
-    let mut actuators = vec![];
-    for device in devices {
-        if let Some(scalar_cmd) = device.message_attributes().scalar_cmd() {
-            for (idx, scalar_cmd) in scalar_cmd.iter().enumerate() {
-                actuators.push(Arc::new(Actuator {
-                    device: device.clone(),
-                    actuator: *scalar_cmd.actuator_type(),
-                    index_in_device: idx as u32,
-                }))
-            }
-        }
-        if let Some(linear_cmd) = device.message_attributes().linear_cmd() {
-            for (idx, _) in linear_cmd.iter().enumerate() {
-                actuators.push(Arc::new(Actuator {
-                    device: device.clone(),
-                    actuator: ActuatorType::Position,
-                    index_in_device: idx as u32,
-                }));
-            }
-        }
-        if let Some(rotate_cmd) = device.message_attributes().rotate_cmd() {
-            for (idx, _) in rotate_cmd.iter().enumerate() {
-                actuators.push(Arc::new(Actuator {
-                    device: device.clone(),
-                    actuator: ActuatorType::Rotate,
-                    index_in_device: idx as u32,
-                }))
-            }
-        }
-    }
-    actuators
-}
-
-#[derive(Clone, Debug)]
-pub enum DeviceAction {
-    Start(Arc<Actuator>, Speed, bool, i32),
-    Update(Arc<Actuator>, Speed),
-    End(
-        Arc<Actuator>,
-        bool,
-        i32,
-        UnboundedSender<ButtplugClientResult>,
-    ),
-    Move(
-        Arc<Actuator>,
-        f64,
-        u32,
-        bool,
-        UnboundedSender<ButtplugClientResult>,
-    ),
-    StopAll, // global but required for resetting device state
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Speed {
-    pub value: u16,
-}
-
-impl Display for Speed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
-    }
-}
-
-impl Speed {
-    pub fn new(mut percentage: i64) -> Speed {
-        if percentage < 0 {
-            percentage = 0;
-        }
-        if percentage > 100 {
-            percentage = 100;
-        }
-        Speed {
-            value: percentage as u16,
-        }
-    }
-    pub fn from_fs(point: &FSPoint) -> Speed {
-        Speed::new(point.pos.into())
-    }
-    pub fn min() -> Speed {
-        Speed { value: 0 }
-    }
-    pub fn max() -> Speed {
-        Speed { value: 100 }
-    }
-    pub fn as_float(self) -> f64 {
-        self.value as f64 / 100.0
-    }
-}
-
-/// Stores information about concurrent accesses to a buttplug actuator
-/// to calculate the actual vibration speed or linear movement
-struct DeviceEntry {
-    /// The amount of tasks that currently access this device,
-    pub task_count: usize,
-    /// Priority calculation work like a stack with the top of the stack
-    /// task being the used vibration speed
-    pub linear_tasks: Vec<(i32, Speed)>
-}
-
-struct DeviceAccess {
-    device_actions: HashMap<String, DeviceEntry>
-}
-
-impl DeviceAccess {
-    pub fn default() -> Self {
-        DeviceAccess {
-            device_actions: HashMap::new(),
-        }
-    }
-
-    async fn set_scalar(&self, actuator: &Arc<Actuator>, speed: Speed) -> Result<(), ButtplugClientError> {
-        let cmd = ScalarCommand::ScalarMap(HashMap::from([(
-            actuator.index_in_device,
-            (speed.as_float(), actuator.actuator),
-        )]));
-        if let Err(err) = actuator
-            .device
-            .scalar(&cmd)
-        .await
-        {
-            error!("failed to set scalar speed {:?}", err);
-            return Err(err);
-        }
-        debug!("Device stopped {}", actuator.identifier());
-        Ok(())
-    }
-
-    pub async fn start_scalar(&mut self, actuator: &Arc<Actuator>, speed: Speed, is_not_pattern: bool, handle: i32) {
-        trace!("start scalar {} {}", actuator, handle);
-        self.device_actions
-            .entry(actuator.identifier())
-            .and_modify(|entry| {
-                entry.task_count += 1;
-                if is_not_pattern {
-                    entry.linear_tasks.push((handle, speed))
-                }
-            })
-            .or_insert_with(|| {
-                DeviceEntry {
-                    task_count: 1,
-                    linear_tasks: if is_not_pattern { vec![(handle, speed)] } else { vec![] }
-                }
-            });
-        self.update_scalar(actuator, speed).await;
-    }
-
-    pub async fn stop_scalar(&mut self, actuator: &Arc<Actuator>, is_not_pattern: bool, handle: i32) -> Result<(), ButtplugClientError> {
-        trace!("stop scalar {} {}", actuator, handle);
-        if let Some(mut entry) = self.device_actions.remove(&actuator.identifier()) {
-            if is_not_pattern {
-                entry.linear_tasks.retain(|t| t.0 != handle);
-            }
-            let mut task_count = entry.task_count;
-            if task_count != 0 {
-                task_count -= 1;
-            }
-            entry.task_count = task_count;
-            self.device_actions.insert(actuator.identifier(), entry);
-            if task_count == 0 {
-                // nothing else is controlling the device, stop it
-                return self.set_scalar( actuator, Speed::min() ).await;
-            } else if let Some(last_speed) = self.get_priority_speed(actuator) {
-                self.update_scalar(actuator, last_speed).await;
-            }
-        }
-        Ok(())
-    }
-
-    pub async fn update_scalar(&self, actuator: &Arc<Actuator>, new_speed: Speed) {
-        let speed = self.get_priority_speed(actuator).unwrap_or(new_speed);
-        debug!("updating {} speed to {}", actuator, speed);
-        let _ = self.set_scalar( actuator, speed ).await;
-    }
-
-    fn get_priority_speed(&self, actuator: &Arc<Actuator>) -> Option<Speed> {
-        if let Some(entry) = self.device_actions.get(&actuator.identifier()) {
-            let mut sorted: Vec<(i32, Speed)> = entry.linear_tasks.clone();
-            sorted.sort_by_key(|b| b.0);
-            if let Some(tuple) = sorted.last() {
-                return Some(tuple.1);
-            }
-        }
-        None
-    }
-
-    pub fn clear_all(&mut self) {
-        self.device_actions.clear();
-    }
-}
-
-impl ButtplugWorker {
-    /// Process the queue of all device actions from all player threads
-    ///
-    /// This was introduced so that that the housekeeping and the decision which
-    /// thread gets priority on a device is always done in the same thread and
-    /// its not necessary to introduce Mutex/etc to handle multithreaded access
-    pub async fn run_worker_thread(&mut self) {
-        let mut device_access = DeviceAccess::default();
-        loop {
-            if let Some(next_action) = self.tasks.recv().await {
-                trace!("exec device action {:?}", next_action);
-                match next_action {
-                    DeviceAction::Start(actuator, speed, is_not_pattern, handle) => {
-                        device_access.start_scalar(&actuator, speed, is_not_pattern, handle).await;
-                    }
-                    DeviceAction::Update(actuator, speed) => {
-                        device_access.update_scalar(&actuator, speed).await;
-                    }
-                    DeviceAction::End(actuator, is_not_pattern, handle, result_sender) => {
-                        let result = device_access.stop_scalar(&actuator, is_not_pattern, handle).await;
-                        result_sender.send(result).unwrap();
-                    }
-                    DeviceAction::Move(
-                        actuator,
-                        position,
-                        duration_ms,
-                        finish,
-                        result_sender,
-                    ) => {
-                        let cmd = LinearCommand::LinearMap(HashMap::from([(
-                            actuator.index_in_device,
-                            (duration_ms, position),
-                        )]));
-                        let result = actuator.device.linear(&cmd).await;
-                        if finish {
-                            result_sender.send(result).unwrap();
-                        }
-                    }
-                    DeviceAction::StopAll => {
-                        device_access.clear_all();
-                        info!("stop all action");
-                    }
-                }
-            }
-        }
-    }
-}
-
 impl ButtplugScheduler {
     fn get_next_handle(&mut self) -> i32 {
         self.last_handle += 1;
@@ -308,15 +38,15 @@ impl ButtplugScheduler {
     }
 
     pub fn create(settings: PlayerSettings) -> (ButtplugScheduler, ButtplugWorker) {
-        let (device_action_sender, tasks) = unbounded_channel::<DeviceAction>();
+        let (worker_task_sender, task_receiver) = unbounded_channel::<WorkerTask>();
         (
             ButtplugScheduler {
-                device_action_sender,
+                worker_task_sender,
                 settings,
                 cancellation_tokens: HashMap::new(),
                 last_handle: 0,
             },
-            ButtplugWorker { tasks },
+            ButtplugWorker { task_receiver },
         )
     }
 
@@ -341,187 +71,19 @@ impl ButtplugScheduler {
             result_receiver,
             handle,
             cancellation_token,
-            action_sender: self.device_action_sender.clone(),
+            action_sender: self.worker_task_sender.clone(),
             player_scalar_resolution_ms: self.settings.player_scalar_resolution_ms,
         }
     }
 
     pub fn stop_all(&mut self) {
         let queue_full_err = "Event sender full";
-        self.device_action_sender
-            .send(DeviceAction::StopAll)
+        self.worker_task_sender
+            .send(WorkerTask::StopAll)
             .unwrap_or_else(|_| error!(queue_full_err));
         for entry in self.cancellation_tokens.drain() {
             entry.1.cancel();
         }
-    }
-}
-
-impl PatternPlayer {
-    /// Executes the linear 'fscript' for 'duration' and consumes the player
-    pub async fn play_linear(
-        mut self,
-        fscript: FScript,
-        duration: Duration,
-    ) -> ButtplugClientResult {
-        let handle = self.handle;
-        info!("start pattern {:?} <linear> ({})", fscript, handle);
-        let mut last_result = Ok(());
-        if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
-            return last_result;
-        }
-        let waiter = self.stop_after(duration);
-        while !self.cancellation_token.is_cancelled() {
-            let started = Instant::now();
-            for point in fscript.actions.iter() {
-                let point_as_float = Speed::from_fs(point).as_float();
-                if let Some(waiting_time) =
-                    Duration::from_millis(point.at as u64).checked_sub(started.elapsed())
-                {
-                    let token = &self.cancellation_token.clone();
-                    if let Some(result) = tokio::select! {
-                        _ = token.cancelled() => { None }
-                        result = async {
-                            let r = self.do_linear(point_as_float, waiting_time.as_millis() as u32).await;
-                            sleep(waiting_time).await;
-                            r
-                        } => {
-                            Some(result)
-                        }
-                    } {
-                        last_result = result;
-                    }
-                }
-            }
-        }
-        waiter.abort();
-        info!("stop pattern ({})", handle);
-        last_result
-    }
-
-    pub async fn play_scalar_pattern(
-        self,
-        duration: Duration,
-        fscript: FScript,
-    ) -> ButtplugClientResult {
-        if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
-            return Ok(());
-        }
-        info!(
-            "start pattern {}(ms) for {:?} <scalar> ({})",
-            fscript.actions.last().unwrap().at,
-            duration,
-            self.handle
-        );
-        let waiter = self.stop_after(duration);
-        let action_len = fscript.actions.len();
-        let mut started = false;
-        let mut loop_started = Instant::now();
-        let mut i: usize = 0;
-        loop {
-            let mut j = 1;
-            while j + i < action_len - 1
-                && (fscript.actions[i + j].at - fscript.actions[i].at)
-                    < self.player_scalar_resolution_ms
-            {
-                j += 1;
-            }
-            let current = &fscript.actions[i % action_len];
-            let next = &fscript.actions[(i + j) % action_len];
-
-            if !started {
-                self.do_scalar(Speed::from_fs(current), false);
-                started = true;
-            } else {
-                self.do_update(Speed::from_fs(current))
-            }
-            if let Some(waiting_time) =
-                Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
-            {
-                if !(cancellable_wait(waiting_time, &self.cancellation_token).await) {
-                    break;
-                }
-            }
-            i += j;
-            if (i % action_len) == 0 {
-                loop_started = Instant::now();
-            }
-        }
-        waiter.abort();
-        self.do_stop(false).await
-    }
-
-    /// Executes the scalar 'fscript' for 'duration' and consumes the player
-    pub async fn play_scalar(self, duration: Duration, speed: Speed) -> ButtplugClientResult {
-        self.do_scalar(speed, true);
-        cancellable_wait(duration, &self.cancellation_token).await;
-        self.do_stop(true).await
-    }
-
-    fn do_update(&self, speed: Speed) {
-        for actuator in self.actuators.iter() {
-            trace!("do_update {} {:?}", speed, actuator);
-            self.action_sender
-                .send(DeviceAction::Update(actuator.clone(), speed))
-                .unwrap_or_else(|_| error!("queue full"));
-        }
-    }
-
-    fn do_scalar(&self, speed: Speed, is_not_pattern: bool) {
-        for actuator in self.actuators.iter() {
-            trace!("do_scalar {} {:?}", speed, actuator);
-            self.action_sender
-                .send(DeviceAction::Start(
-                    actuator.clone(),
-                    speed,
-                    is_not_pattern,
-                    self.handle,
-                ))
-                .unwrap_or_else(|_| error!("queue full"));
-        }
-    }
-
-    async fn do_stop(mut self, is_not_pattern: bool) -> ButtplugClientResult {
-        trace!("do_stop");
-        for actuator in self.actuators.iter() {
-            trace!("do_stop actuator {:?}", actuator);
-            self.action_sender
-                .send(DeviceAction::End(
-                    actuator.clone(),
-                    is_not_pattern,
-                    self.handle,
-                    self.result_sender.clone(),
-                ))
-                .unwrap_or_else(|_| error!("queue full"));
-        }
-        let mut last_result = Ok(());
-        for _ in self.actuators.iter() {
-            last_result = self.result_receiver.recv().await.unwrap();
-        }
-        last_result
-    }
-
-    async fn do_linear(&mut self, pos: f64, duration_ms: u32) -> ButtplugClientResult {
-        for actuator in &self.actuators {
-            self.action_sender
-                .send(DeviceAction::Move(
-                    actuator.clone(),
-                    pos,
-                    duration_ms,
-                    true,
-                    self.result_sender.clone(),
-                ))
-                .unwrap_or_else(|_| error!("queue full"));
-        }
-        self.result_receiver.recv().await.unwrap()
-    }
-
-    fn stop_after(&self, duration: Duration) -> JoinHandle<()> {
-        let cancellation_clone = self.cancellation_token.clone();
-        Handle::current().spawn(async move {
-            sleep(duration).await;
-            cancellation_clone.cancel();
-        })
     }
 }
 
@@ -541,8 +103,8 @@ mod tests {
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
     use bp_fakes::*;
-
-    use crate::Speed;
+    use crate::actuator::get_actuators;
+    use crate::speed::Speed;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -557,7 +119,7 @@ mod tests {
     use tokio::task::JoinHandle;
     use tokio::time::timeout;
 
-    use super::{get_actuators, Actuator, ButtplugScheduler, PlayerSettings};
+    use super::{Actuator, ButtplugScheduler, PlayerSettings};
 
     struct PlayerTest {
         pub scheduler: ButtplugScheduler,
@@ -668,8 +230,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_linear_empty_pattern_finishes_and_does_not_panic() {
-        let client =
-            get_test_client(vec![linear(1, "lin1")]).await;
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
 
         // act & assert

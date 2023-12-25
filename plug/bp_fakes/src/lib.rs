@@ -510,15 +510,12 @@ impl ButtplugTestClient {
 
 #[cfg(test)]
 pub mod tests {
-   
-
     use buttplug::{
         client::{
-            ButtplugClient, ButtplugClientDevice, LinearCommand, RotateCommand, ScalarCommand,
+             LinearCommand, RotateCommand, ScalarCommand,
         },
         core::message::ActuatorType,
     };
-    use futures::StreamExt;
     use tracing::Level;
 
     use super::*;

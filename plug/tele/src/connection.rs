@@ -4,7 +4,7 @@ use std::{
     time::Duration, fmt::{Display, self}
 };
 
-use bp_scheduler::{Actuator, Speed};
+use bp_scheduler::{actuator::Actuator, speed::Speed};
 use buttplug::{client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent}, core::message::ActuatorType};
 use crossbeam_channel::Sender;
 use futures::StreamExt;

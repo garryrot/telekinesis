@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use anyhow::Error;
 use bp_scheduler::ButtplugScheduler;
 use bp_scheduler::PlayerSettings;
-use bp_scheduler::get_actuators;
+use bp_scheduler::actuator::get_actuators;
 use buttplug::{
     client::{ButtplugClient, ButtplugClientDevice},
     core::{
@@ -144,7 +144,6 @@ impl Telekinesis {
                 connection_status
                     .device_status
                     .values()
-                    .into_iter()
                     .map(|value| value.device.clone())
                     .collect(),
             );
@@ -160,7 +159,6 @@ impl Telekinesis {
             let devices = status
                 .device_status
                 .values()
-                .into_iter()
                 .find(|d| d.device.name() == device_name)
                 .cloned();
             return devices;
@@ -468,6 +466,7 @@ pub fn read_pattern_name(
 mod tests {
     use crate::connection::TkConnectionStatus;
     use bp_fakes::{scalar, FakeDeviceConnector, linear, FakeConnectorCallRegistry};
+    use bp_scheduler::speed::Speed;
     use crate::telekinesis::in_process_connector;
     use crate::*;
     use buttplug::core::message::{ActuatorType, DeviceAdded};
