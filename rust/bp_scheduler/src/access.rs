@@ -27,23 +27,6 @@ impl DeviceAccess {
         }
     }
 
-    async fn set_scalar(
-        &self,
-        actuator: &Arc<Actuator>,
-        speed: Speed,
-    ) -> Result<(), ButtplugClientError> {
-        let cmd = ScalarCommand::ScalarMap(HashMap::from([(
-            actuator.index_in_device,
-            (speed.as_float(), actuator.actuator),
-        )]));
-        if let Err(err) = actuator.device.scalar(&cmd).await {
-            error!("failed to set scalar speed {:?}", err);
-            return Err(err);
-        }
-        debug!("Device stopped {}", actuator.identifier());
-        Ok(())
-    }
-
     pub async fn start_scalar(
         &mut self,
         actuator: &Arc<Actuator>,
@@ -97,7 +80,7 @@ impl DeviceAccess {
     }
 
     pub async fn update_scalar(&mut self, actuator: &Arc<Actuator>, new_speed: Speed, is_pattern: bool, handle: i32) {
-        trace!("update_scalar scalar {:?} {} ({})", new_speed, actuator, handle);
+        trace!("update scalar scalar {:?} {} ({})", new_speed, actuator, handle);
         if ! is_pattern {
             self.device_actions.entry(actuator.identifier()).and_modify(|entry| {
                 entry.linear_tasks = entry.linear_tasks.iter().map(|t| {
@@ -111,6 +94,23 @@ impl DeviceAccess {
         let speed = self.get_priority_speed(actuator).unwrap_or(new_speed);
         debug!("updating {} speed to {}", actuator, speed);
         let _ = self.set_scalar(actuator, speed).await;
+    }
+
+    async fn set_scalar(
+        &self,
+        actuator: &Arc<Actuator>,
+        speed: Speed,
+    ) -> Result<(), ButtplugClientError> {
+        let cmd = ScalarCommand::ScalarMap(HashMap::from([(
+            actuator.index_in_device,
+            (speed.as_float(), actuator.actuator),
+        )]));
+        if let Err(err) = actuator.device.scalar(&cmd).await {
+            error!("failed to set scalar speed {:?}", err);
+            return Err(err);
+        }
+        debug!("Device stopped {}", actuator.identifier());
+        Ok(())
     }
 
     fn get_priority_speed(&self, actuator: &Arc<Actuator>) -> Option<Speed> {
