@@ -1,6 +1,7 @@
 use actuator::Actuator;
 use buttplug::client::ButtplugClientError;
 use player::PatternPlayer;
+use speed::Speed;
 use std::collections::HashMap;
 use worker::{ButtplugWorker, WorkerTask};
 
@@ -21,8 +22,13 @@ mod worker;
 pub struct ButtplugScheduler {
     worker_task_sender: UnboundedSender<WorkerTask>,
     settings: PlayerSettings,
-    cancellation_tokens: HashMap<i32, CancellationToken>,
-    last_handle: i32,
+    control_handles: HashMap<i32, ControlHandle>,
+    last_handle: i32
+}
+
+struct ControlHandle {
+    cancellation_token: CancellationToken,
+    update_sender: UnboundedSender<Speed>
 }
 
 pub struct PlayerSettings {
@@ -36,7 +42,7 @@ impl ButtplugScheduler {
             ButtplugScheduler {
                 worker_task_sender,
                 settings,
-                cancellation_tokens: HashMap::new(),
+                control_handles: HashMap::new(),
                 last_handle: 0,
             },
             ButtplugWorker { task_receiver },
@@ -48,28 +54,40 @@ impl ButtplugScheduler {
         self.last_handle
     }
 
+    // stop player
     pub fn stop_task(&mut self, handle: i32) {
-        if self.cancellation_tokens.contains_key(&handle) {
-            self.cancellation_tokens.remove(&handle).unwrap().cancel();
+        if self.control_handles.contains_key(&handle) {
+            self.control_handles.remove(&handle).unwrap().cancellation_token.cancel();
+        } else {
+            error!("Unknown handle {}", handle);
+        }
+    }
+
+    // control player
+    pub fn update_task(&mut self, handle: i32, speed: Speed) {
+        if self.control_handles.contains_key(&handle) {
+            let _ = self.control_handles.get(&handle).unwrap().update_sender.send(speed);
         } else {
             error!("Unknown handle {}", handle);
         }
     }
 
     pub fn create_player(&mut self, actuators: Vec<Arc<Actuator>>) -> PatternPlayer {
+        let (update_sender, update_receiver) = unbounded_channel::<Speed>();
         let cancellation_token = CancellationToken::new();
         let handle = self.get_next_handle();
-        self.cancellation_tokens
-            .insert(handle, cancellation_token.clone());
+        self.control_handles
+            .insert(handle, ControlHandle { cancellation_token: cancellation_token.clone(), update_sender } );
         let (result_sender, result_receiver) =
             unbounded_channel::<Result<(), ButtplugClientError>>();
         PatternPlayer {
             actuators,
             result_sender,
             result_receiver,
+            update_receiver,
             handle,
             cancellation_token,
-            action_sender: self.worker_task_sender.clone(),
+            worker_task_sender: self.worker_task_sender.clone(),
             player_scalar_resolution_ms: self.settings.player_scalar_resolution_ms,
         }
     }
@@ -79,9 +97,10 @@ impl ButtplugScheduler {
         self.worker_task_sender
             .send(WorkerTask::StopAll)
             .unwrap_or_else(|_| error!(queue_full_err));
-        for entry in self.cancellation_tokens.drain() {
-            entry.1.cancel();
+        for entry in self.control_handles.drain() {
+            entry.1.cancellation_token.cancel();
         }
+        self.control_handles.clear();
     }
 }
 
@@ -103,6 +122,7 @@ mod tests {
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
     use bp_fakes::*;
+    use tracing::Level;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -511,6 +531,37 @@ mod tests {
         calls[0].assert_strenth(0.1);
         calls[1].assert_strenth(0.07);
         calls[2].assert_strenth(0.0);
+    }
+    
+    fn enable_log() {
+        tracing::subscriber::set_global_default(
+            tracing_subscriber::fmt()
+                .with_max_level(Level::TRACE)
+                .finish(),
+        )
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_scalar_update_speed() {
+        // arrange
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        // act
+        let start = Instant::now();
+        player.play_scalar(Duration::from_millis(300), Speed::new(100), None);
+        wait_ms(100).await;
+        player.scheduler.update_task(1, Speed::new(50));
+        wait_ms(100).await;
+        player.scheduler.update_task(1, Speed::new(10));
+        player.await_all().await;
+        
+        client.print_device_calls(start);
+        client.get_device_calls(1)[0].assert_strenth(1.0).assert_timestamp(0, start);
+        client.get_device_calls(1)[1].assert_strenth(0.5).assert_timestamp(100, start);
+        client.get_device_calls(1)[2].assert_strenth(0.1).assert_timestamp(200, start);
+        client.get_device_calls(1)[3].assert_strenth(0.0).assert_timestamp(300, start);
     }
 
     // Concurrency Tests

@@ -11,7 +11,7 @@ pub struct Actuator {
 }
 
 impl Actuator {
-    pub fn identifier(&self) -> String {
+    pub fn identifier(&self) -> String { // TODO return ref with lifetime of Actuator?
         self.to_string()
     }
 }

@@ -21,7 +21,7 @@ pub struct ButtplugWorker {
 #[derive(Clone, Debug)]
 pub enum WorkerTask {
     Start(Arc<Actuator>, Speed, bool, i32),
-    Update(Arc<Actuator>, Speed),
+    Update(Arc<Actuator>, Speed, bool, i32),
     End(
         Arc<Actuator>,
         bool,
@@ -50,8 +50,8 @@ impl ButtplugWorker {
                             .start_scalar(&actuator, speed, is_not_pattern, handle)
                             .await;
                     }
-                    WorkerTask::Update(actuator, speed) => {
-                        device_access.update_scalar(&actuator, speed).await;
+                    WorkerTask::Update(actuator, speed, is_not_pattern, handle) => {
+                        device_access.update_scalar(&actuator, speed, is_not_pattern, handle).await;
                     }
                     WorkerTask::End(actuator, is_not_pattern, handle, result_sender) => {
                         let result = device_access

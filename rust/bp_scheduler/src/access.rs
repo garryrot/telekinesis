@@ -51,7 +51,7 @@ impl DeviceAccess {
         is_not_pattern: bool,
         handle: i32,
     ) {
-        trace!("start scalar {} {}", actuator, handle);
+        trace!("start scalar {:?} {} {}", speed, actuator, handle);
         self.device_actions
             .entry(actuator.identifier())
             .and_modify(|entry| {
@@ -68,7 +68,7 @@ impl DeviceAccess {
                     vec![]
                 },
             });
-        self.update_scalar(actuator, speed).await;
+        let _ = self.set_scalar(actuator, speed).await;
     }
 
     pub async fn stop_scalar(
@@ -77,7 +77,7 @@ impl DeviceAccess {
         is_not_pattern: bool,
         handle: i32,
     ) -> Result<(), ButtplugClientError> {
-        trace!("stop scalar {} {}", actuator, handle);
+        trace!("stop scalar {} ({})", actuator, handle);
         if let Some(mut entry) = self.device_actions.remove(&actuator.identifier()) {
             if is_not_pattern {
                 entry.linear_tasks.retain(|t| t.0 != handle);
@@ -90,13 +90,24 @@ impl DeviceAccess {
                 // nothing else is controlling the device, stop it
                 return self.set_scalar(actuator, Speed::min()).await;
             } else if let Some(last_speed) = self.get_priority_speed(actuator) {
-                self.update_scalar(actuator, last_speed).await;
+                let _ = self.set_scalar(actuator, last_speed).await;
             }
         }
         Ok(())
     }
 
-    pub async fn update_scalar(&self, actuator: &Arc<Actuator>, new_speed: Speed) {
+    pub async fn update_scalar(&mut self, actuator: &Arc<Actuator>, new_speed: Speed, is_not_pattern: bool, handle: i32) {
+        trace!("update_scalar scalar {:?} {} ({})", new_speed, actuator, handle);
+        if is_not_pattern {
+            self.device_actions.entry(actuator.identifier()).and_modify(|entry| {
+                entry.linear_tasks = entry.linear_tasks.iter().map(|t| {
+                    if t.0 == handle {
+                        return (handle, new_speed);
+                    }
+                    *t
+                }).collect()
+            });
+        }
         let speed = self.get_priority_speed(actuator).unwrap_or(new_speed);
         debug!("updating {} speed to {}", actuator, speed);
         let _ = self.set_scalar(actuator, speed).await;

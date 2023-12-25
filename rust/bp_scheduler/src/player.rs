@@ -12,12 +12,13 @@ use tracing::{error, info, trace};
 
 use crate::{cancellable_wait, actuator::Actuator, speed::Speed, worker::{WorkerTask, ButtplugClientResult}};
 
-/// Pattern executor that can be passed to a sub-thread
+/// Pattern executor that can be passed from the schedulers main-thread to a sub-thread
 pub struct PatternPlayer {
     pub actuators: Vec<Arc<Actuator>>,
-    pub action_sender: UnboundedSender<WorkerTask>,
+    pub worker_task_sender: UnboundedSender<WorkerTask>,
     pub result_sender: UnboundedSender<ButtplugClientResult>,
     pub result_receiver: UnboundedReceiver<ButtplugClientResult>,
+    pub update_receiver: UnboundedReceiver<Speed>,
     pub player_scalar_resolution_ms: i32,
     pub handle: i32,
     pub cancellation_token: CancellationToken,
@@ -94,7 +95,7 @@ impl PatternPlayer {
                 self.do_scalar(Speed::from_fs(current).multiply(&speed), false);
                 started = true;
             } else {
-                self.do_update(Speed::from_fs(current).multiply(&speed))
+                self.do_update(Speed::from_fs(current).multiply(&speed), false);
             }
             if let Some(waiting_time) =
                 Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
@@ -113,17 +114,30 @@ impl PatternPlayer {
     }
 
     /// Executes a constant movement with 'speed' for 'duration' and consumes the player
-    pub async fn play_scalar(self, duration: Duration, speed: Speed) -> ButtplugClientResult {
+    pub async fn play_scalar(mut self, duration: Duration, speed: Speed) -> ButtplugClientResult {
+        let waiter = self.stop_after(duration);
         self.do_scalar(speed, true);
-        cancellable_wait(duration, &self.cancellation_token).await;
+        loop {
+            tokio::select! {
+                _ = self.cancellation_token.cancelled() => {
+                    break;
+                }
+                update = self.update_receiver.recv() => {
+                    if let Some(speed) = update {
+                        self.do_update(speed, true);
+                    }
+                }
+            };
+        }
+        waiter.abort();
         self.do_stop(true).await
     }
 
-    fn do_update(&self, speed: Speed) {
+    fn do_update(&self, speed: Speed, is_not_pattern: bool) {
         for actuator in self.actuators.iter() {
             trace!("do_update {} {:?}", speed, actuator);
-            self.action_sender
-                .send(WorkerTask::Update(actuator.clone(), speed))
+            self.worker_task_sender
+                .send(WorkerTask::Update(actuator.clone(), speed, is_not_pattern, self.handle))
                 .unwrap_or_else(|_| error!("queue full"));
         }
     }
@@ -131,7 +145,7 @@ impl PatternPlayer {
     fn do_scalar(&self, speed: Speed, is_not_pattern: bool) {
         for actuator in self.actuators.iter() {
             trace!("do_scalar {} {:?}", speed, actuator);
-            self.action_sender
+            self.worker_task_sender
                 .send(WorkerTask::Start(
                     actuator.clone(),
                     speed,
@@ -145,7 +159,7 @@ impl PatternPlayer {
     async fn do_stop(mut self, is_not_pattern: bool) -> ButtplugClientResult {
         for actuator in self.actuators.iter() {
             trace!("do_stop actuator {:?}", actuator);
-            self.action_sender
+            self.worker_task_sender
                 .send(WorkerTask::End(
                     actuator.clone(),
                     is_not_pattern,
@@ -163,7 +177,7 @@ impl PatternPlayer {
 
     async fn do_linear(&mut self, pos: f64, duration_ms: u32) -> ButtplugClientResult {
         for actuator in &self.actuators {
-            self.action_sender
+            self.worker_task_sender
                 .send(WorkerTask::Move(
                     actuator.clone(),
                     pos,
