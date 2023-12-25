@@ -509,7 +509,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_scalar_speed_control() {
+    async fn test_scalar_pattern_control() {
         // arrange
         let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
@@ -543,7 +543,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_scalar_update_speed() {
+    async fn test_scalar_constant_control() {
         // arrange
         let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
         let mut player = PlayerTest::setup(&client.created_devices);

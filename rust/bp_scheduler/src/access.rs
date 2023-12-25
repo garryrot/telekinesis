@@ -48,7 +48,7 @@ impl DeviceAccess {
         &mut self,
         actuator: &Arc<Actuator>,
         speed: Speed,
-        is_not_pattern: bool,
+        is_pattern: bool,
         handle: i32,
     ) {
         trace!("start scalar {:?} {} {}", speed, actuator, handle);
@@ -56,16 +56,16 @@ impl DeviceAccess {
             .entry(actuator.identifier())
             .and_modify(|entry| {
                 entry.task_count += 1;
-                if is_not_pattern {
+                if ! is_pattern {
                     entry.linear_tasks.push((handle, speed))
                 }
             })
             .or_insert_with(|| DeviceEntry {
                 task_count: 1,
-                linear_tasks: if is_not_pattern {
-                    vec![(handle, speed)]
-                } else {
+                linear_tasks: if is_pattern {
                     vec![]
+                } else {
+                    vec![(handle, speed)]
                 },
             });
         let _ = self.set_scalar(actuator, speed).await;
@@ -74,12 +74,12 @@ impl DeviceAccess {
     pub async fn stop_scalar(
         &mut self,
         actuator: &Arc<Actuator>,
-        is_not_pattern: bool,
+        is_pattern: bool,
         handle: i32,
     ) -> Result<(), ButtplugClientError> {
         trace!("stop scalar {} ({})", actuator, handle);
         if let Some(mut entry) = self.device_actions.remove(&actuator.identifier()) {
-            if is_not_pattern {
+            if ! is_pattern {
                 entry.linear_tasks.retain(|t| t.0 != handle);
             }
             let mut count = entry.task_count;
@@ -96,9 +96,9 @@ impl DeviceAccess {
         Ok(())
     }
 
-    pub async fn update_scalar(&mut self, actuator: &Arc<Actuator>, new_speed: Speed, is_not_pattern: bool, handle: i32) {
+    pub async fn update_scalar(&mut self, actuator: &Arc<Actuator>, new_speed: Speed, is_pattern: bool, handle: i32) {
         trace!("update_scalar scalar {:?} {} ({})", new_speed, actuator, handle);
-        if is_not_pattern {
+        if ! is_pattern {
             self.device_actions.entry(actuator.identifier()).and_modify(|entry| {
                 entry.linear_tasks = entry.linear_tasks.iter().map(|t| {
                     if t.0 == handle {

@@ -92,10 +92,10 @@ impl PatternPlayer {
             let next = &fscript.actions[(i + j) % action_len];
 
             if !started {
-                self.do_scalar(Speed::from_fs(current).multiply(&speed), false);
+                self.do_scalar(Speed::from_fs(current).multiply(&speed), true);
                 started = true;
             } else {
-                self.do_update(Speed::from_fs(current).multiply(&speed), false);
+                self.do_update(Speed::from_fs(current).multiply(&speed), true);
             }
             if let Some(waiting_time) =
                 Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
@@ -110,13 +110,13 @@ impl PatternPlayer {
             }
         }
         waiter.abort();
-        self.do_stop(false).await
+        self.do_stop(true).await
     }
 
     /// Executes a constant movement with 'speed' for 'duration' and consumes the player
     pub async fn play_scalar(mut self, duration: Duration, speed: Speed) -> ButtplugClientResult {
         let waiter = self.stop_after(duration);
-        self.do_scalar(speed, true);
+        self.do_scalar(speed, false);
         loop {
             tokio::select! {
                 _ = self.cancellation_token.cancelled() => {
@@ -124,45 +124,45 @@ impl PatternPlayer {
                 }
                 update = self.update_receiver.recv() => {
                     if let Some(speed) = update {
-                        self.do_update(speed, true);
+                        self.do_update(speed, false);
                     }
                 }
             };
         }
         waiter.abort();
-        self.do_stop(true).await
+        self.do_stop(false).await
     }
 
-    fn do_update(&self, speed: Speed, is_not_pattern: bool) {
+    fn do_update(&self, speed: Speed, is_pattern: bool) {
         for actuator in self.actuators.iter() {
             trace!("do_update {} {:?}", speed, actuator);
             self.worker_task_sender
-                .send(WorkerTask::Update(actuator.clone(), speed, is_not_pattern, self.handle))
+                .send(WorkerTask::Update(actuator.clone(), speed, is_pattern, self.handle))
                 .unwrap_or_else(|_| error!("queue full"));
         }
     }
 
-    fn do_scalar(&self, speed: Speed, is_not_pattern: bool) {
+    fn do_scalar(&self, speed: Speed, is_pattern: bool) {
         for actuator in self.actuators.iter() {
             trace!("do_scalar {} {:?}", speed, actuator);
             self.worker_task_sender
                 .send(WorkerTask::Start(
                     actuator.clone(),
                     speed,
-                    is_not_pattern,
+                    is_pattern,
                     self.handle,
                 ))
                 .unwrap_or_else(|_| error!("queue full"));
         }
     }
 
-    async fn do_stop(mut self, is_not_pattern: bool) -> ButtplugClientResult {
+    async fn do_stop(mut self, is_pattern: bool) -> ButtplugClientResult {
         for actuator in self.actuators.iter() {
             trace!("do_stop actuator {:?}", actuator);
             self.worker_task_sender
                 .send(WorkerTask::End(
                     actuator.clone(),
-                    is_not_pattern,
+                    is_pattern,
                     self.handle,
                     self.result_sender.clone(),
                 ))

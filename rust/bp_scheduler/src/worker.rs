@@ -45,17 +45,17 @@ impl ButtplugWorker {
             if let Some(next_action) = self.task_receiver.recv().await {
                 trace!("exec device action {:?}", next_action);
                 match next_action {
-                    WorkerTask::Start(actuator, speed, is_not_pattern, handle) => {
+                    WorkerTask::Start(actuator, speed, is_pattern, handle) => {
                         device_access
-                            .start_scalar(&actuator, speed, is_not_pattern, handle)
+                            .start_scalar(&actuator, speed, is_pattern, handle)
                             .await;
                     }
-                    WorkerTask::Update(actuator, speed, is_not_pattern, handle) => {
-                        device_access.update_scalar(&actuator, speed, is_not_pattern, handle).await;
+                    WorkerTask::Update(actuator, speed, is_pattern, handle) => {
+                        device_access.update_scalar(&actuator, speed, is_pattern, handle).await;
                     }
-                    WorkerTask::End(actuator, is_not_pattern, handle, result_sender) => {
+                    WorkerTask::End(actuator, is_pattern, handle, result_sender) => {
                         let result = device_access
-                            .stop_scalar(&actuator, is_not_pattern, handle)
+                            .stop_scalar(&actuator, is_pattern, handle)
                             .await;
                         result_sender.send(result).unwrap();
                     }
