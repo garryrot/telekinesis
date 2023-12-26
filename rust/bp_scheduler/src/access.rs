@@ -2,7 +2,7 @@ use buttplug::client::{ButtplugClientError, ScalarCommand};
 use std::collections::HashMap;
 
 use std::sync::Arc;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, instrument};
 
 use crate::{actuator::Actuator, speed::Speed};
 
@@ -36,7 +36,7 @@ impl DeviceAccess {
     ) {
         trace!("start scalar {:?} {} {}", speed, actuator, handle);
         self.device_actions
-            .entry(actuator.identifier())
+            .entry(actuator.identifier().into())
             .and_modify(|entry| {
                 entry.task_count += 1;
                 if ! is_pattern {
@@ -54,21 +54,22 @@ impl DeviceAccess {
         let _ = self.set_scalar(actuator, speed).await;
     }
 
+    #[instrument(skip(self))]
     pub async fn stop_scalar(
         &mut self,
         actuator: &Arc<Actuator>,
         is_pattern: bool,
         handle: i32,
     ) -> Result<(), ButtplugClientError> {
-        trace!("stop scalar {} ({})", actuator, handle);
-        if let Some(mut entry) = self.device_actions.remove(&actuator.identifier()) {
+        trace!("stop scalar");
+        if let Some(mut entry) = self.device_actions.remove(actuator.identifier()) {
             if ! is_pattern {
                 entry.linear_tasks.retain(|t| t.0 != handle);
             }
             let mut count = entry.task_count;
             count = count.saturating_sub(1);
             entry.task_count = count;
-            self.device_actions.insert(actuator.identifier(), entry);
+            self.device_actions.insert(actuator.identifier().into(), entry);
             if count == 0 {
                 // nothing else is controlling the device, stop it
                 return self.set_scalar(actuator, Speed::min()).await;
@@ -79,10 +80,11 @@ impl DeviceAccess {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     pub async fn update_scalar(&mut self, actuator: &Arc<Actuator>, new_speed: Speed, is_pattern: bool, handle: i32) {
-        trace!("update scalar scalar {:?} {} ({})", new_speed, actuator, handle);
+        trace!("update scalar scalar");
         if ! is_pattern {
-            self.device_actions.entry(actuator.identifier()).and_modify(|entry| {
+            self.device_actions.entry(actuator.identifier().into()).and_modify(|entry| {
                 entry.linear_tasks = entry.linear_tasks.iter().map(|t| {
                     if t.0 == handle {
                         return (handle, new_speed);
@@ -96,6 +98,7 @@ impl DeviceAccess {
         let _ = self.set_scalar(actuator, speed).await;
     }
 
+    #[instrument(skip(self))]
     async fn set_scalar(
         &self,
         actuator: &Arc<Actuator>,
@@ -109,12 +112,11 @@ impl DeviceAccess {
             error!("failed to set scalar speed {:?}", err);
             return Err(err);
         }
-        debug!("Device stopped {}", actuator.identifier());
         Ok(())
     }
 
     fn get_priority_speed(&self, actuator: &Arc<Actuator>) -> Option<Speed> {
-        if let Some(entry) = self.device_actions.get(&actuator.identifier()) {
+        if let Some(entry) = self.device_actions.get(actuator.identifier()) {
             let mut sorted: Vec<(i32, Speed)> = entry.linear_tasks.clone();
             sorted.sort_by_key(|b| b.0);
             if let Some(tuple) = sorted.last() {

@@ -2,13 +2,13 @@ use funscript::FScript;
 use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration, fmt};
 use tokio::{
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{sleep, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, instrument};
 
 use crate::{cancellable_wait, actuator::Actuator, speed::Speed, worker::{WorkerTask, ButtplugClientResult}};
 
@@ -19,19 +19,20 @@ pub struct PatternPlayer {
     pub result_sender: UnboundedSender<ButtplugClientResult>,
     pub result_receiver: UnboundedReceiver<ButtplugClientResult>,
     pub update_receiver: UnboundedReceiver<Speed>,
-    pub player_scalar_resolution_ms: i32,
+    pub scalar_resolution_ms: i32,
     pub handle: i32,
     pub cancellation_token: CancellationToken,
 }
 
 impl PatternPlayer {
     /// Executes the linear 'fscript' for 'duration' and consumes the player
+    #[instrument(skip(fscript))]
     pub async fn play_linear(
         mut self,
         duration: Duration,
         fscript: FScript,
     ) -> ButtplugClientResult {
-        let handle = self.handle;
+        info!("linear pattern started");
         let mut last_result = Ok(());
         if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
             return last_result;
@@ -61,11 +62,12 @@ impl PatternPlayer {
             }
         }
         waiter.abort();
-        info!("stop pattern ({})", handle);
+        info!("linear pattern done");
         last_result
     }
 
     /// Executes the scalar 'fscript' for 'duration' and consumes the player
+    #[instrument(skip(fscript))]
     pub async fn play_scalar_pattern(
         self,
         duration: Duration,
@@ -75,6 +77,7 @@ impl PatternPlayer {
         if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
             return Ok(());
         }
+        info!("scalar pattern started");
         let waiter = self.stop_after(duration);
         let action_len = fscript.actions.len();
         let mut started = false;
@@ -84,7 +87,7 @@ impl PatternPlayer {
             let mut j = 1;
             while j + i < action_len - 1
                 && (fscript.actions[i + j].at - fscript.actions[i].at)
-                    < self.player_scalar_resolution_ms
+                    < self.scalar_resolution_ms
             {
                 j += 1;
             }
@@ -110,11 +113,14 @@ impl PatternPlayer {
             }
         }
         waiter.abort();
-        self.do_stop(true).await
+        let result = self.do_stop(true).await;
+        info!("scalar pattern done");
+        result
     }
 
     /// Executes a constant movement with 'speed' for 'duration' and consumes the player
     pub async fn play_scalar(mut self, duration: Duration, speed: Speed) -> ButtplugClientResult {
+        info!("scalar started");
         let waiter = self.stop_after(duration);
         self.do_scalar(speed, false);
         loop {
@@ -130,7 +136,9 @@ impl PatternPlayer {
             };
         }
         waiter.abort();
-        self.do_stop(false).await
+        let result = self.do_stop(false).await;
+        info!("scalar done");
+        result
     }
 
     fn do_update(&self, speed: Speed, is_pattern: bool) {
@@ -142,9 +150,10 @@ impl PatternPlayer {
         }
     }
 
+    #[instrument(skip(self))]
     fn do_scalar(&self, speed: Speed, is_pattern: bool) {
         for actuator in self.actuators.iter() {
-            trace!("do_scalar {} {:?}", speed, actuator);
+            trace!("do_scalar");
             self.worker_task_sender
                 .send(WorkerTask::Start(
                     actuator.clone(),
@@ -156,9 +165,10 @@ impl PatternPlayer {
         }
     }
 
+    #[instrument(skip(self))]
     async fn do_stop(mut self, is_pattern: bool) -> ButtplugClientResult {
         for actuator in self.actuators.iter() {
-            trace!("do_stop actuator {:?}", actuator);
+            trace!("do_stop");
             self.worker_task_sender
                 .send(WorkerTask::End(
                     actuator.clone(),
@@ -175,8 +185,10 @@ impl PatternPlayer {
         last_result
     }
 
+    #[instrument(skip(self))]
     async fn do_linear(&mut self, pos: f64, duration_ms: u32) -> ButtplugClientResult {
         for actuator in &self.actuators {
+            trace!("do_linear");
             self.worker_task_sender
                 .send(WorkerTask::Move(
                     actuator.clone(),
@@ -196,5 +208,15 @@ impl PatternPlayer {
             sleep(duration).await;
             cancellation_clone.cancel();
         })
+    }
+}
+
+impl fmt::Debug for PatternPlayer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PatternPlayer")
+            .field("actuators", &self.actuators)
+            .field("handle", &self.handle)
+            .field("resolution", &self.scalar_resolution_ms)
+            .finish()
     }
 }

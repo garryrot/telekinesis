@@ -4,7 +4,7 @@ use std::{
     time::Duration, fmt::{Display, self}
 };
 
-use bp_scheduler::{actuator::Actuator, speed::Speed};
+use bp_scheduler::{actuator::{Actuator, get_actuators}, speed::Speed};
 use buttplug::{client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent}, core::message::ActuatorType};
 use crossbeam_channel::Sender;
 use futures::StreamExt;
@@ -76,15 +76,6 @@ pub enum TkCommand {
 pub enum Task {
     Scalar(Speed),
     Pattern(Speed, ActuatorType, String)
-}
-
-impl Display for Task {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Task::Scalar(speed) => write!(f, "Linear({}%)", speed),
-            Task::Pattern(speed, actuator, pattern) => write!(f, "Pattern({}, {}, {})", speed, actuator, pattern)
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -167,17 +158,22 @@ pub async fn handle_connection(
     while let Some(event) = buttplug_events.next().await {
         match event.clone() {
             ButtplugClientEvent::DeviceAdded(device) => {
-                info!("device added {} ({})", device.name(), device.index() );
+                let actuators = get_actuators(vec![device.clone()]);
+                let name = device.name();
+                let index = device.index();
+                info!( name, index, ?actuators, "device connected");
                 try_set_device_status(&connection_status, &device, TkConnectionStatus::Connected);
                 try_send_event(&event_sender, TkConnectionEvent::DeviceAdded(device));
             }
             ButtplugClientEvent::DeviceRemoved(device) => {
-                info!("device removed {} ({})", device.name(), device.index() );
+                let name = device.name();
+                let index = device.index();
+                info!( name, index, "device disconnected");
                 try_set_device_status(&connection_status, &device, TkConnectionStatus::NotConnected);             
                 try_send_event(&event_sender, TkConnectionEvent::DeviceRemoved(device));
             }
             ButtplugClientEvent::Error(err) => {
-                error!("client error event {:?}", err);
+                error!(?err, "client error event");
             }
             _ => {}
         };
@@ -206,4 +202,13 @@ fn try_send_event(sender: &Sender<TkConnectionEvent>, evt: TkConnectionEvent) {
     sender
         .try_send(evt)
         .unwrap_or_else(|_| error!("Event sender full"));
+}
+
+impl Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Task::Scalar(speed) => write!(f, "Linear({}%)", speed),
+            Task::Pattern(speed, actuator, pattern) => write!(f, "Pattern({}, {}, {})", speed, actuator, pattern)
+        }
+    }
 }

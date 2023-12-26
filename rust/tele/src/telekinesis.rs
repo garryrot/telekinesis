@@ -22,6 +22,7 @@ use buttplug::{
 use funscript::FScript;
 use futures::Future;
 use itertools::Itertools;
+use tracing::instrument;
 
 use std::time::Duration;
 use std::{
@@ -48,18 +49,6 @@ use crate::{
 
 pub static ERROR_HANDLE: i32 = -1;
 
-pub fn in_process_connector(
-) -> impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage> {
-    ButtplugInProcessClientConnectorBuilder::default()
-        .server(
-            ButtplugServerBuilder::default()
-                .comm_manager(BtlePlugCommunicationManagerBuilder::default())
-                .finish()
-                .expect("Could not create in-process-server."), // TODO log error instead of panic
-        )
-        .finish()
-}
-
 pub struct Telekinesis {
     pub connection_status: Arc<Mutex<TkStatus>>,
     pub settings: TkSettings,
@@ -82,13 +71,24 @@ impl Telekinesis {
         T: ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage>
             + 'static,
     {
-        let runtime = Runtime::new()?;
         let (event_sender, event_receiver) = crossbeam_channel::unbounded();
-        let (command_sender, command_receiver) = channel(256); // we handle them immediately
-        let event_sender_clone = event_sender.clone();
+        let (command_sender, command_receiver) = channel(256);
         let connection_status = Arc::new(Mutex::new(TkStatus::default())); // ugly
-        let status_clone = connection_status.clone();
-        runtime.spawn(async move {
+        let (scheduler, mut worker) = ButtplugScheduler::create(PlayerSettings {
+            scalar_resolution_ms: 100,
+        });
+        let telekinesis = Telekinesis {
+            command_sender,
+            connection_events: event_receiver,
+            runtime: Runtime::new()?,
+            settings: provided_settings.unwrap_or_else(TkSettings::default),
+            connection_status: connection_status.clone(),
+            scheduler,
+            event_sender: event_sender.clone(),
+        };
+        info!(?telekinesis, "connecting...");
+
+        telekinesis.runtime.spawn(async move {
             debug!("starting connection handling thread");
             let client = with_connector(connector_factory().await).await;
             handle_connection(
@@ -101,32 +101,12 @@ impl Telekinesis {
             .await;
             debug!("connection handling stopped");
         });
-
-        let (scheduler, mut worker) = ButtplugScheduler::create(PlayerSettings {
-            player_scalar_resolution_ms: 100,
-        });
-
-        runtime.spawn(async move {
+        telekinesis.runtime.spawn(async move {
             debug!("starting worker thread");
             worker.run_worker_thread().await;
             debug!("worked thread stopped");
         });
-
-        Ok(Telekinesis {
-            command_sender,
-            connection_events: event_receiver,
-            runtime,
-            settings: provided_settings.unwrap_or_else(TkSettings::default),
-            connection_status: status_clone,
-            scheduler,
-            event_sender: event_sender_clone,
-        })
-    }
-}
-
-impl fmt::Debug for Telekinesis {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Telekinesis").finish()
+        Ok(telekinesis)
     }
 }
 
@@ -198,7 +178,7 @@ impl Telekinesis {
     }
 
     pub fn scan_for_devices(&self) -> bool {
-        info!("start scan for devices");
+        info!("start scan");
         if self.command_sender.try_send(TkCommand::Scan).is_err() {
             error!("Failed to start scan");
             return false;
@@ -247,6 +227,7 @@ impl Telekinesis {
         TkConnectionStatus::NotConnected
     }
 
+    #[instrument(skip(self, fscript))]
     pub fn vibrate(
         &mut self,
         task: Task,
@@ -254,7 +235,7 @@ impl Telekinesis {
         tags: Vec<String>,
         fscript: Option<FScript>,
     ) -> i32 {
-        info!("vibrate {:?}", task);
+        info!("vibrate");
         let task_clone = task.clone();
         let params = TkParams::from_input(tags.clone(), &task, &self.settings.devices);
 
@@ -277,22 +258,13 @@ impl Telekinesis {
                 ))
                 .expect("queue full");
             let result = match task {
-                Task::Scalar(speed) => {
-                    info!(
-                        "starting {} for {:?} <scalar> ({})",
-                        speed, duration, handle
-                    );
-                    player.play_scalar(duration, speed).await
-                }
-                Task::Pattern(speed, _actuator, pattern) => {
-                    info!(
-                        "starting '{}' for {:?} <scalar> ({})",
-                        pattern, duration, handle
-                    );
-                    player.play_scalar_pattern(duration, fscript.unwrap(), speed).await
+                Task::Scalar(speed) => player.play_scalar(duration, speed).await,
+                Task::Pattern(speed, _, _) => {
+                    player
+                        .play_scalar_pattern(duration, fscript.unwrap(), speed)
+                        .await
                 }
             };
-            info!("done");
             if let Ok(mut connection_status) = connection_status.lock() {
                 for actuator in &actuators {
                     let status = match &result {
@@ -317,12 +289,14 @@ impl Telekinesis {
         handle
     }
 
+    #[instrument(skip(self))]
     pub fn stop(&mut self, handle: i32) -> bool {
-        info!("stop handle {}", handle);
+        info!("stop");
         self.scheduler.stop_task(handle);
         true
     }
 
+    #[instrument(skip(self))]
     pub fn stop_all(&mut self) -> bool {
         info!("stop all");
         self.scheduler.stop_all();
@@ -333,6 +307,7 @@ impl Telekinesis {
         true
     }
 
+    #[instrument(skip(self))]
     pub fn disconnect(&mut self) {
         info!("disconnect");
         if self.command_sender.try_send(TkCommand::Disconect).is_err() {
@@ -340,15 +315,17 @@ impl Telekinesis {
         }
     }
 
+    #[instrument(skip(self))]
     pub fn settings_set_enabled(&mut self, device_name: &str, enabled: bool) {
-        debug!("Setting '{}'.enabled={}", device_name, enabled);
+        debug!("settings={:?}", self.settings);
         let mut settings = self.settings.clone();
         settings.set_enabled(device_name, enabled);
         self.settings = settings;
     }
 
+    #[instrument(skip(self))]
     pub fn settings_set_events(&mut self, device_name: &str, events: &[String]) {
-        debug!("Setting '{}'.events={:?}", device_name, events);
+        debug!("settings={:?}", self.settings);
         let settings = self.settings.clone();
         self.settings = settings.set_events(device_name, events);
     }
@@ -358,9 +335,7 @@ impl Telekinesis {
     }
 
     pub fn settings_get_enabled(&self, device_name: &str) -> bool {
-        let enabled = self.settings.is_enabled(device_name);
-        debug!("Getting setting '{}'.enabled={}", device_name, enabled);
-        enabled
+        self.settings.is_enabled(device_name)
     }
 
     pub fn get_connection_status(&self) -> TkConnectionStatus {
@@ -369,6 +344,18 @@ impl Telekinesis {
         }
         TkConnectionStatus::NotConnected
     }
+}
+
+pub fn in_process_connector(
+) -> impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage> {
+    ButtplugInProcessClientConnectorBuilder::default()
+        .server(
+            ButtplugServerBuilder::default()
+                .comm_manager(BtlePlugCommunicationManagerBuilder::default())
+                .finish()
+                .expect("Could not create in-process-server."),
+        )
+        .finish()
 }
 
 async fn with_connector<T>(connector: T) -> ButtplugClient
@@ -473,10 +460,20 @@ pub fn read_pattern_name(
     Ok(fs)
 }
 
+impl fmt::Debug for Telekinesis {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Telekinesis")
+            .field("connected", &self.connection_status)
+            .field("settings", &self.settings)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::connection::TkConnectionStatus;
     use crate::telekinesis::in_process_connector;
+    use crate::util::enable_log;
     use crate::*;
     use bp_fakes::{linear, scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
     use bp_scheduler::speed::Speed;
@@ -509,42 +506,51 @@ mod tests {
         }
     }
 
+    /// Vibrate
+
     #[test]
-    fn get_devices_contains_connected_devices() {
+    fn vibrate_infinitely_and_then_stop() {
         // arrange
-        let (tk, _) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate),
-            scalar(2, "vib2", ActuatorType::Inflate),
-        ]);
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
 
-        // assert
-        assert_timeout!(
-            tk.connection_status.lock().unwrap().device_status.len() == 2,
-            "Enough devices connected"
-        );
-        assert!(
-            tk.get_known_device_names().contains(&String::from("vib1")),
-            "Contains name vib1"
-        );
-        assert!(
-            tk.get_known_device_names().contains(&String::from("vib2")),
-            "Contains name vib2"
-        );
+        // act
+        let handle = tk.vibrate(Task::Scalar(Speed::max()), Duration::MAX, vec![], None);
+
+        thread::sleep(Duration::from_secs(1));
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+
+        tk.stop(handle);
+        thread::sleep(Duration::from_secs(1));
+        call_registry.get_device(1)[1].assert_strenth(0.0);
     }
 
     #[test]
-    fn get_devices_contains_devices_from_settings() {
-        let (mut tk, _) = wait_for_connection(vec![]);
-        tk.settings_set_enabled("foreign", true);
-        assert!(
-            tk.get_known_device_names()
-                .contains(&String::from("foreign")),
-            "Contains additional device from settings"
+    fn vibrate_linear_then_cancel() {
+        // arrange
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+
+        // act
+        thread::sleep(Duration::from_secs(1));
+        tk.vibrate(
+            Task::Scalar(Speed::max()),
+            Duration::from_secs(1),
+            vec![],
+            None,
         );
+        thread::sleep(Duration::from_secs(2));
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        tk.stop_all();
+
+        thread::sleep(Duration::from_secs(1));
+        call_registry.get_device(1)[1].assert_strenth(0.0);
     }
 
     #[test]
-    fn vibrate_all_demo_only_vibrates_vibrators() {
+    fn vibrate_all_demo_vibrators() {
+        enable_log();
+
         // arrange
         let (connector, call_registry) = FakeDeviceConnector::device_demo();
         let count = connector.devices.len();
@@ -618,6 +624,147 @@ mod tests {
         call_registry.assert_unused(2);
     }
 
+    /// Vibrate (E2E)
+
+    #[test]
+    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
+    fn vibrate_pattern_then_cancel() {
+        let (mut tk, handle) = test_pattern("02_Cruel-Tease", Duration::from_secs(10));
+        thread::sleep(Duration::from_secs(2)); // dont disconnect
+        tk.stop(handle);
+        thread::sleep(Duration::from_secs(10));
+    }
+
+    #[test]
+    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
+    fn vibrate_pattern_loops() {
+        let (mut tk, handle) = test_pattern("03_Wub-Wub-Wub", Duration::from_secs(20));
+        thread::sleep(Duration::from_secs(20));
+        tk.stop(handle);
+        thread::sleep(Duration::from_secs(2));
+    }
+
+    fn test_pattern(pattern_name: &str, duration: Duration) -> (Telekinesis, i32) {
+        let settings = TkSettings::default();
+        let pattern_path =
+            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+        let mut tk = Telekinesis::connect_with(
+            || async move { in_process_connector() },
+            Some(settings),
+            TkConnectionType::Test,
+        )
+        .unwrap();
+        tk.scan_for_devices();
+        tk.await_connect(1);
+        thread::sleep(Duration::from_secs(2));
+        tk.settings
+            .set_enabled(tk.get_known_device_names().first().unwrap(), true);
+
+        let fscript = read_pattern(&pattern_path, pattern_name, true).unwrap();
+        let handle = tk.vibrate(
+            Task::Pattern(Speed::max(), ActuatorType::Vibrate, pattern_name.into()),
+            duration,
+            vec![],
+            Some(fscript),
+        );
+        (tk, handle)
+    }
+
+    /// Intiface (E2E)
+
+    #[test]
+    #[ignore = "Requires intiface to be connected, with a connected device (vibrates it)"]
+    fn intiface_test_vibration() {
+        let mut settings = TkSettings::default();
+        settings.connection = TkConnectionType::WebSocket(String::from("127.0.0.1:12345"));
+
+        let mut tk = Telekinesis::connect(settings).unwrap();
+        tk.scan_for_devices();
+
+        thread::sleep(Duration::from_secs(5));
+        assert!(matches!(
+            tk.connection_status.lock().unwrap().connection_status,
+            TkConnectionStatus::Connected
+        ));
+
+        for actuator in tk.get_devices() {
+            tk.settings.set_enabled(actuator.device.name(), true);
+        }
+        tk.vibrate(Task::Scalar(Speed::max()), Duration::MAX, vec![], None);
+        thread::sleep(Duration::from_secs(5));
+    }
+
+    #[test]
+    fn intiface_not_available_connection_status_error() {
+        let mut settings = TkSettings::default();
+        settings.connection = TkConnectionType::WebSocket(String::from("bogushost:6572"));
+
+        let tk = Telekinesis::connect(settings).unwrap();
+        tk.scan_for_devices();
+        thread::sleep(Duration::from_secs(5));
+        match &tk.connection_status.lock().unwrap().connection_status {
+            TkConnectionStatus::Failed(err) => {
+                assert!(!err.is_empty());
+            }
+            _ => todo!(),
+        };
+    }
+
+    /// Settings
+
+    #[test]
+    fn settings_are_trimmed_and_lowercased() {
+        let (mut tk, call_registry) =
+            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
+        tk.settings_set_enabled("vib1", true);
+        tk.settings_set_events("vib1", &[String::from(" SoMe EvEnT    ")]);
+        tk.vibrate(
+            Task::Scalar(Speed::max()),
+            Duration::from_millis(1),
+            vec![String::from("some event")],
+            None,
+        );
+
+        thread::sleep(Duration::from_millis(500));
+        call_registry.get_device(1)[0].assert_strenth(1.0);
+        call_registry.get_device(1)[1].assert_strenth(0.0);
+    }
+
+    #[test]
+    fn get_devices_contains_connected_devices() {
+        // arrange
+        let (tk, _) = wait_for_connection(vec![
+            scalar(1, "vib1", ActuatorType::Vibrate),
+            scalar(2, "vib2", ActuatorType::Inflate),
+        ]);
+
+        // assert
+        assert_timeout!(
+            tk.connection_status.lock().unwrap().device_status.len() == 2,
+            "Enough devices connected"
+        );
+        assert!(
+            tk.get_known_device_names().contains(&String::from("vib1")),
+            "Contains name vib1"
+        );
+        assert!(
+            tk.get_known_device_names().contains(&String::from("vib2")),
+            "Contains name vib2"
+        );
+    }
+
+    #[test]
+    fn get_devices_contains_devices_from_settings() {
+        let (mut tk, _) = wait_for_connection(vec![]);
+        tk.settings_set_enabled("foreign", true);
+        assert!(
+            tk.get_known_device_names()
+                .contains(&String::from("foreign")),
+            "Contains additional device from settings"
+        );
+    }
+
+
     #[test]
     fn events_get() {
         let empty: Vec<String> = vec![];
@@ -678,24 +825,8 @@ mod tests {
         call_registry.get_device(1)[0].assert_strenth(1.0);
         call_registry.get_device(1)[1].assert_strenth(0.0);
     }
-
-    #[test]
-    fn settings_are_trimmed_and_lowercased() {
-        let (mut tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-        tk.settings_set_enabled("vib1", true);
-        tk.settings_set_events("vib1", &[String::from(" SoMe EvEnT    ")]);
-        tk.vibrate(
-            Task::Scalar(Speed::max()),
-            Duration::from_millis(1),
-            vec![String::from("some event")],
-            None,
-        );
-
-        thread::sleep(Duration::from_millis(500));
-        call_registry.get_device(1)[0].assert_strenth(1.0);
-        call_registry.get_device(1)[1].assert_strenth(0.0);
-    }
+    
+    /// Device Status
 
     #[test]
     fn get_device_capabilities() {
@@ -741,152 +872,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn vibrate_infinitely_and_then_stop() {
-        // arrange
-        let (mut tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-
-        // act
-        let handle = tk.vibrate(Task::Scalar(Speed::max()), Duration::MAX, vec![], None);
-
-        thread::sleep(Duration::from_secs(1));
-        call_registry.get_device(1)[0].assert_strenth(1.0);
-
-        tk.stop(handle);
-        thread::sleep(Duration::from_secs(1));
-        call_registry.get_device(1)[1].assert_strenth(0.0);
-    }
-
-    #[test]
-    fn vibrate_linear_then_cancel() {
-        // arrange
-        let (mut tk, call_registry) =
-            wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)]);
-
-        // act
-        thread::sleep(Duration::from_secs(1));
-        tk.vibrate(
-            Task::Scalar(Speed::max()),
-            Duration::from_secs(1),
-            vec![],
-            None,
-        );
-        thread::sleep(Duration::from_secs(2));
-        call_registry.get_device(1)[0].assert_strenth(1.0);
-        tk.stop_all();
-
-        thread::sleep(Duration::from_secs(1));
-        call_registry.get_device(1)[1].assert_strenth(0.0);
-    }
-
-    // TODO: Scheduler test
-    #[test]
-    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
-    fn vibrate_pattern_then_cancel() {
-        let (mut tk, handle) = test_pattern("02_Cruel-Tease", Duration::from_secs(10));
-        thread::sleep(Duration::from_secs(2)); // dont disconnect
-        tk.stop(handle);
-        thread::sleep(Duration::from_secs(10));
-    }
-
-    // TODO: Scheduler test
-    #[test]
-    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
-    fn vibrate_pattern_loops() {
-        let (mut tk, handle) = test_pattern("03_Wub-Wub-Wub", Duration::from_secs(20));
-        thread::sleep(Duration::from_secs(20));
-        tk.stop(handle);
-        thread::sleep(Duration::from_secs(2));
-    }
-
-    fn test_pattern(pattern_name: &str, duration: Duration) -> (Telekinesis, i32) {
-        let settings = TkSettings::default();
-        let pattern_path =
-            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
-        let mut tk = Telekinesis::connect_with(
-            || async move { in_process_connector() },
-            Some(settings),
-            TkConnectionType::Test,
-        )
-        .unwrap();
-        tk.scan_for_devices();
-        tk.await_connect(1);
-        thread::sleep(Duration::from_secs(2));
-        tk.settings
-            .set_enabled(tk.get_known_device_names().first().unwrap(), true);
-
-        let fscript = read_pattern(&pattern_path, pattern_name, true).unwrap();
-        let handle = tk.vibrate(
-            Task::Pattern(Speed::max(), ActuatorType::Vibrate, pattern_name.into()),
-            duration,
-            vec![],
-            Some(fscript),
-        );
-        (tk, handle)
-    }
-
-    #[test]
-    #[ignore = "Requires intiface to be connected, with a connected device (vibrates it)"]
-    fn intiface_test_vibration() {
-        let mut settings = TkSettings::default();
-        settings.connection = TkConnectionType::WebSocket(String::from("127.0.0.1:12345"));
-
-        let mut tk = Telekinesis::connect(settings).unwrap();
-        tk.scan_for_devices();
-
-        thread::sleep(Duration::from_secs(5));
-        assert!(matches!(
-            tk.connection_status.lock().unwrap().connection_status,
-            TkConnectionStatus::Connected
-        ));
-
-        for actuator in tk.get_devices() {
-            tk.settings.set_enabled(actuator.device.name(), true);
-        }
-        tk.vibrate(Task::Scalar(Speed::max()), Duration::MAX, vec![], None);
-        thread::sleep(Duration::from_secs(5));
-    }
-
-    #[test]
-    fn intiface_not_available_connection_status_error() {
-        let mut settings = TkSettings::default();
-        settings.connection = TkConnectionType::WebSocket(String::from("bogushost:6572"));
-
-        let tk = Telekinesis::connect(settings).unwrap();
-        tk.scan_for_devices();
-        thread::sleep(Duration::from_secs(5));
-        match &tk.connection_status.lock().unwrap().connection_status {
-            TkConnectionStatus::Failed(err) => {
-                assert!(!err.is_empty());
-            }
-            _ => todo!(),
-        };
-    }
-
-    fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {
-        let devices_names: Vec<String> = devices.iter().map(|d| d.device_name().clone()).collect();
-        let (connector, call_registry) = FakeDeviceConnector::new(devices);
-        let count = connector.devices.len();
-
-        // act
-        let mut settings = TkSettings::default();
-        settings.pattern_path =
-            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
-        let mut tk = Telekinesis::connect_with(
-            || async move { connector },
-            Some(settings),
-            TkConnectionType::Test,
-        )
-        .unwrap();
-        tk.await_connect(count);
-
-        for name in devices_names {
-            tk.settings_set_enabled(&name, true);
-        }
-
-        (tk, call_registry)
-    }
+    /// Events
 
     #[test]
     fn process_next_events_after_action_returns_1() {
@@ -927,5 +913,29 @@ mod tests {
         );
         get_next_events_blocking(&tk.connection_events);
         get_next_events_blocking(&tk.connection_events);
+    }
+
+    fn wait_for_connection(devices: Vec<DeviceAdded>) -> (Telekinesis, FakeConnectorCallRegistry) {
+        let devices_names: Vec<String> = devices.iter().map(|d| d.device_name().clone()).collect();
+        let (connector, call_registry) = FakeDeviceConnector::new(devices);
+        let count = connector.devices.len();
+
+        // act
+        let mut settings = TkSettings::default();
+        settings.pattern_path =
+            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+        let mut tk = Telekinesis::connect_with(
+            || async move { connector },
+            Some(settings),
+            TkConnectionType::Test,
+        )
+        .unwrap();
+        tk.await_connect(count);
+
+        for name in devices_names {
+            tk.settings_set_enabled(&name, true);
+        }
+
+        (tk, call_registry)
     }
 }

@@ -119,7 +119,7 @@ impl TkSettings {
 
     pub fn set_events(mut self, device_name: &str, events: &[String]) -> Self {
         self.assure_exists(device_name);
-        let evts: Vec<String> = sanitize_name_list(&events);
+        let evts: Vec<String> = sanitize_name_list(events);
         self.devices = self
             .devices
             .iter()

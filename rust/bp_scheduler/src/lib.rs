@@ -11,7 +11,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::error;
+use tracing::{error, instrument};
 
 mod access;
 pub mod actuator;
@@ -19,20 +19,23 @@ mod player;
 pub mod speed;
 mod worker;
 
+#[derive(Debug)]
 pub struct ButtplugScheduler {
     worker_task_sender: UnboundedSender<WorkerTask>,
     settings: PlayerSettings,
     control_handles: HashMap<i32, ControlHandle>,
-    last_handle: i32
+    last_handle: i32,
 }
 
+#[derive(Debug)]
 struct ControlHandle {
     cancellation_token: CancellationToken,
-    update_sender: UnboundedSender<Speed>
+    update_sender: UnboundedSender<Speed>,
 }
 
+#[derive(Debug)]
 pub struct PlayerSettings {
-    pub player_scalar_resolution_ms: i32,
+    pub scalar_resolution_ms: i32,
 }
 
 impl ButtplugScheduler {
@@ -55,29 +58,57 @@ impl ButtplugScheduler {
     }
 
     // stop player
+    #[instrument]
     pub fn stop_task(&mut self, handle: i32) {
         if self.control_handles.contains_key(&handle) {
-            self.control_handles.remove(&handle).unwrap().cancellation_token.cancel();
+            self.control_handles
+                .remove(&handle)
+                .unwrap()
+                .cancellation_token
+                .cancel();
         } else {
             error!("Unknown handle {}", handle);
         }
     }
 
     // control player
+    #[instrument]
     pub fn update_task(&mut self, handle: i32, speed: Speed) {
         if self.control_handles.contains_key(&handle) {
-            let _ = self.control_handles.get(&handle).unwrap().update_sender.send(speed);
+            let _ = self
+                .control_handles
+                .get(&handle)
+                .unwrap()
+                .update_sender
+                .send(speed);
         } else {
             error!("Unknown handle {}", handle);
         }
+    }
+
+    #[instrument]
+    pub fn stop_all(&mut self) {
+        let queue_full_err = "Event sender full";
+        self.worker_task_sender
+            .send(WorkerTask::StopAll)
+            .unwrap_or_else(|_| error!(queue_full_err));
+        for entry in self.control_handles.drain() {
+            entry.1.cancellation_token.cancel();
+        }
+        self.control_handles.clear();
     }
 
     pub fn create_player(&mut self, actuators: Vec<Arc<Actuator>>) -> PatternPlayer {
         let (update_sender, update_receiver) = unbounded_channel::<Speed>();
         let cancellation_token = CancellationToken::new();
         let handle = self.get_next_handle();
-        self.control_handles
-            .insert(handle, ControlHandle { cancellation_token: cancellation_token.clone(), update_sender } );
+        self.control_handles.insert(
+            handle,
+            ControlHandle {
+                cancellation_token: cancellation_token.clone(),
+                update_sender,
+            },
+        );
         let (result_sender, result_receiver) =
             unbounded_channel::<Result<(), ButtplugClientError>>();
         PatternPlayer {
@@ -88,19 +119,8 @@ impl ButtplugScheduler {
             handle,
             cancellation_token,
             worker_task_sender: self.worker_task_sender.clone(),
-            player_scalar_resolution_ms: self.settings.player_scalar_resolution_ms,
+            scalar_resolution_ms: self.settings.scalar_resolution_ms,
         }
-    }
-
-    pub fn stop_all(&mut self) {
-        let queue_full_err = "Event sender full";
-        self.worker_task_sender
-            .send(WorkerTask::StopAll)
-            .unwrap_or_else(|_| error!(queue_full_err));
-        for entry in self.control_handles.drain() {
-            entry.1.cancellation_token.cancel();
-        }
-        self.control_handles.clear();
     }
 }
 
@@ -122,10 +142,10 @@ mod tests {
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
     use bp_fakes::*;
-    use tracing::Level;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
+    use tracing::Level;
 
     use funscript::{FSPoint, FScript};
     use futures::future::join_all;
@@ -150,7 +170,7 @@ mod tests {
             PlayerTest::setup_with_settings(
                 all_devices,
                 PlayerSettings {
-                    player_scalar_resolution_ms: 1,
+                    scalar_resolution_ms: 1,
                 },
             )
         }
@@ -485,7 +505,7 @@ mod tests {
         let mut player = PlayerTest::setup_with_settings(
             &client.created_devices,
             PlayerSettings {
-                player_scalar_resolution_ms: 100,
+                scalar_resolution_ms: 100,
             },
         );
 
@@ -532,7 +552,7 @@ mod tests {
         calls[1].assert_strenth(0.07);
         calls[2].assert_strenth(0.0);
     }
-    
+
     fn enable_log() {
         tracing::subscriber::set_global_default(
             tracing_subscriber::fmt()
@@ -556,12 +576,20 @@ mod tests {
         wait_ms(100).await;
         player.scheduler.update_task(1, Speed::new(10));
         player.await_all().await;
-        
+
         client.print_device_calls(start);
-        client.get_device_calls(1)[0].assert_strenth(1.0).assert_timestamp(0, start);
-        client.get_device_calls(1)[1].assert_strenth(0.5).assert_timestamp(100, start);
-        client.get_device_calls(1)[2].assert_strenth(0.1).assert_timestamp(200, start);
-        client.get_device_calls(1)[3].assert_strenth(0.0).assert_timestamp(300, start);
+        client.get_device_calls(1)[0]
+            .assert_strenth(1.0)
+            .assert_timestamp(0, start);
+        client.get_device_calls(1)[1]
+            .assert_strenth(0.5)
+            .assert_timestamp(100, start);
+        client.get_device_calls(1)[2]
+            .assert_strenth(0.1)
+            .assert_timestamp(200, start);
+        client.get_device_calls(1)[3]
+            .assert_strenth(0.0)
+            .assert_timestamp(300, start);
     }
 
     // Concurrency Tests
