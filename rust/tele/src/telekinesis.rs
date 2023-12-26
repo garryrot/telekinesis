@@ -549,8 +549,6 @@ mod tests {
 
     #[test]
     fn vibrate_all_demo_vibrators() {
-        enable_log();
-
         // arrange
         let (connector, call_registry) = FakeDeviceConnector::device_demo();
         let count = connector.devices.len();
