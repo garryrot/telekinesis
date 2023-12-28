@@ -79,7 +79,7 @@ impl Status {
                 TkConnectionEvent::DeviceRemoved(device) =>  self.set_status(device.clone(), TkConnectionStatus::NotConnected),
                 TkConnectionEvent::ActionError(actuator, err) => self.set_status(actuator.device.clone(), TkConnectionStatus::Failed(err)),
                 TkConnectionEvent::ActionStarted(_, _, _, _) => {},
-                TkConnectionEvent::ActionDone(_, _, _) => todo!(),
+                TkConnectionEvent::ActionDone(_, _, _) => {},
             }   
         }
     }
