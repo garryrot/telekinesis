@@ -11,7 +11,7 @@ use crate::input::sanitize_name_list;
 
 pub static DEFAULT_PATTERN_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis\\Patterns";
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
-pub static SETTINGS_FILE: &str = "Telekinesis.json";
+pub static SETTINGS_FILE: &str = "Telekinesis.v2.json";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum TkConnectionType {
@@ -51,15 +51,15 @@ pub struct TkSettings {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TkDeviceSettings {
-    pub name: String,
+    pub actuator_id: String,
     pub enabled: bool,
     pub events: Vec<String>,
 }
 
 impl TkDeviceSettings {
-    pub fn from_name(name: &str) -> TkDeviceSettings {
+    pub fn from_name(actuator_id: &str) -> TkDeviceSettings {
         TkDeviceSettings {
-            name: name.into(),
+            actuator_id: actuator_id.into(),
             enabled: false,
             events: vec![],
         }
@@ -110,22 +110,23 @@ impl TkSettings {
     pub fn get_enabled_devices(&self) -> Vec<TkDeviceSettings> {
         self.devices.iter().filter(|d| d.enabled).cloned().collect()
     }
-    pub fn add(&mut self, device_name: &str) {
-        if self.devices.iter().any(|d| d.name == device_name) {
+
+    pub fn add(&mut self, actuator_id: &str) {
+        if self.devices.iter().any(|d| d.actuator_id == actuator_id) {
             return;
         }
-        self.devices.push(TkDeviceSettings::from_name(device_name));
+        self.devices.push(TkDeviceSettings::from_name(actuator_id));
     }
 
-    pub fn set_events(mut self, device_name: &str, events: &[String]) -> Self {
-        self.assure_exists(device_name);
+    pub fn set_events(mut self, actuator_id: &str, events: &[String]) -> Self {
+        self.assure_exists(actuator_id);
         let evts: Vec<String> = sanitize_name_list(events);
         self.devices = self
             .devices
             .iter()
             .map(|d| {
                 let mut device = d.clone();
-                if d.name == device_name {
+                if d.actuator_id == actuator_id {
                     device.events = evts.clone();
                 }
                 device
@@ -134,11 +135,11 @@ impl TkSettings {
         self
     }
 
-    pub fn get_events(&self, device_name: &str) -> Vec<String> {
+    pub fn get_events(&self, actuator_id: &str) -> Vec<String> {
         match self
             .devices
             .iter()
-            .filter(|d| d.name == device_name)
+            .filter(|d| d.actuator_id == actuator_id)
             .map(|d| d.events.clone())
             .next()
         {
@@ -147,15 +148,15 @@ impl TkSettings {
         }
     }
 
-    pub fn set_enabled(&mut self, device_name: &str, enabled: bool) {
-        self.assure_exists(device_name);
+    pub fn set_enabled(&mut self, actuator_id: &str, enabled: bool) {
+        self.assure_exists(actuator_id);
 
         self.devices = self
             .devices
             .iter()
             .map(|d| {
                 let mut device = d.clone();
-                if d.name == device_name {
+                if d.actuator_id == actuator_id {
                     device.enabled = enabled;
                 }
                 device
@@ -163,22 +164,22 @@ impl TkSettings {
             .collect();
     }
 
-    pub fn assure_exists(&mut self, device_name: &str) {
+    pub fn assure_exists(&mut self, actuator_id: &str) {
         if self
             .devices
             .iter()
-            .filter(|d| d.name == device_name)
+            .filter(|d| d.actuator_id == actuator_id)
             .count()
             == 0
         {
-            self.add(device_name);
+            self.add(actuator_id);
         }
     }
 
-    pub fn is_enabled(&self, device_name: &str) -> bool {
+    pub fn is_enabled(&self, actuator_id: &str) -> bool {
         self.devices
             .iter()
-            .filter(|d| d.name == device_name && d.enabled)
+            .filter(|d| d.actuator_id == actuator_id && d.enabled)
             .count()
             >= 1
     }
@@ -201,7 +202,7 @@ mod tests {
         let serialized = serde_json::to_string_pretty(&setting).unwrap();
         let deserialized: TkSettings = serde_json::from_str(&serialized).unwrap();
         println!("{}", serialized);
-        assert_eq!(deserialized.devices[0].name, setting.devices[0].name);
+        assert_eq!(deserialized.devices[0].actuator_id, setting.devices[0].actuator_id);
     }
 
     #[test]
@@ -256,7 +257,7 @@ mod tests {
         settings.set_enabled("a", true);
         let enabled_devices = settings.get_enabled_devices();
         assert_eq!(enabled_devices.len(), 1);
-        assert_eq!(enabled_devices[0].name, "a");
+        assert_eq!(enabled_devices[0].actuator_id, "a");
 
         settings.set_enabled("a", false);
         assert_eq!(settings.get_enabled_devices().len(), 0);
@@ -276,7 +277,7 @@ mod tests {
     fn enable_unknown_device() {
         let mut settings = TkSettings::default();
         settings.set_enabled("foobar", true);
-        assert_eq!(settings.get_enabled_devices()[0].name, "foobar");
+        assert_eq!(settings.get_enabled_devices()[0].actuator_id, "foobar");
     }
 
     #[test]
@@ -307,7 +308,7 @@ mod tests {
         // assert
         let settings2 =
             TkSettings::try_read_or_default(tmpdir.path().to_str().unwrap(), target_file);
-        assert_eq!(settings2.devices[0].name, "foobar");
+        assert_eq!(settings2.devices[0].actuator_id, "foobar");
         assert_ok!(tmpdir.close());
     }
 

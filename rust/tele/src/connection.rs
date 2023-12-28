@@ -1,6 +1,5 @@
 use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::Duration, fmt::{Display, self}
 };
 
@@ -12,55 +11,6 @@ use tokio::runtime::Handle;
 use tracing::{error, info, span, Level};
 
 use crate::settings::TkConnectionType;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TkConnectionStatus {
-    NotConnected,
-    Connected,
-    Failed(String),
-}
-
-impl Display for TkConnectionStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self {
-            TkConnectionStatus::Failed(err) => write!(f, "{}", err),
-            TkConnectionStatus::NotConnected => write!(f, "Not Connected"),
-            TkConnectionStatus::Connected => write!(f, "Connected"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TkDeviceStatus {
-    pub status: TkConnectionStatus,
-    pub device: Arc<ButtplugClientDevice>,
-}
-
-impl TkDeviceStatus {
-    pub fn new(device: &Arc<ButtplugClientDevice>, status: TkConnectionStatus) -> Self {
-        TkDeviceStatus {
-            device: device.clone(),
-            status,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct TkStatus {
-    pub connection_status: TkConnectionStatus,
-    pub device_status: HashMap<u32, TkDeviceStatus>,
-}
-
-impl TkStatus {
-    pub fn default() -> Self {
-        TkStatus {
-            connection_status: TkConnectionStatus::NotConnected,
-            device_status: HashMap::new(),
-        }
-    }
-}
-
-pub type ActuatorList = Vec<Arc<Actuator>>;
 
 /// Global commands on connection level, i.e. connection handling 
 /// or emergency stop
@@ -84,21 +34,21 @@ pub enum TkConnectionEvent {
     ConnectionFailure(String),
     DeviceAdded(Arc<ButtplugClientDevice>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
-    ActionStarted(Task, ActuatorList, Vec<String>, i32),
+    ActionStarted(Task, Vec<Arc<Actuator>>, Vec<String>, i32),
     ActionDone(Task, Duration, i32),
     ActionError(Arc<Actuator>, String),
 }
 
 pub async fn handle_connection(
     event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
+    event_sender_internal: crossbeam_channel::Sender<TkConnectionEvent>,
     mut command_receiver: tokio::sync::mpsc::Receiver<TkCommand>,
     client: ButtplugClient,
-    connection_status: Arc<Mutex<TkStatus>>,
     connection_type: TkConnectionType,
 ) {
+    let sender_interla_clone = event_sender_internal.clone();
     let mut buttplug_events = client.event_stream();
     let sender_clone = event_sender.clone();
-    let status_clone = connection_status.clone();
     Handle::current().spawn(async move {
         let _ = span!(Level::INFO, "connection control").entered();
         loop {
@@ -110,26 +60,25 @@ pub async fn handle_connection(
                         if let Err(err) = client.start_scanning().await {
                             let error = err.to_string();
                             error!("connection failure {}", error);
-                            try_send_event(
-                                &sender_clone,
-                                TkConnectionEvent::ConnectionFailure(err.to_string()),
-                            );
-                            try_set_status(
-                                &status_clone,
-                                TkConnectionStatus::Failed(err.to_string()),
-                            );
+                            let failure = TkConnectionEvent::ConnectionFailure(err.to_string());
+                            try_send_event( &sender_clone, failure.clone() );
+                            try_send_event( &event_sender_internal, failure );
                         } else {
                             let settings = connection_type.to_string();
                             info!(settings, "connection success");
-                            try_send_event(&sender_clone, TkConnectionEvent::Connected(settings));
-                            try_set_status(&status_clone, TkConnectionStatus::Connected);
+
+                            let connected = TkConnectionEvent::Connected(settings.clone());
+                            try_send_event(&sender_clone, connected.clone());
+                            try_send_event(&event_sender_internal, connected);
                         }
                     }
                     TkCommand::StopScan => {
                         if let Err(err) = client.stop_scanning().await {
                             let error = err.to_string();
                             error!(error, "failed stop scan");
-                            try_set_status(&status_clone, TkConnectionStatus::Failed(error));
+                            let err = TkConnectionEvent::ConnectionFailure(error);
+                            try_send_event(&sender_clone, err.clone());
+                            try_send_event(&event_sender_internal, err);
                         }
                     }
                     TkCommand::Disconect => {
@@ -137,7 +86,6 @@ pub async fn handle_connection(
                             .disconnect()
                             .await
                             .unwrap_or_else(|_| error!("Failed to disconnect."));
-                        try_set_status(&status_clone, TkConnectionStatus::NotConnected);
                         break;
                     }
                     TkCommand::StopAll => {
@@ -158,19 +106,23 @@ pub async fn handle_connection(
     while let Some(event) = buttplug_events.next().await {
         match event.clone() {
             ButtplugClientEvent::DeviceAdded(device) => {
-                let actuators = get_actuators(vec![device.clone()]);
                 let name = device.name();
                 let index = device.index();
+                let actuators = get_actuators(vec![device.clone()]);
                 info!( name, index, ?actuators, "device connected");
-                try_set_device_status(&connection_status, &device, TkConnectionStatus::Connected);
-                try_send_event(&event_sender, TkConnectionEvent::DeviceAdded(device));
+
+                let added = TkConnectionEvent::DeviceAdded(device);
+                try_send_event(&sender_interla_clone, added.clone());
+                try_send_event(&event_sender, added);
             }
             ButtplugClientEvent::DeviceRemoved(device) => {
                 let name = device.name();
                 let index = device.index();
-                info!( name, index, "device disconnected");
-                try_set_device_status(&connection_status, &device, TkConnectionStatus::NotConnected);             
-                try_send_event(&event_sender, TkConnectionEvent::DeviceRemoved(device));
+                info!( name, index, "device disconnected");    
+                
+                let removed = TkConnectionEvent::DeviceRemoved(device);
+                try_send_event(&sender_interla_clone, removed.clone());
+                try_send_event(&event_sender, removed);
             }
             ButtplugClientEvent::Error(err) => {
                 error!(?err, "client error event");
@@ -178,24 +130,6 @@ pub async fn handle_connection(
             _ => {}
         };
     }
-}
-
-fn try_set_device_status(connection_status: &Arc<Mutex<TkStatus>>, device: &Arc<ButtplugClientDevice>, status: TkConnectionStatus) {
-    connection_status
-        .lock()
-        .expect("mutex healthy")
-        .device_status
-        .insert(
-            device.index(),
-            TkDeviceStatus::new(device, status),
-        );
-}
-
-fn try_set_status(connection_status: &Arc<Mutex<TkStatus>>, status: TkConnectionStatus) {
-    connection_status
-        .lock()
-        .expect("mutex healthy")
-        .connection_status = status;
 }
 
 fn try_send_event(sender: &Sender<TkConnectionEvent>, evt: TkConnectionEvent) {

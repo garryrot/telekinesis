@@ -1,8 +1,9 @@
-use std::time::Duration;
+use std::{time::Duration, sync::Arc};
 
+use bp_scheduler::actuator::Actuator;
 use cxx::{CxxString, CxxVector};
 
-use crate::{settings::TkDeviceSettings, connection::{ActuatorList, Task}};
+use crate::{settings::TkDeviceSettings, connection::Task};
 
 pub fn sanitize_name_list(list: &[String]) -> Vec<String> {
     list.iter()
@@ -47,12 +48,12 @@ pub struct TkParams<'a> {
 impl<'a> TkParams<'a> {
     pub fn filter_devices(
         &self,
-        actuators: &ActuatorList,
-    ) -> ActuatorList {
+        actuators: &Vec<Arc<Actuator>>,
+    ) -> Vec<Arc<Actuator>> {
         actuators
             .iter()
             .filter(|a| {
-                self.selector.iter().any(|x| x == a.device.name())
+                self.selector.iter().any(|x| x == a.identifier())
                     && a.device.message_attributes().scalar_cmd().is_some()
             })
             .cloned()
@@ -65,16 +66,16 @@ impl<'a> TkParams<'a> {
         devices: &[TkDeviceSettings],
     ) -> Self {
         let event_names = sanitize_name_list(&events);
-        let device_names = devices
+        let actuator_ids = devices
             .iter()
             .filter(|d| {
                 d.enabled
                     && (event_names.is_empty() || d.events.iter().any(|e| event_names.contains(e)))
             })
-            .map(|d| d.name.clone())
+            .map(|d| d.actuator_id.clone())
             .collect();
         TkParams {
-            selector: device_names,
+            selector: actuator_ids,
             task,
             events
         }

@@ -1,5 +1,6 @@
 use buttplug::client::ButtplugClientDevice;
 use buttplug::core::message::ActuatorType;
+use tracing::error;
 use std::{
     fmt::{self, Display},
     sync::Arc,
@@ -20,16 +21,29 @@ impl Actuator {
         index_in_device: usize,
     ) -> Self {
         let identifier = format!("{}[{}].{}", device.name(), index_in_device, actuator);
+        error!("identifier: {:?}", identifier);
         Actuator {
             device: device.clone(),
             actuator,
             index_in_device: index_in_device as u32,
-            identifier,
+            identifier
         }
     }
 
+    pub fn from(device: Arc<ButtplugClientDevice>) -> Vec<Arc<Actuator>> {
+        vec![]
+    }
+
+    /// i.e. ToyName[0].Vibrate or ToyName[1].Inflate
     pub fn identifier(&self) -> &str {
         &self.identifier
+    }
+
+    pub fn description(&self) -> String {
+        if self.index_in_device > 0 {
+            return format!("{} ({} {})", self.device.name(), self.actuator.to_string(), self.index_in_device);
+        }
+        format!("{} ({})", self.device.name(), self.actuator.to_string())
     }
 }
 

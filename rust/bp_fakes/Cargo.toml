@@ -2,6 +2,7 @@
 name = "bp_fakes"
 version = "0.1.0"
 edition = "2021"
+description = "Fake buttplug server for testing device access"
 
 [dependencies]
 buttplug = "7.1.2"

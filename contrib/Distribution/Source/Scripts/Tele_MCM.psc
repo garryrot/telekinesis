@@ -41,7 +41,7 @@ Event OnVersionUpdate(int aVersion)
     If CurrentVersion < 12
         ; Update from 1.1.0
         InitLocals()
-        TeleDevices.LogDebug("Updating event handling")
+        TeleDevices.LogDebug("Resetting device settings, please re-enable them.")
         TeleDevices.MigrateToV12()
         TeleIntegration.MigrateToV12()
     EndIf
@@ -145,14 +145,18 @@ Event OnPageReset(String page)
 
         Int i = 0
         While (i < len) 
-            String name = _DeviceNames[i]
+            String actuatorId = _DeviceNames[i]
             
-            If name != ""
-                String status = Tele_Api.Qry_Str_1("device.connection.status", name)
-                AddHeaderOption(name)
+            If actuatorId != ""
+                String status = Tele_Api.Qry_Str_1("device.connection.status", actuatorId)
+                String description = Tele_Api.Qry_Str_1("device.description", actuatorId);
+                If description == ""
+                    description = actuatorId
+                EndIf
+                AddHeaderOption(description)
                 AddTextOption(Key(i, "State"), status, OPTION_FLAG_DISABLED)                
-                AddTextOption(Key(i, "Actions"), Tele_Api.Qry_Lst_1("device.capabilities", name), OPTION_FLAG_DISABLED)
-                _DeviceEventOids[i] = AddInputOption(Key(i, "Body Parts"), Join(Tele_Api.Qry_Lst_1("device.settings.events", name), ","))
+                AddTextOption(Key(i, "Motor"), Tele_Api.Qry_Str_1("device.actuator", actuatorId), OPTION_FLAG_DISABLED)
+                _DeviceEventOids[i] = AddInputOption(Key(i, "Body Parts"), Join(Tele_Api.Qry_Lst_1("device.settings.events", actuatorId), ","))
 
                 Int flags = OPTION_FLAG_DISABLED
                 If status == "Connected"
@@ -161,7 +165,7 @@ Event OnPageReset(String page)
 
                 bool connects = false
                 If TeleDevices.Connects()
-                    connects = Tele_Api.Qry_Bool_1("device.settings.enabled", name)
+                    connects = Tele_Api.Qry_Bool_1("device.settings.enabled", actuatorId)
                 EndIf
                 _UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), connects, flags)
             EndIf

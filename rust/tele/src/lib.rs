@@ -1,7 +1,7 @@
 use api::*;
 use bp_scheduler::speed::Speed;
 use buttplug::core::message::ActuatorType;
-use connection::{TkConnectionEvent, TkConnectionStatus, TkStatus, Task};
+use connection::{TkConnectionEvent, Task};
 use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
 use itertools::Itertools;
@@ -21,8 +21,9 @@ mod connection;
 mod input;
 mod logging;
 mod settings;
-pub mod telekinesis;
+mod status;
 mod util;
+pub mod telekinesis;
 
 #[derive(Debug)]
 pub struct TkApi {
@@ -229,7 +230,7 @@ pub fn get_next_events_blocking(
                 let str_arg = format!(
                     "{}{} on ({})",
                     task,
-                    if !tags.is_empty() { format!(" {}", tags.iter().join(",")) } else { String::from("") },
+                    if !tags.is_empty() { format!(" {}", tags.iter().join(",")) } else { String::default() },
                     actuators.iter().map(|x| x.identifier()).join(",")
                 );
                 SKSEModEvent::new("Tele_DeviceActionStarted", &str_arg, f64::from(handle))
@@ -276,10 +277,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "connection.status",
         default: "Not Connected",
         exec: |tk| {
-            if let Ok(status) = tk.connection_status.try_lock() {
-                return status.connection_status.to_string();
-            }
-            TkConnectionStatus::NotConnected.to_string()
+            tk.status.connection_status().to_string()
         },
     })
     // scan
@@ -336,53 +334,62 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     // devices settings
     .def_qry_lst(ApiQryList {
         name: "devices",
-        exec: |tk| tk.get_known_device_names(), // -> unique id TODO
+        exec: |tk| tk.status.get_known_actuator_ids(),
     })
-    .def_qry_lst_1(ApiQryList1 {
-        name: "device.descriptor",  // TODO
-        exec: |tk, device_name| tk.get_device_capabilities(device_name), // -> actuator feature descriptor, may be empty
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.description",
+        default: "",
+        exec: |tk, actuator_id| {
+            if let Some(actuator) = tk.status.get_actuator(actuator_id) {
+                return actuator.description();
+            }
+            String::default()
+        },
     })
-    .def_qry_lst_1(ApiQryList1 {
-        name: "device.capabilities",
-        exec: |tk, device_name| tk.get_device_capabilities(device_name), // -> single actuator type
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.actuator",
+        default: "Not Connected",
+        exec: |tk, actuator_id| {
+            if let Some(actuator) = tk.status.get_actuator(actuator_id) {
+                return actuator.actuator.to_string();
+            }
+            String::default()
+        },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.settings.enable",
-        exec: |tk, device_name| {
-            tk.settings_set_enabled(device_name, true);
+        exec: |tk, actuator_id| {
+            tk.settings_set_enabled(actuator_id, true);
             true
         },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.settings.disable",
-        exec: |tk, device_name| {
-            tk.settings_set_enabled(device_name, false);
+        exec: |tk, actuator_id| {
+            tk.settings_set_enabled(actuator_id, false);
             true
         },
     })
     .def_qry_bool_1(ApiQryBool1 {
         name: "device.settings.enabled",
-        exec: |tk, device_name| tk.settings_get_enabled(device_name),
+        exec: |tk, actuator_id| tk.settings_get_enabled(actuator_id),
     })
     .def_cmd2(ApiCmd2 {
         name: "device.settings.events",
-        exec: |tk, device_name, events| {
-            tk.settings_set_events(device_name, &parse_list_string(events));
+        exec: |tk, actuator_id, events| {
+            tk.settings_set_events(actuator_id, &parse_list_string(events));
             true
         },
     })
     .def_qry_lst_1(ApiQryList1 {
         name: "device.settings.events",
-        exec: |tk, device_name| tk.settings_get_events(device_name),
+        exec: |tk, actuator_id| tk.settings_get_events(actuator_id),
     })
     .def_qry_str1(ApiQryStr1 {
         name: "device.connection.status",
         default: "Not Connected",
-        exec: |tk, device_name| {
-            if let Some(a) = tk.get_device_status(device_name) {
-                return a.status.to_string();
-            }
-            TkConnectionStatus::NotConnected.to_string()
+        exec: |tk, actuator_id| {
+            tk.status.get_actuator_status(actuator_id).to_string()
         },
     })
     // patterns
