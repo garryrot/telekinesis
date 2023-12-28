@@ -5,11 +5,12 @@ use connection::{TkConnectionEvent, Task};
 use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
 use itertools::Itertools;
+use pattern::{get_pattern_names, read_pattern};
 use std::sync::{Arc, Mutex};
 use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::{get_pattern_names, read_pattern, ERROR_HANDLE, Telekinesis};
+use telekinesis::{ERROR_HANDLE, Telekinesis};
 
 use crate::{
     input::{parse_list_string, read_input_string},
@@ -23,6 +24,7 @@ mod logging;
 mod settings;
 mod status;
 mod util;
+mod pattern;
 pub mod telekinesis;
 
 #[derive(Debug)]
