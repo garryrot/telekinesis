@@ -75,6 +75,10 @@ pub struct ApiControl<State> {
 }
 declare_api_cmd!(ApiControl);
 
+pub struct ApiUpdate<State> {
+    pub exec: fn(&mut State, i32, i32) -> bool
+}
+
 pub struct ApiStop<State> {
     pub exec: fn(&mut State, i32) -> bool,
 }
@@ -116,6 +120,7 @@ pub struct ApiBuilder<T> {
     pub qry_bool: Vec<ApiQryBool<T>>,
     pub qry_bool_1: Vec<ApiQryBool1<T>>,
     pub control: Vec<ApiControl<T>>,
+    pub update: ApiUpdate<T>,
     pub stop: ApiStop<T>,
 }
 
@@ -133,6 +138,7 @@ impl<T> ApiBuilder<T> {
             qry_bool: vec![],
             qry_bool_1: vec![],
             control: vec![],
+            update: ApiUpdate { exec: |_,_,_| false },
             stop: ApiStop { exec: |_,_| true },
         }
     }
@@ -150,6 +156,10 @@ impl<T> ApiBuilder<T> {
     }
     pub fn def_control(mut self, cmd: ApiControl<T>) -> Self {
         self.control.push(cmd);
+        self
+    }
+    pub fn def_update(mut self, cmd: ApiUpdate<T>) -> Self {
+        self.update = cmd;
         self
     }
     pub fn def_stop(mut self, cmd: ApiStop<T>) -> Self {
@@ -284,6 +294,11 @@ pub trait Api<T> {
             return self.try_exec(|tk| (api.exec)(tk, arg0, arg1, arg2, arg3), -1);
         }
         self.fail_dispatch(-1)
+    }
+
+    fn exec_update(&mut self, arg0: i32, arg1: i32) -> bool {
+        let update = self.fns().update;  
+        self.try_exec(|tk| (update.exec)(tk, arg0, arg1), false)
     }
 
     fn exec_stop(&mut self, arg0: i32) -> bool {

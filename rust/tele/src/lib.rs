@@ -1,7 +1,7 @@
 use api::*;
 use bp_scheduler::speed::Speed;
 use buttplug::core::message::ActuatorType;
-use connection::{TkConnectionEvent, Task};
+use connection::{Task, TkConnectionEvent};
 use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
 use itertools::Itertools;
@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::{ERROR_HANDLE, Telekinesis};
+use telekinesis::{Telekinesis, ERROR_HANDLE};
 
 use crate::{
     input::{parse_list_string, read_input_string},
@@ -21,11 +21,11 @@ mod api;
 mod connection;
 mod input;
 mod logging;
+mod pattern;
 mod settings;
 mod status;
-mod util;
-mod pattern;
 pub mod telekinesis;
+mod util;
 
 #[derive(Debug)]
 pub struct TkApi {
@@ -68,6 +68,7 @@ mod ffi {
             arg2: &str,
             arg3: &CxxVector<CxxString>,
         ) -> i32;
+        fn tk_update(&mut self, arg0: i32, arg1: i32) -> bool;
         fn tk_stop(&mut self, arg0: i32) -> bool;
         // blocking
         fn tk_qry_nxt_evt(&mut self) -> Vec<SKSEModEvent>;
@@ -118,52 +119,52 @@ impl Api<Telekinesis> for TkApi {
 }
 
 impl TkApi {
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_cmd(&mut self, cmd: &str) -> bool {
         self.exec_cmd_0(cmd)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_cmd_1(&mut self, cmd: &str, arg0: &str) -> bool {
         self.exec_cmd_1(cmd, arg0)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_cmd_2(&mut self, cmd: &str, arg0: &str, arg1: &str) -> bool {
         self.exec_cmd_2(cmd, arg0, arg1)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_qry_str(&mut self, qry: &str) -> String {
         self.exec_qry_str(qry)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_qry_str_1(&mut self, qry: &str, arg0: &str) -> String {
         self.exec_qry_str_1(qry, arg0)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_qry_lst(&mut self, qry: &str) -> Vec<String> {
         self.exec_qry_lst(qry)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_qry_lst_1(&mut self, qry: &str, arg0: &str) -> Vec<String> {
         self.exec_qry_lst_1(qry, arg0)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_qry_bool(&mut self, qry: &str) -> bool {
         self.exec_qry_bool(qry)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_qry_bool_1(&mut self, qry: &str, arg0: &str) -> bool {
         self.exec_qry_bool_1(qry, arg0)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     fn tk_control(
         &mut self,
         qry: &str,
@@ -175,7 +176,12 @@ impl TkApi {
         self.exec_control(qry, arg0, arg1, arg2, arg3)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
+    fn tk_update(&mut self, arg0: i32, arg1: i32) -> bool {
+        self.exec_update(arg0, arg1)
+    }
+
+    #[instrument(skip(self))]
     fn tk_stop(&mut self, arg0: i32) -> bool {
         self.exec_stop(arg0)
     }
@@ -183,7 +189,6 @@ impl TkApi {
     /// Return type Vec cause cxx crate does not support Option
     /// and Result enforces try catch with some weird template
     /// I don't wanna get into
-    #[instrument]
     fn tk_qry_nxt_evt(&mut self) -> Vec<SKSEModEvent> {
         let tele = &self.state();
         let mut receiver = None;
@@ -232,7 +237,11 @@ pub fn get_next_events_blocking(
                 let str_arg = format!(
                     "{}{} on ({})",
                     task,
-                    if !tags.is_empty() { format!(" {}", tags.iter().join(",")) } else { String::default() },
+                    if !tags.is_empty() {
+                        format!(" {}", tags.iter().join(","))
+                    } else {
+                        String::default()
+                    },
                     actuators.iter().map(|x| x.identifier()).join(",")
                 );
                 SKSEModEvent::new("Tele_DeviceActionStarted", &str_arg, f64::from(handle))
@@ -278,9 +287,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_str(ApiQryStr {
         name: "connection.status",
         default: "Not Connected",
-        exec: |tk| {
-            tk.status.connection_status().to_string()
-        },
+        exec: |tk| tk.status.connection_status().to_string(),
     })
     // scan
     .def_cmd(ApiCmd0 {
@@ -299,7 +306,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
                 Task::Scalar(Speed::new(speed.into())),
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
-                None
+                None,
             )
         },
         default: ERROR_HANDLE,
@@ -312,14 +319,23 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             true,
         ) {
             Some(fscript) => tk.vibrate(
-                Task::Pattern(Speed::new(speed.into()), ActuatorType::Vibrate, pattern_name.into()),
+                Task::Pattern(
+                    Speed::new(speed.into()),
+                    ActuatorType::Vibrate,
+                    pattern_name.into(),
+                ),
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
-                Some(fscript)
+                Some(fscript),
             ),
             None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
+    })
+    .def_update(ApiUpdate { 
+        exec: |tk, handle, speed| {
+            tk.update(handle, Speed::new(speed.into()))
+        }
     })
     .def_stop(ApiStop {
         exec: Telekinesis::stop,
@@ -390,9 +406,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_str1(ApiQryStr1 {
         name: "device.connection.status",
         default: "Not Connected",
-        exec: |tk, actuator_id| {
-            tk.status.get_actuator_status(actuator_id).to_string()
-        },
+        exec: |tk, actuator_id| tk.status.get_actuator_status(actuator_id).to_string(),
     })
     // patterns
     .def_qry_lst(ApiQryList {
@@ -404,4 +418,3 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         exec: |tk| get_pattern_names(&tk.settings.pattern_path, false),
     })
 }
-

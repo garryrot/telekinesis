@@ -1794,7 +1794,7 @@ Event OnOptionSelect(int oid)
         If (oid == _TestVibratePatternOid[i])
             String patternName = _VibrateFunscriptNames[i]
             String[] allEvents = new String[1]
-            TeleDevices.VibratePattern(patternName, 30, allEvents)
+            TeleDevices.VibratePattern(patternName, 100, 30, allEvents)
         EndIf
         i += 1
     EndWhile

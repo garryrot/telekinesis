@@ -14,14 +14,14 @@ use crate::{cancellable_wait, actuator::Actuator, speed::Speed, worker::{WorkerT
 
 /// Pattern executor that can be passed from the schedulers main-thread to a sub-thread
 pub struct PatternPlayer {
+    pub handle: i32,
+    pub scalar_resolution_ms: i32,
     pub actuators: Vec<Arc<Actuator>>,
-    pub worker_task_sender: UnboundedSender<WorkerTask>,
     pub result_sender: UnboundedSender<ButtplugClientResult>,
     pub result_receiver: UnboundedReceiver<ButtplugClientResult>,
     pub update_receiver: UnboundedReceiver<Speed>,
-    pub scalar_resolution_ms: i32,
-    pub handle: i32,
     pub cancellation_token: CancellationToken,
+    pub worker_task_sender: UnboundedSender<WorkerTask>,
 }
 
 impl PatternPlayer {
@@ -119,6 +119,7 @@ impl PatternPlayer {
     }
 
     /// Executes a constant movement with 'speed' for 'duration' and consumes the player
+    #[instrument]
     pub async fn play_scalar(mut self, duration: Duration, speed: Speed) -> ButtplugClientResult {
         info!("scalar started");
         let waiter = self.stop_after(duration);

@@ -11,7 +11,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, instrument};
+use tracing::{error, instrument, info, debug};
 
 mod access;
 pub mod actuator;
@@ -57,8 +57,12 @@ impl ButtplugScheduler {
         self.last_handle
     }
 
-    // stop player
-    #[instrument]
+    /// Clean up finished tasks
+    pub fn clean_finished_tasks(&mut self) {
+        self.control_handles.retain(|i,handle| ! handle.cancellation_token.is_cancelled() );
+    } 
+
+    #[instrument(skip(self))]
     pub fn stop_task(&mut self, handle: i32) {
         if self.control_handles.contains_key(&handle) {
             self.control_handles
@@ -71,22 +75,24 @@ impl ButtplugScheduler {
         }
     }
 
-    // control player
-    #[instrument]
-    pub fn update_task(&mut self, handle: i32, speed: Speed) {
+    #[instrument(skip(self))]
+    pub fn update_task(&mut self, handle: i32, speed: Speed) -> bool {
         if self.control_handles.contains_key(&handle) {
+            debug!("updating handle {}", handle);
             let _ = self
                 .control_handles
                 .get(&handle)
                 .unwrap()
                 .update_sender
                 .send(speed);
+            true
         } else {
             error!("Unknown handle {}", handle);
+            false
         }
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn stop_all(&mut self) {
         let queue_full_err = "Event sender full";
         self.worker_task_sender
@@ -100,6 +106,7 @@ impl ButtplugScheduler {
 
     pub fn create_player(&mut self, actuators: Vec<Arc<Actuator>>) -> PatternPlayer {
         let (update_sender, update_receiver) = unbounded_channel::<Speed>();
+
         let cancellation_token = CancellationToken::new();
         let handle = self.get_next_handle();
         self.control_handles.insert(
@@ -109,6 +116,7 @@ impl ButtplugScheduler {
                 update_sender,
             },
         );
+
         let (result_sender, result_receiver) =
             unbounded_channel::<Result<(), ButtplugClientError>>();
         PatternPlayer {
@@ -142,6 +150,7 @@ mod tests {
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
     use bp_fakes::*;
+    use tracing::error;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -590,6 +599,27 @@ mod tests {
         client.get_device_calls(1)[3]
             .assert_strenth(0.0)
             .assert_timestamp(300, start);
+    }
+
+    #[tokio::test]
+    async fn test_clean_finished_tasks() {
+        // arrange
+        let start = Instant::now();
+        let client = get_test_client(vec![scalar(1, "vib1", ActuatorType::Vibrate)]).await;
+
+        let mut player = PlayerTest::setup(&client.created_devices);
+        player.play_scalar(Duration::from_millis(100), Speed::max(), None);
+        for _ in 0..2 {
+            player.play_scalar(Duration::from_millis(1), Speed::max(), None);
+            player.await_last().await;
+        }
+
+        // act
+        player.scheduler.clean_finished_tasks();
+
+        // assert
+        client.print_device_calls(start);
+        assert_eq!(player.scheduler.control_handles.len(), 1);
     }
 
     // Concurrency Tests

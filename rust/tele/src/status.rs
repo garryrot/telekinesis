@@ -4,7 +4,7 @@ use bp_scheduler::actuator::{Actuator, get_actuators};
 use buttplug::client::ButtplugClientDevice;
 use crossbeam_channel::Receiver;
 use itertools::Itertools;
-use tracing::error;
+use tracing::{error, debug};
 
 use crate::{connection::TkConnectionEvent, settings::TkSettings};
 
@@ -48,11 +48,11 @@ impl Status {
     }
 
     pub fn get_actuator(&mut self, actuator_id: &str) -> Option<Arc<Actuator>> {
-        self.process_status_events();
         self.actuators().iter().find( |x| x.identifier() == actuator_id ).cloned()
     }
 
     pub fn get_actuator_status(&mut self, actuator_id: &str) -> TkConnectionStatus {
+        self.process_status_events();
         let entry: Option<&(Arc<Actuator>, TkConnectionStatus)> = self.actuator_status().iter().find( |x| x.0.identifier() == actuator_id );
         if let Some(status) = entry {
             return status.1.clone();
@@ -66,9 +66,8 @@ impl Status {
     }
 
     pub fn process_status_events(&mut self) {
-        error!("process status events");
         while let Ok(evt) = self.status_events.try_recv() {
-            error!("got event {:?}", evt);
+            debug!("processing status event {:?}", evt);
             match evt {
                 TkConnectionEvent::Connected(_) => self.connection = TkConnectionStatus::Connected,
                 TkConnectionEvent::ConnectionFailure(err) => self.connection = TkConnectionStatus::Failed(err),

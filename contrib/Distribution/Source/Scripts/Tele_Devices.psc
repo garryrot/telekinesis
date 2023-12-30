@@ -144,15 +144,23 @@ Int Function VibrateEvents(Int speed, Float duration_sec = -1.0, String[] events
     return -1
 EndFunction
 
-Int Function VibratePattern(String pattern, Float duration_sec = -1.0, String[] events)
+Int Function VibratePattern(String pattern, Int speed, Float duration_sec = -1.0, String[] events)
     { Like VibrateEvents(speed, duration_sec, events) but instead of a speed,
         the vibration strength is regulated by the given funscript pattern
       Returns an Int handle to stop the vibration early, see StopHandle(Int) }
     If Connects()
-        return Tele_Api.Tele_Control("vibrate.pattern", 100, duration_sec, pattern, events)
+        return Tele_Api.Tele_Control("vibrate.pattern", speed, duration_sec, pattern, events)
     EndIf
     Trace("(Vibrate) pattern='" + pattern + " duration=" + duration_sec + " events=" + events)
     return -1
+EndFunction
+
+Function UpdateHandle(Int handle, Int speed)
+    { Update the vibratino speed of any running scalar task }
+    If Connects()
+        Tele_Api.Tele_Update(handle, speed)
+    EndIf
+    Trace("(Update) update handle=" + handle + " speed=" + speed)
 EndFunction
 
 Function StopHandle(Int handle)

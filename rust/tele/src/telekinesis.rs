@@ -2,6 +2,7 @@
 use anyhow::Error;
 use bp_scheduler::ButtplugScheduler;
 use bp_scheduler::PlayerSettings;
+use bp_scheduler::speed::Speed;
 use buttplug::{
     client::ButtplugClient,
     core::{
@@ -154,6 +155,8 @@ impl Telekinesis {
         fscript: Option<FScript>,
     ) -> i32 {
         info!("vibrate");
+        self.scheduler.clean_finished_tasks();
+
         let task_clone = task.clone();
         let params = TkParams::from_input(tags.clone(), &task, &self.settings.devices);
         let actuators = self.status.actuators();
@@ -189,6 +192,13 @@ impl Telekinesis {
             status_sender_clone.send(event.clone()).expect("never full");
         });
         handle
+    }
+
+    #[instrument(skip(self))]
+    pub fn update(&mut self, handle: i32, speed: Speed) -> bool {
+        info!("update");
+        self.scheduler.clean_finished_tasks();
+        self.scheduler.update_task(handle, speed)
     }
 
     #[instrument(skip(self))]

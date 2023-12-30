@@ -21,7 +21,6 @@ impl Actuator {
         index_in_device: usize,
     ) -> Self {
         let identifier = format!("{}[{}].{}", device.name(), index_in_device, actuator);
-        error!("identifier: {:?}", identifier);
         Actuator {
             device: device.clone(),
             actuator,
