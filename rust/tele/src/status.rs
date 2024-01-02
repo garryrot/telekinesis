@@ -73,13 +73,12 @@ impl Status {
                 TkConnectionEvent::ConnectionFailure(err) => self.connection = TkConnectionStatus::Failed(err),
                 TkConnectionEvent::DeviceAdded(device) => {
                     self.set_status(device.clone(), TkConnectionStatus::Connected);
-                    error!("New count: {:?}", self.actuators.len())
                 },
                 TkConnectionEvent::DeviceRemoved(device) =>  self.set_status(device.clone(), TkConnectionStatus::NotConnected),
                 TkConnectionEvent::ActionError(actuator, err) => self.set_status(actuator.device.clone(), TkConnectionStatus::Failed(err)),
                 TkConnectionEvent::ActionStarted(_, _, _, _) => {},
                 TkConnectionEvent::ActionDone(_, _, _) => {},
-            }   
+            };
         }
     }
     

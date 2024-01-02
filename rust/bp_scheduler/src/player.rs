@@ -49,9 +49,9 @@ impl PatternPlayer {
                     if let Some(result) = tokio::select! {
                         _ = token.cancelled() => { None }
                         result = async {
-                            let r = self.do_linear(point_as_float, waiting_time.as_millis() as u32).await;
+                            let result = self.do_linear(point_as_float, waiting_time.as_millis() as u32).await;
                             sleep(waiting_time).await;
-                            r
+                            result
                         } => {
                             Some(result)
                         }
@@ -69,7 +69,7 @@ impl PatternPlayer {
     /// Executes the scalar 'fscript' for 'duration' and consumes the player
     #[instrument(skip(fscript))]
     pub async fn play_scalar_pattern(
-        self,
+        mut self,
         duration: Duration,
         fscript: FScript,
         speed: Speed,
@@ -83,6 +83,7 @@ impl PatternPlayer {
         let mut started = false;
         let mut loop_started = Instant::now();
         let mut i: usize = 0;
+        let mut current_speed = speed;
         loop {
             let mut j = 1;
             while j + i < action_len - 1
@@ -93,12 +94,15 @@ impl PatternPlayer {
             }
             let current = &fscript.actions[i % action_len];
             let next = &fscript.actions[(i + j) % action_len];
+            if let Ok(update) = self.update_receiver.try_recv() {
+                current_speed = update;
+            }
 
             if !started {
-                self.do_scalar(Speed::from_fs(current).multiply(&speed), true);
+                self.do_scalar(Speed::from_fs(current).multiply(&current_speed), true);
                 started = true;
             } else {
-                self.do_update(Speed::from_fs(current).multiply(&speed), true);
+                self.do_update(Speed::from_fs(current).multiply(&current_speed), true);
             }
             if let Some(waiting_time) =
                 Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())

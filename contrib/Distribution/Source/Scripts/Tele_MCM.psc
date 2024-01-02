@@ -242,13 +242,13 @@ Event OnPageReset(String page)
             EndIf
 
             Int sexlab_animation_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Sexlab_Animation && ! TeleIntegration.Sexlab_Animation_Rousing
+            If TeleIntegration.Sexlab_Animation
                 sexlab_animation_pattern_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_SEXLAB_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Sexlab_Animation_Pattern], sexlab_animation_pattern_flag)
         
             Int sexlab_animation_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Sexlab_Animation && ! TeleIntegration.Sexlab_Animation_Rousing && TeleIntegration.Sexlab_Animation_Pattern == 1
+            If TeleIntegration.Sexlab_Animation && TeleIntegration.Sexlab_Animation_Pattern == 1
                 sexlab_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_SEXLAB_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Sexlab_Animation_Funscript, sexlab_animation_funscript_flag)
@@ -290,16 +290,16 @@ Event OnPageReset(String page)
             If TeleIntegration.Ostim_Animation
                 ostim_animation_speed_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_OSTIM_ANIMATION_SPEED", "Speed", _OstimSpeedOptions[TeleIntegration.Ostim_Animation_Speed_Control], ostim_animation_speed_flag)
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_SPEED", "Strength", _OstimSpeedOptions[TeleIntegration.Ostim_Animation_Speed_Control], ostim_animation_speed_flag)
 
             Int ostim_animation_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_Speed_Control == 0
+            If TeleIntegration.Ostim_Animation
                 ostim_animation_pattern_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_OSTIM_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Ostim_Animation_Pattern], ostim_animation_pattern_flag)
         
             Int ostim_animation_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_Speed_Control == 0 && TeleIntegration.Ostim_Animation_Pattern == 1
+            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_Pattern == 1
                 ostim_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_OSTIM_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Ostim_Animation_Funscript, ostim_animation_funscript_flag)
@@ -341,7 +341,7 @@ Event OnPageReset(String page)
             AddMenuOptionST("MENU_TOYS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Toys_Vibrate_Funscript, toys_vibrate_funscript_flag)
         
             Int toys_vibrate_linear_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_Pattern == 0
+            If TeleIntegration.Toys_Vibrate
                 toys_vibrate_linear_flag = OPTION_FLAG_NONE
             EndIf
             AddSliderOptionST("SLIDER_TOYS_VIBRATE_LINEAR_STRENGTH", "Strength", TeleIntegration.Toys_Vibrate_Linear_Strength, "{0}", toys_vibrate_linear_flag)
@@ -374,13 +374,13 @@ Event OnPageReset(String page)
             AddToggleOptionST("OPTION_TOYS_ANIMATION_ROUSING", "Rousing = Vibration Strength", TeleIntegration.Toys_Animation_Rousing, toys_animation_rousing)
 
             Int toys_animation_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation && ! TeleIntegration.Toys_Animation_Rousing
+            If TeleIntegration.Toys_Animation
                 toys_animation_pattern_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_TOYS_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Toys_Animation_Pattern], toys_animation_pattern_flag)
         
             Int toys_animation_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation && ! TeleIntegration.Toys_Animation_Rousing &&  TeleIntegration.Toys_Animation_Pattern == 1
+            If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_Pattern == 1
                 toys_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_TOYS_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Toys_Animation_Funscript, toys_animation_funscript_flag)
@@ -436,7 +436,7 @@ Event OnPageReset(String page)
         AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Chainbeasts_Vibrate_Funscript, chainbeast_vibrate_funscript_flag)
 
         Int chainbeasts_vibrate_linear_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_Pattern == 0
+        If TeleIntegration.Chainbeasts_Vibrate
             chainbeasts_vibrate_linear_flag = OPTION_FLAG_NONE
         EndIf
 	    AddSliderOptionST("SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH", "Strength", TeleIntegration.Chainbeasts_Vibrate_Linear_Strength, "{0}", chainbeasts_vibrate_linear_flag)

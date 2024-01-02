@@ -14,15 +14,10 @@ Quest Property Toys Auto          ; ToysFramework
 Quest Property SexLabAroused Auto ; SlaFrameworkScr
 OSexIntegrationMain Property OStim Auto
 
-String[] _SexlabSceneTags
 Bool _InSexlabScene = false
 Bool _InToysScene = false
-
-Bool _InOstimScene = false
-Bool _OstimInSexualScene = false
 Int _OstimSceneVibrationHandle = -1
 Int _OstimMaxSpeed = 4
-String[] _OstimSceneTags
 
 Bool _DeviousDevices_Vibrate = false
 Bool _Sexlab_Animation = false
@@ -42,9 +37,9 @@ Bool _Toys_Oral_Penetration = false
 Bool _Chainbeasts_Vibrate = false
 Int _EmergencyHotkey = 211
 
-Int _DeviousDevicesVibrateHandle
-Int _SexlabSceneVibrationHandle
-Int _ToysSceneVibrationHandle
+Int _DeviousDevicesVibrateHandle = -1
+Int _SexlabSceneVibrationHandle = -1
+Int _ToysSceneVibrationHandle = -1
 
 Int Property EmergencyHotkey_Default = 211 AutoReadOnly ; del
 Int Property EmergencyHotkey
@@ -176,8 +171,10 @@ Bool Property Ostim_Animation
             UnregisterForModEvent("OStim_Start")
             UnregisterForModEvent("OStim_SceneChanged")
             UnregisterForModEvent("OStim_End")
-            _InOstimScene = false
-            _OstimInSexualScene = false
+            If _OstimSceneVibrationHandle != -1
+                TeleDevices.StopHandle(_OstimSceneVibrationHandle)
+            EndIf
+            _OstimSceneVibrationHandle = -1
         EndIf
     EndFunction
     Bool Function Get()
@@ -443,10 +440,8 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     If PlayerRef.WornHasKeyword((ZadLib as ZadLibs).zad_DeviousBlindfold) 
         numVibratorsMult /= 1.15
     EndIf
-
-    ; TODO Also use strength for patterns, once pattern strength is supported
     Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
-    _DeviousDevicesVibrateHandle = HandleVibration(DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events)
+    _DeviousDevicesVibrateHandle = StartVibration(DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events)
 	; TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 
@@ -468,14 +463,12 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	EndIf
     sslThreadController controller = (Sexlab as SexLabFramework).GetController(threadID)
     sslBaseAnimation animation = controller.Animation
-    _SexlabSceneTags = animation.GetTags()
 
+    _SexlabSceneVibrationHandle = StartVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, animation.GetTags())
     If Sexlab_Animation_Rousing
         _InSexlabScene = True
         UnregisterForUpdate()
         UpdateRousingControlledSexScene()
-    Else 
-        HandleVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, _SexlabSceneTags)
     EndIf
 EndEvent
 
@@ -527,18 +520,13 @@ Bool Function OstimPlayerIsPenetrated(String sceneID, Int playerTarget, Int play
 EndFunction
 
 Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
-    ; TeleDevices.LogDebug("OnOStimStart")
-    _InOstimScene = true
+    TeleDevices.LogDebug("OnOStimStart")
     UnregisterForUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
 
 Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
-    ; TeleDevices.LogDebug("OnOstimEnd")
-    
-    _InOstimScene = false
-    _OstimInSexualScene = false
-
+    TeleDevices.LogDebug("OnOstimEnd")
     If _OstimSceneVibrationHandle != -1
         TeleDevices.StopHandle(_OstimSceneVibrationHandle)
         _OstimSceneVibrationHandle = -1
@@ -549,7 +537,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     If OThread.GetScene(0) != sceneID
         return
     EndIf
-    ; TeleDevices.LogDebug("OnOStimSceneChanged")
+    TeleDevices.LogDebug("OnOStimSceneChanged: " + sceneID + " "  + numArg)
 
     Int playerActorIndex = -1
     Int playerTargetIndex = -1
@@ -596,18 +584,17 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     If isPenetrated
         evts[4] = Ostim_Animation_Event_Penetration
     EndIf
-
-    If hasVaginalStim || hasAnalStim || hasNippleStim || hasPenisStim || isPenetrated
-        _OstimInSexualScene = true
-    Else
-        _OstimInSexualScene = false
-    EndIf
-    _OstimSceneTags = evts
     _OstimMaxSpeed = OMetadata.GetMaxSpeed(sceneID)
-    ; TeleDevices.LogDebug("Updating OStim Scene Tags: " + evts )
 
-    UnregisterForUpdate()
-    UpdateRousingControlledSexScene()
+    Int oldHandle = _OstimSceneVibrationHandle
+    If hasVaginalStim || hasAnalStim || hasNippleStim || hasPenisStim || isPenetrated
+        _OstimSceneVibrationHandle = StartVibration(Ostim_Animation_DeviceSelector, -1, Ostim_Animation_Pattern, Ostim_Animation_Funscript, GetOStimSpeed(), evts)
+    Else
+        _OstimSceneVibrationHandle = -1
+    EndIf
+    If oldHandle != -1
+        TeleDevices.StopHandle(oldHandle)
+    EndIf
 EndEvent
 
 Int Function GetOStimSpeed()
@@ -645,7 +632,7 @@ Event OnToysPulsate(string eventName, string argString, float argNum, form sende
     Int duration = Utility.RandomInt(12,35)
     String[] events = new String[1]
     events[0] = Toys_Vibrate_Event
-    HandleVibration(Toys_Vibrate_DeviceSelector, duration, Toys_Vibrate_Pattern, Toys_Vibrate_Funscript, Toys_Vibrate_Linear_Strength, events)
+        StartVibration(Toys_Vibrate_DeviceSelector, duration, Toys_Vibrate_Pattern, Toys_Vibrate_Funscript, Toys_Vibrate_Linear_Strength, events)
 	; TeleDevices.LogDebug("ToysPulsate")
 EndEvent
 
@@ -663,12 +650,11 @@ Event OnToysFondleEnd(string eventName, string argString, float argNum, form sen
 EndEvent
 
 Event OnToysSquirt(string eventName, string argString, float argNum, form sender)
-     ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
+    ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
 	TeleDevices.Vibrate(100, 12.0)
 	; TeleDevices.LogDebug("ToysSquirt")
 EndEvent
 
-String _LoveName
 Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bool playerConsent, Form actInPos1, Form actInPos2, Form actInPos3, Form actInPos4, Form actInPos5)
     ; - ToysLoveSceneInfo - Dual purpose event: 1) Get Scene Info. 2) Event indicates start of animating. It's the moment actors are in place and the first animation has started. Scene Info includes:
     ; 	- LoveName, PlayerInScene, NumStages, PlayerConsent, ActInPos1.. Pos2.. Pos3.. Pos4.. Pos5
@@ -676,21 +662,17 @@ Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bo
     ; 	- event is sent for Player-less scenes. The param PlayerInScene will be false
     ; 	**Custom Parameters** Event <callbackName>(string LoveName, Bool PlayerInScene, int NumStages, Bool PlayerConsent, Form ActInPos1, Form ActInPos2, Form ActInPos3, Form ActInPos4, Form ActInPos5)
     If ! playerInScene
-        ; TeleDevices.LogDebug("Not the player")
         return
     EndIf
 
-    _LoveName = loveName
+    String[] events = GetLoveTags(loveName)
+    _ToysSceneVibrationHandle = StartVibration(Toys_Animation_DeviceSelector, -1, Toys_Animation_Pattern, Toys_Animation_Funscript, Toys_Animation_Linear_Strength, events)
+
     If Toys_Animation_Rousing
         _InToysScene = true
         UnregisterForUpdate()
         UpdateRousingControlledSexScene()
-    Else
-        String[] events = GetLoveTags(loveName)
-        _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, -1, Toys_Animation_Pattern, Toys_Animation_Funscript, Toys_Animation_Linear_Strength, events)
     EndIf
-
-    ; TeleDevices.LogDebug("OnToysLoveSceneInfo LoveName=" + LoveName + " PlayerInScene + " + PlayerInScene + " Stages: " + NumStages + " PlayerConsent: " + PlayerConsent)
 EndEvent
 
 String[] Function GetLoveTags(String loveName)
@@ -758,7 +740,7 @@ EndEvent
 Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
     String[] evts = new String[1]
     evts[0] = Chainbeasts_Vibrate_Event
-    HandleVibration(Chainbeasts_Vibrate_DeviceSelector, 3, Chainbeasts_Vibrate_Pattern, Chainbeasts_Vibrate_Funscript, Chainbeasts_Vibrate_Linear_Strength, evts)
+    StartVibration(Chainbeasts_Vibrate_DeviceSelector, 3, Chainbeasts_Vibrate_Pattern, Chainbeasts_Vibrate_Funscript, Chainbeasts_Vibrate_Linear_Strength, evts)
 	; TeleDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent
 
@@ -839,55 +821,28 @@ EndEvent
 Function UpdateRousingControlledSexScene()
     If _InToysScene
         Int rousing = (Toys as ToysFramework).GetRousing()
-        String[] evts = GetLoveTags(_LoveName)
-        Int oldHandle = _ToysSceneVibrationHandle
-        _ToysSceneVibrationHandle = HandleVibration(Toys_Animation_DeviceSelector, 5, 0, Toys_Animation_Funscript, rousing, evts)
-        TeleDevices.StopHandle(oldHandle)
-        RegisterForSingleUpdate(2)
-
-        ; Prevent lingering vibrations if scene finishes during handler
-        If ! _InToysScene 
-            TeleDevices.StopHandle(_ToysSceneVibrationHandle)
-        EndIf
+        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, rousing)
     ElseIf _InSexlabScene
         Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
-        Int oldHandle = _SexlabSceneVibrationHandle
-        _SexlabSceneVibrationHandle = HandleVibration(Sexlab_Animation_DeviceSelector, 5, 0, Sexlab_Animation_Funscript, arousal, _SexlabSceneTags)
-        TeleDevices.StopHandle(oldHandle)
-        RegisterForSingleUpdate(2)
-
-        If ! _InSexlabScene
-            TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
-        EndIf
-	ElseIf _InOstimScene
-        Int oldHandle = _OstimSceneVibrationHandle
-        If _OstimInSexualScene
-            _OstimSceneVibrationHandle = HandleVibration(Ostim_Animation_DeviceSelector, 5, 0, Ostim_Animation_Funscript, GetOStimSpeed(), _OstimSceneTags)
-        Else
-            _OstimSceneVibrationHandle = -1
-        EndIf
-        If oldHandle != -1
-            TeleDevices.StopHandle(oldHandle)
-        EndIf
-
-        RegisterForSingleUpdate(2)
-        If ! _InOstimScene
-            TeleDevices.StopHandle(_OstimSceneVibrationHandle)
-        EndIf
+        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, arousal)
+	ElseIf _OstimSceneVibrationHandle != -1
+        TeleDevices.UpdateHandle(_OstimSceneVibrationHandle, GetOStimSpeed())
     EndIf
+    RegisterForSingleUpdate(2)
 EndFunction
 
-Int Function HandleVibration(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int linearStrength, String[] evts)
+Int Function StartVibration(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int speed, String[] evts)
     String[] events = new String[1]
     If deviceSelector == 1
         events = evts
     EndIf
     If patternType == 2
-        return TeleDevices.VibratePattern(TeleDevices.GetRandomPattern(true), duration_sec, events)
+        String random_funscript = TeleDevices.GetRandomPattern(true)
+        return TeleDevices.VibratePattern(random_funscript, speed, duration_sec, events)
     ElseIf patternType == 1
-        return TeleDevices.VibratePattern(funscript, duration_sec, events)
+        return TeleDevices.VibratePattern(funscript, speed, duration_sec, events)
     Else
-        return TeleDevices.VibrateEvents(linearStrength, duration_sec, events)
+        return TeleDevices.VibrateEvents(speed, duration_sec, events)
     EndIf
 EndFunction
 
