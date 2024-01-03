@@ -8,38 +8,141 @@ Tele_Devices Property TeleDevices Auto
 
 Actor Property PlayerRef Auto
 
-Quest Property ZadLib Auto        ; ZadLibs
-Quest Property SexLab Auto        ; SexLabFramework
-Quest Property Toys Auto          ; ToysFramework
-Quest Property SexLabAroused Auto ; SlaFrameworkScr
+; Type ZadLibs
+Quest Property ZadLib Auto  
+
+; Type SexLabFramework
+Quest Property SexLab Auto 
+
+; Type ToysFramework
+Quest Property Toys Auto  
+
+; Type SlaFrameworkScr
+Quest Property SexLabAroused Auto 
+
+; Type OSexIntegrationMain
 OSexIntegrationMain Property OStim Auto
 
-Bool _InSexlabScene = false
-Bool _InToysScene = false
-Int _OstimSceneVibrationHandle = -1
-Int _OstimMaxSpeed = 4
+Event OnInit()
+    InitDefaultOnEventHandlers()
+EndEvent
 
-Bool _DeviousDevices_Vibrate = false
-Bool _Sexlab_Animation = false
-Bool _Sexlab_ActorOrgasm = false
-Bool _Sexlab_ActorEdge = false
-Bool _Ostim_Animation = false
-Bool _Toys_Animation = false
-Bool _Toys_Caressed = false
-Bool _Toys_Climax = false
-Bool _Toys_Denial = false
-Bool _Toys_Fondle = false
-Bool _Toys_Squirt = false
-Bool _Toys_Vibrate = false
-Bool _Toys_Vaginal_Penetration = false
-Bool _Toys_Anal_Penetration = false
-Bool _Toys_Oral_Penetration = false
-Bool _Chainbeasts_Vibrate = false
-Int _EmergencyHotkey = 211
+Event OnUpdate()
+    UpdateRousingControlledSexScene()
+EndEvent
 
-Int _DeviousDevicesVibrateHandle = -1
+Function InitDefaultOnEventHandlers()
+    EmergencyHotkey = EmergencyHotkey_Default
+    DeviousDevices_Vibrate = true
+    Toys_Vibrate = true
+    Chainbeasts_Vibrate = true
+EndFunction
+
 Int _SexlabSceneVibrationHandle = -1
+Int _OstimSceneVibrationHandle = -1
 Int _ToysSceneVibrationHandle = -1
+
+Function UpdateRousingControlledSexScene()
+    If _InToysScene
+        Int rousing = (Toys as ToysFramework).GetRousing()
+        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, rousing)
+    ElseIf _InSexlabScene
+        Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
+        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, arousal)
+	ElseIf _OstimSceneVibrationHandle != -1
+        TeleDevices.UpdateHandle(_OstimSceneVibrationHandle, GetOStimSpeed())
+    EndIf
+    RegisterForSingleUpdate(2)
+EndFunction
+
+Int Function StartVibration(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int speed, String[] evts)
+    String[] events = new String[1]
+    If deviceSelector == 1
+        events = evts
+    EndIf
+    If patternType == 2
+        String random_funscript = TeleDevices.GetRandomPattern(true)
+        return TeleDevices.VibratePattern(random_funscript, speed, duration_sec, events)
+    ElseIf patternType == 1
+        return TeleDevices.VibratePattern(funscript, speed, duration_sec, events)
+    Else
+        return TeleDevices.VibrateEvents(speed, duration_sec, events)
+    EndIf
+EndFunction
+
+Function MigrateToV12()
+    UnregisterForUpdate()
+EndFunction
+
+Function ResetIntegrationSettings()
+    TeleDevices.Notify("All settings reset to default")
+    DeviousDevices_Vibrate = DeviousDevices_Vibrate_Default
+    DeviousDevices_Vibrate_DeviceSelector = DeviousDevices_Vibrate_DeviceSelector_Default
+    DeviousDevices_Vibrate_Event_Anal = DeviousDevices_Vibrate_Event_Anal_Default
+    DeviousDevices_Vibrate_Event_Vaginal = DeviousDevices_Vibrate_Event_Vaginal_Default
+    DeviousDevices_Vibrate_Event_Nipple = DeviousDevices_Vibrate_Event_Nipple_Default
+    DeviousDevices_Vibrate_Funscript = DeviousDevices_Vibrate_Funscript_Default
+    DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
+    Sexlab_Animation = Sexlab_Animation_Default
+    Sexlab_Animation_DeviceSelector = Sexlab_Animation_DeviceSelector_Default
+    Sexlab_Animation_Funscript = Sexlab_Animation_Funscript_Default
+    Sexlab_Animation_Pattern = Sexlab_Animation_Pattern_Default
+    Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
+    Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
+    Sexlab_ActorEdge = Sexlab_ActorEdge_Default
+    Ostim_Animation_Funscript = Ostim_Animation_Funscript_Default
+    Ostim_Animation_DeviceSelector = Ostim_Animation_DeviceSelector_Default
+    Ostim_Animation_Pattern = Ostim_Animation_Pattern_Default
+    Ostim_Animation_Event_Anal = Ostim_Animation_Event_Anal_Default
+    Ostim_Animation_Event_Vaginal = Ostim_Animation_Event_Vaginal_Default
+    Ostim_Animation_Event_Nipple = Ostim_Animation_Event_Nipple_Default
+    Ostim_Animation_Event_Penetration = Ostim_Animation_Event_Penetration_Default
+    Ostim_Animation_Event_Penis = Ostim_Animation_Event_Penis_Default
+    Ostim_Animation_Speed_Control = Ostim_Animation_Speed_Control_Default
+    Toys_Animation = Toys_Animation_Default
+    Toys_Animation_DeviceSelector = Toys_Animation_DeviceSelector_Default
+    Toys_Animation_Rousing = Toys_Animation_Rousing_Default
+    Toys_Animation_Match_Tags = Toys_Animation_Match_Tags_Default
+    Toys_Animation_Event_Vaginal = Toys_Animation_Event_Vaginal_Default
+    Toys_Animation_Event_Oral = Toys_Animation_Event_Oral_Default
+    Toys_Animation_Event_Anal = Toys_Animation_Event_Anal_Default
+    Toys_Animation_Event_Nipple = Toys_Animation_Event_Nipple_Default
+    Toys_Animation_Funscript = Toys_Animation_Funscript_Default
+    Toys_Animation_Pattern = Toys_Animation_Pattern_Default
+    Toys_Animation_Linear_Strength = Toys_Animation_Linear_Strength_Default
+    Toys_Caressed = Toys_Caressed_Default
+    Toys_Climax = Toys_Climax_Default
+    Toys_Denial = Toys_Denial_Default
+    Toys_Fondle = Toys_Fondle_Default
+    Toys_Squirt = Toys_Squirt_Default
+    Toys_Vibrate = Toys_Vibrate_Default
+    Toys_Vibrate_DeviceSelector = Toys_Vibrate_DeviceSelector_Default
+    Toys_Vibrate_Event = Toys_Vibrate_Event_Default
+    Toys_Vibrate_Funscript = Toys_Vibrate_Funscript_Default
+    Toys_Vibrate_Pattern = Toys_Vibrate_Pattern_Default
+    Toys_Vibrate_Linear_Strength = Toys_Vibrate_Linear_Strength_Default
+    Toys_Vaginal_Penetration = Toys_Vaginal_Penetration_Default
+    Toys_Anal_Penetration = Toys_Anal_Penetration_Default
+    Toys_Oral_Penetration = Toys_Oral_Penetration_Default
+    Chainbeasts_Vibrate = Chainbeasts_Vibrate_Default
+    Chainbeasts_Vibrate_DeviceSelector = Chainbeasts_Vibrate_DeviceSelector_Default
+    Chainbeasts_Vibrate_Event = Chainbeasts_Vibrate_Event_Default
+    Chainbeasts_Vibrate_Funscript = Chainbeasts_Vibrate_Funscript_Default
+    Chainbeasts_Vibrate_Pattern = Chainbeasts_Vibrate_Pattern_Default
+    Chainbeasts_Vibrate_Linear_Strength = Chainbeasts_Vibrate_Linear_Strength_Default
+    EmergencyHotkey = EmergencyHotkey_Default
+EndFunction
+
+
+;               ______                                               
+;              / ____/___ ___  ___  _________ ____  ____  _______  __
+;             / __/ / __ `__ \/ _ \/ ___/ __ `/ _ \/ __ \/ ___/ / / /
+;            / /___/ / / / / /  __/ /  / /_/ /  __/ / / / /__/ /_/ / 
+;           /_____/_/ /_/ /_/\___/_/   \__, /\___/_/ /_/\___/\__, /  
+;                                     /____/                /____/   
+
+
+Int _EmergencyHotkey = 211
 
 Int Property EmergencyHotkey_Default = 211 AutoReadOnly ; del
 Int Property EmergencyHotkey
@@ -52,6 +155,24 @@ Int Property EmergencyHotkey
         return _EmergencyHotkey
     EndFunction
 EndProperty
+
+Event OnKeyUp(Int keyCode, Float HoldTime)
+    If keyCode == _EmergencyHotkey
+        TeleDevices.EmergencyStop()
+    Else
+        TeleDevices.LogDebug("Unregistered keypress code: " + KeyCode)
+    EndIf
+EndEvent
+
+
+;               ____            _                      ____            _               
+;              / __ \___ _   __(_)___  __  _______    / __ \___ _   __(_)_______  _____
+;             / / / / _ \ | / / / __ \/ / / / ___/   / / / / _ \ | / / / ___/ _ \/ ___/
+;            / /_/ /  __/ |/ / / /_/ / /_/ (__  )   / /_/ /  __/ |/ / / /__/  __(__  ) 
+;           /_____/\___/|___/_/\____/\__,_/____/   /_____/\___/|___/_/\___/\___/____/  
+
+
+Int _DeviousDevicesVibrateHandle = -1
 
 Int Property DeviousDevices_Vibrate_DeviceSelector = 0 Auto
 Int Property DeviousDevices_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
@@ -66,6 +187,8 @@ Int Property DeviousDevices_Vibrate_Pattern_Default = 0 AutoReadOnly
 Bool Property DeviousDevices_Vibrate_Default = true AutoReadOnly
 String Property DeviousDevices_Vibrate_Funscript = "30_Sawtooth" Auto
 String Property DeviousDevices_Vibrate_Funscript_Default = "30_Sawtooth" Auto
+
+Bool _DeviousDevices_Vibrate = false
 Bool Property DeviousDevices_Vibrate
     Function Set(Bool enable)
         _DeviousDevices_Vibrate = enable
@@ -81,334 +204,6 @@ Bool Property DeviousDevices_Vibrate
         return _DeviousDevices_Vibrate
     EndFunction
 EndProperty
-
-String Property Sexlab_Animation_Funscript = "" Auto
-String Property Sexlab_Animation_Funscript_Default = "" Auto
-Int Property Sexlab_Animation_DeviceSelector = 0 Auto
-Int Property Sexlab_Animation_DeviceSelector_Default = 0 AutoReadOnly
-Bool Property Sexlab_Animation_Rousing = False Auto
-Bool Property Sexlab_Animation_Rousing_Default = False AutoReadOnly
-Int Property Sexlab_Animation_Pattern = 0 Auto
-Int Property Sexlab_Animation_Pattern_Default = 0 AutoReadOnly
-Int Property Sexlab_Animation_Linear_Strength = 80 Auto
-Int Property Sexlab_Animation_Linear_Strength_Default = 80 AutoReadOnly
-Bool Property Sexlab_Animation_Default = true AutoReadOnly
-Bool Property Sexlab_Animation
-    Function Set(Bool enable)
-        _Sexlab_Animation = enable
-        If enable
-            RegisterForModEvent("HookAnimationStart", "OnSexlabAnimationStart")
-            RegisterForModEvent("HookAnimationEnd", "OnSexlabAnimationEnd")
-        Else
-            _InSexlabScene = False
-            UnregisterForModEvent("HookAnimationStart")
-            UnregisterForModEvent("HookAnimationEnd")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Sexlab_Animation
-    EndFunction
-EndProperty
-
-Bool Property Sexlab_ActorOrgasm_Default = false AutoReadOnly
-Bool Property Sexlab_ActorOrgasm
-    Function Set(Bool enable)
-        _Sexlab_ActorOrgasm = enable
-        If enable
-            RegisterForModEvent("DeviceActorOrgasm", "OnDeviceActorOrgasm")
-        Else
-            UnregisterForModEvent("DeviceActorOrgasm")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Sexlab_ActorOrgasm
-    EndFunction
-EndProperty
-
-Bool Property Sexlab_ActorEdge_Default = false AutoReadOnly
-Bool Property Sexlab_ActorEdge
-    Function Set(Bool enable)
-        _Sexlab_ActorEdge = enable
-        If enable
-            RegisterForModEvent("DeviceEdgedActor", "OnDeviceEdgedActor")
-        Else
-            UnregisterForModEvent("DeviceEdgedActor")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Sexlab_ActorEdge
-    EndFunction
-EndProperty
-
-String Property Ostim_Animation_Funscript = "" Auto
-String Property Ostim_Animation_Funscript_Default = "" Auto
-Int Property Ostim_Animation_DeviceSelector = 0 Auto
-Int Property Ostim_Animation_DeviceSelector_Default = 0 AutoReadOnly
-Int Property Ostim_Animation_Speed_Control = 1 Auto
-Int Property Ostim_Animation_Speed_Control_Default = 1 AutoReadOnly
-Int Property Ostim_Animation_Pattern = 0 Auto
-Int Property Ostim_Animation_Pattern_Default = 0 AutoReadOnly  
-String Property Ostim_Animation_Event_Anal = "Anal" Auto
-String Property Ostim_Animation_Event_Anal_Default = "Anal" Auto
-String Property Ostim_Animation_Event_Vaginal = "Vaginal" Auto
-String Property Ostim_Animation_Event_Vaginal_Default = "Vaginal" Auto
-String Property Ostim_Animation_Event_Nipple = "Nipple" Auto
-String Property Ostim_Animation_Event_Nipple_Default = "Nipple" Auto
-String Property Ostim_Animation_Event_Penetration = "Penetration" Auto
-String Property Ostim_Animation_Event_Penetration_Default = "Penetration" Auto
-String Property Ostim_Animation_Event_Penis = "Penis" Auto
-String Property Ostim_Animation_Event_Penis_Default = "Penis" Auto
-
-Bool Property Ostim_Animation_Default = true AutoReadOnly
-Bool Property Ostim_Animation
-    Function Set(Bool enable)
-        _Ostim_Animation = enable
-        If enable
-            RegisterForModEvent("OStim_Start", "OnOStimStart")
-            RegisterForModEvent("OStim_SceneChanged", "OnOStimSceneChanged")
-            RegisterForModEvent("OStim_End", "OnOstimEnd") 
-        Else
-            UnregisterForModEvent("OStim_Start")
-            UnregisterForModEvent("OStim_SceneChanged")
-            UnregisterForModEvent("OStim_End")
-            If _OstimSceneVibrationHandle != -1
-                TeleDevices.StopHandle(_OstimSceneVibrationHandle)
-            EndIf
-            _OstimSceneVibrationHandle = -1
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Ostim_Animation
-    EndFunction
-EndProperty
-
-Bool Property Toys_Vaginal_Penetration_Default = false AutoReadOnly
-Bool Property Toys_Vaginal_Penetration
-    Function Set(Bool enable)
-        _Toys_Vaginal_Penetration = enable
-        If enable
-            RegisterForModEvent("ToysVaginalPenetration", "OnToysVaginalPenetration")
-        Else
-            UnregisterForModEvent("ToysVaginalPenetration")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Vaginal_Penetration
-    EndFunction
-EndProperty
-
-Bool Property Toys_Anal_Penetration_Default = false AutoReadOnly
-Bool Property Toys_Anal_Penetration
-    Function Set(Bool enable)
-        _Toys_Anal_Penetration = enable
-        If enable
-            RegisterForModEvent("ToysAnalPenetration", "OnToysAnalPenetration")
-        Else
-            UnregisterForModEvent("ToysAnalPenetration")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Anal_Penetration
-    EndFunction
-EndProperty
-
-Bool Property Toys_Oral_Penetration_Default = false AutoReadOnly
-Bool Property Toys_Oral_Penetration
-    Function Set(Bool enable)
-        _Toys_Oral_Penetration = enable
-        If enable
-            RegisterForModEvent("ToysOralPenetration", "OnToysOralPenetration")
-        Else
-            UnregisterForModEvent("ToysOralPenetration")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Oral_Penetration
-    EndFunction
-EndProperty
-
-Bool Property Toys_Fondle_Default = false AutoReadOnly
-Bool Property Toys_Fondle
-    Function Set(Bool enable)
-        _Toys_Fondle = enable
-        If enable
-            RegisterForModEvent("ToysFondled", "OnToysFondleStart")
-            RegisterForModEvent("ToysFondle", "OnToysFondleEnd") 
-        Else
-            UnregisterForModEvent("ToysFondled")
-            UnregisterForModEvent("ToysFondle")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Fondle
-    EndFunction
-EndProperty
-
-Bool Property Toys_Squirt_Default = false AutoReadOnly
-Bool Property Toys_Squirt
-    Function Set(Bool enable)
-        _Toys_Squirt = enable
-        If enable
-            RegisterForModEvent("ToysSquirt", "OnToysSquirt")
-        Else
-            UnregisterForModEvent("ToysSquirt")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Squirt
-    EndFunction
-EndProperty
-
-Bool Property Toys_Climax_Default = false AutoReadOnly
-Bool Property Toys_Climax
-    Function Set(Bool enable)
-        _Toys_Climax = enable
-        If enable
-            RegisterForModEvent("ToysClimax", "OnToysClimax")
-            RegisterForModEvent("ToysClimaxSimultaneous", "OnToysClimaxSimultaneous")
-        Else
-            UnregisterForModEvent("ToysClimax")
-            UnregisterForModEvent("ToysClimaxSimultaneous")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Climax
-    EndFunction
-EndProperty
-
-; EndProperty
-String Property Toys_Vibrate_Funscript = "" Auto
-String Property Toys_Vibrate_Funscript_Default = "" Auto
-Int Property Toys_Vibrate_DeviceSelector = 0 Auto
-Int Property Toys_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
-String Property Toys_Vibrate_Event = "Vaginal" Auto
-String Property Toys_Vibrate_Event_Default = "Vaginal" AutoReadOnly
-Int Property Toys_Vibrate_Pattern = 0 Auto
-Int Property Toys_Vibrate_Pattern_Default = 0 AutoReadOnly
-Int Property Toys_Vibrate_Linear_Strength = 80 Auto
-Int Property Toys_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
-Bool Property Toys_Vibrate_Default = true AutoReadOnly
-Bool Property Toys_Vibrate
-    Function Set(Bool enable)
-        _Toys_Vibrate = enable
-        If enable
-            RegisterForModEvent("ToysPulsate", "OnToysPulsate")
-        Else
-            UnregisterForModEvent("ToysPulsate")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Vibrate
-    EndFunction
-EndProperty
-
-String Property Toys_Animation_Funscript = "" Auto
-String Property Toys_Animation_Funscript_Default = "" Auto
-Int Property Toys_Animation_DeviceSelector = 0 Auto
-Int Property Toys_Animation_DeviceSelector_Default = 0 AutoReadOnly
-Bool Property Toys_Animation_Match_Tags = false Auto
-Bool Property Toys_Animation_Match_Tags_Default = false AutoReadOnly
-String Property Toys_Animation_Event_Vaginal = "Vaginal" Auto
-String Property Toys_Animation_Event_Vaginal_Default = "Vaginal" AutoReadOnly
-String Property Toys_Animation_Event_Oral = "Oral" Auto
-String Property Toys_Animation_Event_Oral_Default = "Oral" AutoReadOnly
-String Property Toys_Animation_Event_Anal = "Anal" Auto
-String Property Toys_Animation_Event_Anal_Default = "Anal" AutoReadOnly
-String Property Toys_Animation_Event_Nipple = "Nipple" Auto
-String Property Toys_Animation_Event_Nipple_Default = "Nipple" AutoReadOnly
-Bool Property Toys_Animation_Rousing = true Auto
-Bool Property Toys_Animation_Rousing_Default = true AutoReadOnly
-Int Property Toys_Animation_Pattern = 0 Auto
-Int Property Toys_Animation_Pattern_Default = 0 AutoReadOnly
-Int Property Toys_Animation_Linear_Strength = 80 Auto
-Int Property Toys_Animation_Linear_Strength_Default = 80 AutoReadOnly
-Bool Property Toys_Animation_Default = true AutoReadOnly
-Bool Property Toys_Animation
-    Function Set(Bool enable)
-        _Toys_Animation = enable
-        If enable
-            RegisterForModEvent("ToysLoveSceneEnd", "OnToysSceneEnd")
-            RegisterForModEvent("ToysLoveSceneInfo", "OnToysLoveSceneInfo") 
-        Else
-            UnregisterForModEvent("ToysLoveSceneEnd")
-            UnregisterForModEvent("ToysLoveSceneInfo")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Animation
-    EndFunction
-EndProperty
- 
-Bool Property Toys_Caressed_Default = false AutoReadOnly
-Bool Property Toys_Caressed
-    Function Set(Bool enable)
-        _Toys_Caressed = enable
-        If enable
-            RegisterForModEvent("ToysCaressed", "OnToysCaressed") ; Caressing successfully increased rousing
-        Else
-            UnregisterForModEvent("ToysCaressed")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Caressed
-    EndFunction
-EndProperty
-
-Bool Property Toys_Denial_Default = false AutoReadOnly
-Bool Property Toys_Denial
-    Function Set(Bool enable)
-        _Toys_Denial = enable
-        If enable
-            RegisterForModEvent("ToysDenied", "OnToysDenied") ; An individuall squirt has been denied
-        Else
-            UnregisterForModEvent("ToysDenied")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Toys_Denial
-    EndFunction
-EndProperty
-
-Int Property Chainbeasts_Vibrate_DeviceSelector = 0 Auto
-Int Property Chainbeasts_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
-String Property Chainbeasts_Vibrate_Event = "Vaginal" Auto
-String Property Chainbeasts_Vibrate_Event_Default = "Vaginal" AutoReadOnly
-Int Property Chainbeasts_Vibrate_Pattern = 1 Auto
-Int Property Chainbeasts_Vibrate_Pattern_Default = 1 AutoReadOnly
-String Property Chainbeasts_Vibrate_Funscript = "03_Wub-Wub-Wub" Auto
-String Property Chainbeasts_Vibrate_Funscript_Default = "03_Wub-Wub-Wub" Auto
-Int Property Chainbeasts_Vibrate_Linear_Strength = 80 Auto
-Int Property Chainbeasts_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
-Bool Property Chainbeasts_Vibrate_Default = true AutoReadOnly
-Bool Property Chainbeasts_Vibrate
-    Function Set(Bool enable)
-        _Chainbeasts_Vibrate = enable
-        If enable
-            RegisterForModEvent("SCB_VibeEvent", "OnSCB_VibeEvent")
-        Else
-            UnregisterForModEvent("SCB_VibeEvent")
-        EndIf
-    EndFunction
-    Bool Function Get()
-        return _Chainbeasts_Vibrate
-    EndFunction
-EndProperty
-
-Event OnInit()
-    InitDefaultOnEventHandlers()
-EndEvent
-
-; Key Events
-
-Event OnKeyUp(Int keyCode, Float HoldTime)
-    If keyCode == _EmergencyHotkey
-        TeleDevices.EmergencyStop()
-    Else
-        TeleDevices.LogDebug("Unregistered keypress code: " + KeyCode)
-    EndIf
-EndEvent
-
-; Devious Devices Events
 
 Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationStrength, Form sender)
     If PlayerRef.GetLeveledActorBase().GetName() != actorName
@@ -455,7 +250,77 @@ Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form
     TeleDevices.StopHandle(_DeviousDevicesVibrateHandle)
 EndEvent
 
-; Sexlab Events
+
+;              _____           __      __  
+;             / ___/___  _  __/ /___ _/ /_ 
+;             \__ \/ _ \| |/_/ / __ `/ __ \
+;            ___/ /  __/>  </ / /_/ / /_/ /
+;           /____/\___/_/|_/_/\__,_/_.___/ 
+
+
+Bool _InSexlabScene = false
+
+String Property Sexlab_Animation_Funscript = "" Auto
+String Property Sexlab_Animation_Funscript_Default = "" Auto
+Int Property Sexlab_Animation_DeviceSelector = 0 Auto
+Int Property Sexlab_Animation_DeviceSelector_Default = 0 AutoReadOnly
+Bool Property Sexlab_Animation_Rousing = False Auto
+Bool Property Sexlab_Animation_Rousing_Default = False AutoReadOnly
+Int Property Sexlab_Animation_Pattern = 0 Auto
+Int Property Sexlab_Animation_Pattern_Default = 0 AutoReadOnly
+Int Property Sexlab_Animation_Linear_Strength = 80 Auto
+Int Property Sexlab_Animation_Linear_Strength_Default = 80 AutoReadOnly
+
+Bool _Sexlab_Animation = false
+Bool Property Sexlab_Animation_Default = true AutoReadOnly
+Bool Property Sexlab_Animation
+    Function Set(Bool enable)
+        _Sexlab_Animation = enable
+        If enable
+            RegisterForModEvent("HookAnimationStart", "OnSexlabAnimationStart")
+            RegisterForModEvent("HookAnimationEnd", "OnSexlabAnimationEnd")
+        Else
+            _InSexlabScene = False
+            UnregisterForModEvent("HookAnimationStart")
+            UnregisterForModEvent("HookAnimationEnd")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Sexlab_Animation
+    EndFunction
+EndProperty
+
+Bool _Sexlab_ActorOrgasm = false
+Bool Property Sexlab_ActorOrgasm_Default = false AutoReadOnly
+Bool Property Sexlab_ActorOrgasm
+    Function Set(Bool enable)
+        _Sexlab_ActorOrgasm = enable
+        If enable
+            RegisterForModEvent("DeviceActorOrgasm", "OnDeviceActorOrgasm")
+        Else
+            UnregisterForModEvent("DeviceActorOrgasm")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Sexlab_ActorOrgasm
+    EndFunction
+EndProperty
+
+Bool _Sexlab_ActorEdge = false
+Bool Property Sexlab_ActorEdge_Default = false AutoReadOnly
+Bool Property Sexlab_ActorEdge
+    Function Set(Bool enable)
+        _Sexlab_ActorEdge = enable
+        If enable
+            RegisterForModEvent("DeviceEdgedActor", "OnDeviceEdgedActor")
+        Else
+            UnregisterForModEvent("DeviceEdgedActor")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Sexlab_ActorEdge
+    EndFunction
+EndProperty
 
 Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	If !hasPlayer
@@ -490,43 +355,65 @@ Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sen
     ; TeleDevices.LogDebug("OnDeviceEdgedActor")
 EndEvent
 
-; OStim 
 
-Bool Function OstimPlayerHasVaginalStimulation(String sceneID, Int playerTarget, Int playerActor)
-    Int activeVaginalStim = OMetadata.FindAnyActionForActorCSV(sceneID, playerActor, "femalemasturbation,tribbing")
-    Int passiveVaginalStim = OMetadata.FindAnyActionForTargetCSV(sceneID, playerTarget, "cunnilingus,lickingvagina,rubbingclitoris,vaginalsex,vaginalfisting,vaginalfingering,vaginaltoying")
-    return activeVaginalStim != -1 || passiveVaginalStim != -1
-EndFunction
+;              ____       __  _         
+;             / __ \_____/ /_(_)___ ___ 
+;            / / / / ___/ __/ / __ `__ \
+;           / /_/ (__  ) /_/ / / / / / /
+;           \____/____/\__/_/_/ /_/ /_/ 
 
-Bool Function OstimPlayerHasAnalStimulation(String sceneID, Int playerTarget, Int playerActor)
-    Int passiveAction = OMetadata.FindAnyActionForTargetCSV(sceneID, playerTarget, "analfingering,analfisting,analsex,analtoying,anilingus,rimjob")
-    return passiveAction != -1
-EndFunction
 
-Bool Function OstimPlayerHasNippleStimulation(String sceneID, Int playerTarget, Int playerActor)
-    Int passiveAction = OMetadata.FindAnyActionForTargetCSV( sceneID, playerTarget, "gropingbreast,lickingnipple,boobjob,suckingnipple" )
-    return passiveAction != -1
-EndFunction
+Int _OstimMaxSpeed = 4
 
-Bool Function OstimPlayerHasPenisStimulation(String sceneID, Int playerTarget, Int playerActor)
-    Int passivePenisStim = OMetadata.FindAnyActionForTargetCSV(sceneID, playerTarget, "deepthroat,lickingpenis,grindingpenis,thighjob,handjob")
-    Int activePenisStim = OMetadata.FindAnyActionForActorCSV( sceneID, playerActor, "analsex,malemasturbation,vaginalsex" )
-    return passivePenisStim != -1 || activePenisStim != -1
-EndFunction
+String Property Ostim_Animation_Funscript = "" Auto
+String Property Ostim_Animation_Funscript_Default = "" Auto
+Int Property Ostim_Animation_DeviceSelector = 0 Auto
+Int Property Ostim_Animation_DeviceSelector_Default = 0 AutoReadOnly
+Int Property Ostim_Animation_Speed_Control = 1 Auto
+Int Property Ostim_Animation_Speed_Control_Default = 1 AutoReadOnly
+Int Property Ostim_Animation_Pattern = 0 Auto
+Int Property Ostim_Animation_Pattern_Default = 0 AutoReadOnly  
+String Property Ostim_Animation_Event_Anal = "Anal" Auto
+String Property Ostim_Animation_Event_Anal_Default = "Anal" Auto
+String Property Ostim_Animation_Event_Vaginal = "Vaginal" Auto
+String Property Ostim_Animation_Event_Vaginal_Default = "Vaginal" Auto
+String Property Ostim_Animation_Event_Nipple = "Nipple" Auto
+String Property Ostim_Animation_Event_Nipple_Default = "Nipple" Auto
+String Property Ostim_Animation_Event_Penetration = "Penetration" Auto
+String Property Ostim_Animation_Event_Penetration_Default = "Penetration" Auto
+String Property Ostim_Animation_Event_Penis = "Penis" Auto
+String Property Ostim_Animation_Event_Penis_Default = "Penis" Auto
 
-Bool Function OstimPlayerIsPenetrated(String sceneID, Int playerTarget, Int playerActor)
-    Int passiveAction = OMetadata.FindAnyActionForTargetCSV( sceneID, playerTarget, "analsex,analfisting,analfingering,deepthroat,lickingpenis,vaginalfisting" )
-    return passiveAction != -1
-EndFunction
+Bool _Ostim_Animation = false
+Bool Property Ostim_Animation_Default = true AutoReadOnly
+Bool Property Ostim_Animation
+    Function Set(Bool enable)
+        _Ostim_Animation = enable
+        If enable
+            RegisterForModEvent("OStim_Start", "OnOStimStart")
+            RegisterForModEvent("OStim_SceneChanged", "OnOStimSceneChanged")
+            RegisterForModEvent("OStim_End", "OnOstimEnd") 
+        Else
+            UnregisterForModEvent("OStim_Start")
+            UnregisterForModEvent("OStim_SceneChanged")
+            UnregisterForModEvent("OStim_End")
+            If _OstimSceneVibrationHandle != -1
+                TeleDevices.StopHandle(_OstimSceneVibrationHandle)
+            EndIf
+            _OstimSceneVibrationHandle = -1
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Ostim_Animation
+    EndFunction
+EndProperty
 
 Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
-    TeleDevices.LogDebug("OnOStimStart")
     UnregisterForUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
 
 Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
-    TeleDevices.LogDebug("OnOstimEnd")
     If _OstimSceneVibrationHandle != -1
         TeleDevices.StopHandle(_OstimSceneVibrationHandle)
         _OstimSceneVibrationHandle = -1
@@ -537,7 +424,6 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     If OThread.GetScene(0) != sceneID
         return
     EndIf
-    TeleDevices.LogDebug("OnOStimSceneChanged: " + sceneID + " "  + numArg)
 
     Int playerActorIndex = -1
     Int playerTargetIndex = -1
@@ -625,34 +511,264 @@ Int Function GetOStimSpeed()
     return 100
 EndFunction
 
-; Toys & Love Events
+Bool Function OstimPlayerHasVaginalStimulation(String sceneID, Int playerTarget, Int playerActor)
+    Int activeVaginalStim = OMetadata.FindAnyActionForActorCSV(sceneID, playerActor, "femalemasturbation,tribbing")
+    Int passiveVaginalStim = OMetadata.FindAnyActionForTargetCSV(sceneID, playerTarget, "cunnilingus,lickingvagina,rubbingclitoris,vaginalsex,vaginalfisting,vaginalfingering,vaginaltoying")
+    return activeVaginalStim != -1 || passiveVaginalStim != -1
+EndFunction
+
+Bool Function OstimPlayerHasAnalStimulation(String sceneID, Int playerTarget, Int playerActor)
+    Int passiveAction = OMetadata.FindAnyActionForTargetCSV(sceneID, playerTarget, "analfingering,analfisting,analsex,analtoying,anilingus,rimjob")
+    return passiveAction != -1
+EndFunction
+
+Bool Function OstimPlayerHasNippleStimulation(String sceneID, Int playerTarget, Int playerActor)
+    Int passiveAction = OMetadata.FindAnyActionForTargetCSV( sceneID, playerTarget, "gropingbreast,lickingnipple,boobjob,suckingnipple" )
+    return passiveAction != -1
+EndFunction
+
+Bool Function OstimPlayerHasPenisStimulation(String sceneID, Int playerTarget, Int playerActor)
+    Int passivePenisStim = OMetadata.FindAnyActionForTargetCSV(sceneID, playerTarget, "deepthroat,lickingpenis,grindingpenis,thighjob,handjob")
+    Int activePenisStim = OMetadata.FindAnyActionForActorCSV( sceneID, playerActor, "analsex,malemasturbation,vaginalsex" )
+    return passivePenisStim != -1 || activePenisStim != -1
+EndFunction
+
+Bool Function OstimPlayerIsPenetrated(String sceneID, Int playerTarget, Int playerActor)
+    Int passiveAction = OMetadata.FindAnyActionForTargetCSV( sceneID, playerTarget, "analsex,analfisting,analfingering,deepthroat,lickingpenis,vaginalfisting" )
+    return passiveAction != -1
+EndFunction
+
+
+;             ______                    ___          __                  
+;            /_  __/___  __  _______   ( _ )        / /   ____ _   _____ 
+;             / / / __ \/ / / / ___/  / __ \/|     / /   / __ \ | / / _ \
+;            / / / /_/ / /_/ (__  )  / /_/  <     / /___/ /_/ / |/ /  __/
+;           /_/  \____/\__, /____/   \____/\/    /_____/\____/|___/\___/ 
+;                     /____/                                             
+
+
+Bool _InToysScene = false
+
+Bool _Toys_Vaginal_Penetration = false
+Bool Property Toys_Vaginal_Penetration_Default = false AutoReadOnly
+Bool Property Toys_Vaginal_Penetration
+    Function Set(Bool enable)
+        _Toys_Vaginal_Penetration = enable
+        If enable
+            RegisterForModEvent("ToysVaginalPenetration", "OnToysVaginalPenetration")
+        Else
+            UnregisterForModEvent("ToysVaginalPenetration")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Vaginal_Penetration
+    EndFunction
+EndProperty
+
+Bool _Toys_Anal_Penetration = false
+Bool Property Toys_Anal_Penetration_Default = false AutoReadOnly
+Bool Property Toys_Anal_Penetration
+    Function Set(Bool enable)
+        _Toys_Anal_Penetration = enable
+        If enable
+            RegisterForModEvent("ToysAnalPenetration", "OnToysAnalPenetration")
+        Else
+            UnregisterForModEvent("ToysAnalPenetration")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Anal_Penetration
+    EndFunction
+EndProperty
+
+Bool _Toys_Oral_Penetration = false
+Bool Property Toys_Oral_Penetration_Default = false AutoReadOnly
+Bool Property Toys_Oral_Penetration
+    Function Set(Bool enable)
+        _Toys_Oral_Penetration = enable
+        If enable
+            RegisterForModEvent("ToysOralPenetration", "OnToysOralPenetration")
+        Else
+            UnregisterForModEvent("ToysOralPenetration")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Oral_Penetration
+    EndFunction
+EndProperty
+
+Bool _Toys_Fondle = false
+Bool Property Toys_Fondle_Default = false AutoReadOnly
+Bool Property Toys_Fondle
+    Function Set(Bool enable)
+        _Toys_Fondle = enable
+        If enable
+            RegisterForModEvent("ToysFondled", "OnToysFondleStart")
+            RegisterForModEvent("ToysFondle", "OnToysFondleEnd") 
+        Else
+            UnregisterForModEvent("ToysFondled")
+            UnregisterForModEvent("ToysFondle")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Fondle
+    EndFunction
+EndProperty
+
+Bool _Toys_Squirt = false
+Bool Property Toys_Squirt_Default = false AutoReadOnly
+Bool Property Toys_Squirt
+    Function Set(Bool enable)
+        _Toys_Squirt = enable
+        If enable
+            RegisterForModEvent("ToysSquirt", "OnToysSquirt")
+        Else
+            UnregisterForModEvent("ToysSquirt")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Squirt
+    EndFunction
+EndProperty
+
+Bool _Toys_Climax = false
+Bool Property Toys_Climax_Default = false AutoReadOnly
+Bool Property Toys_Climax
+    Function Set(Bool enable)
+        _Toys_Climax = enable
+        If enable
+            RegisterForModEvent("ToysClimax", "OnToysClimax")
+            RegisterForModEvent("ToysClimaxSimultaneous", "OnToysClimaxSimultaneous")
+        Else
+            UnregisterForModEvent("ToysClimax")
+            UnregisterForModEvent("ToysClimaxSimultaneous")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Climax
+    EndFunction
+EndProperty
+
+String Property Toys_Vibrate_Funscript = "" Auto
+String Property Toys_Vibrate_Funscript_Default = "" Auto
+Int Property Toys_Vibrate_DeviceSelector = 0 Auto
+Int Property Toys_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
+String Property Toys_Vibrate_Event = "Vaginal" Auto
+String Property Toys_Vibrate_Event_Default = "Vaginal" AutoReadOnly
+Int Property Toys_Vibrate_Pattern = 0 Auto
+Int Property Toys_Vibrate_Pattern_Default = 0 AutoReadOnly
+Int Property Toys_Vibrate_Linear_Strength = 80 Auto
+Int Property Toys_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
+
+Bool _Toys_Vibrate = false
+Bool Property Toys_Vibrate_Default = true AutoReadOnly
+Bool Property Toys_Vibrate
+    Function Set(Bool enable)
+        _Toys_Vibrate = enable
+        If enable
+            RegisterForModEvent("ToysPulsate", "OnToysPulsate")
+        Else
+            UnregisterForModEvent("ToysPulsate")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Vibrate
+    EndFunction
+EndProperty
+
+String Property Toys_Animation_Funscript = "" Auto
+String Property Toys_Animation_Funscript_Default = "" Auto
+Int Property Toys_Animation_DeviceSelector = 0 Auto
+Int Property Toys_Animation_DeviceSelector_Default = 0 AutoReadOnly
+Bool Property Toys_Animation_Match_Tags = false Auto
+Bool Property Toys_Animation_Match_Tags_Default = false AutoReadOnly
+String Property Toys_Animation_Event_Vaginal = "Vaginal" Auto
+String Property Toys_Animation_Event_Vaginal_Default = "Vaginal" AutoReadOnly
+String Property Toys_Animation_Event_Oral = "Oral" Auto
+String Property Toys_Animation_Event_Oral_Default = "Oral" AutoReadOnly
+String Property Toys_Animation_Event_Anal = "Anal" Auto
+String Property Toys_Animation_Event_Anal_Default = "Anal" AutoReadOnly
+String Property Toys_Animation_Event_Nipple = "Nipple" Auto
+String Property Toys_Animation_Event_Nipple_Default = "Nipple" AutoReadOnly
+Bool Property Toys_Animation_Rousing = true Auto
+Bool Property Toys_Animation_Rousing_Default = true AutoReadOnly
+Int Property Toys_Animation_Pattern = 0 Auto
+Int Property Toys_Animation_Pattern_Default = 0 AutoReadOnly
+Int Property Toys_Animation_Linear_Strength = 80 Auto
+Int Property Toys_Animation_Linear_Strength_Default = 80 AutoReadOnly
+Bool Property Toys_Animation_Default = true AutoReadOnly
+
+Bool _Toys_Animation = false
+Bool Property Toys_Animation
+    Function Set(Bool enable)
+        _Toys_Animation = enable
+        If enable
+            RegisterForModEvent("ToysLoveSceneEnd", "OnToysSceneEnd")
+            RegisterForModEvent("ToysLoveSceneInfo", "OnToysLoveSceneInfo") 
+        Else
+            UnregisterForModEvent("ToysLoveSceneEnd")
+            UnregisterForModEvent("ToysLoveSceneInfo")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Animation
+    EndFunction
+EndProperty
+ 
+Bool _Toys_Caressed = false
+Bool Property Toys_Caressed_Default = false AutoReadOnly
+Bool Property Toys_Caressed
+    Function Set(Bool enable)
+        _Toys_Caressed = enable
+        If enable
+            RegisterForModEvent("ToysCaressed", "OnToysCaressed") ; Caressing successfully increased rousing
+        Else
+            UnregisterForModEvent("ToysCaressed")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Caressed
+    EndFunction
+EndProperty
+
+Bool _Toys_Denial = false
+Bool Property Toys_Denial_Default = false AutoReadOnly
+Bool Property Toys_Denial
+    Function Set(Bool enable)
+        _Toys_Denial = enable
+        If enable
+            RegisterForModEvent("ToysDenied", "OnToysDenied") ; An individuall squirt has been denied
+        Else
+            UnregisterForModEvent("ToysDenied")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Toys_Denial
+    EndFunction
+EndProperty
 
 Event OnToysPulsate(string eventName, string argString, float argNum, form sender)
     ; Duration is random lasting from approx. 12 to 35 seconds
     Int duration = Utility.RandomInt(12,35)
     String[] events = new String[1]
     events[0] = Toys_Vibrate_Event
-        StartVibration(Toys_Vibrate_DeviceSelector, duration, Toys_Vibrate_Pattern, Toys_Vibrate_Funscript, Toys_Vibrate_Linear_Strength, events)
-	; TeleDevices.LogDebug("ToysPulsate")
+    StartVibration(Toys_Vibrate_DeviceSelector, duration, Toys_Vibrate_Pattern, Toys_Vibrate_Funscript, Toys_Vibrate_Linear_Strength, events)
 EndEvent
 
 Int _ToysFondleHandle = -1
 Event OnToysFondleStart(string eventName, string argString, float argNum, form sender)
     ; Fondle started - successfully increased rousing
 	_ToysFondleHandle = TeleDevices.Vibrate(40, -1)
-	; TeleDevices.LogDebug("ToysFondleStart")
 EndEvent
 
 Event OnToysFondleEnd(string eventName, string argString, float argNum, form sender)
     ; Fondle animation has ended (no player controls locking). Anim duration is 10 to 18 seconds.
 	TeleDevices.StopHandle(_ToysFondleHandle)
-	; TeleDevices.LogDebug("ToysFondleEnd")
 EndEvent
 
 Event OnToysSquirt(string eventName, string argString, float argNum, form sender)
     ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
 	TeleDevices.Vibrate(100, 12.0)
-	; TeleDevices.LogDebug("ToysSquirt")
 EndEvent
 
 Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bool playerConsent, Form actInPos1, Form actInPos2, Form actInPos3, Form actInPos4, Form actInPos5)
@@ -695,47 +811,73 @@ EndFunction
 Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
     _InToysScene = false
     TeleDevices.StopHandle(_ToysSceneVibrationHandle)
-	; TeleDevices.LogDebug("OnToysSceneEnd")
 EndEvent
 
 Event OnToysClimax(string eventName, string argString, float argNum, form sender)
     ; Simultaneous Orgasm. Both player & NPC have climaxed. This can happen multiple times. Sent in addition to other climax events. This event always first
 	TeleDevices.Vibrate(80, 5)
-	; TeleDevices.LogDebug("OnToysClimax")
 EndEvent
 
 Event OnToysClimaxSimultaneous(string eventName, string argString, float argNum, form sender)
 	TeleDevices.Vibrate(100, 7)
-	; TeleDevices.LogDebug("OnToysClimaxSimultaneous")
 EndEvent
 
 Event OnToysDenied(string eventName, string argString, float argNum, form sender)
 	TeleDevices.Vibrate(0, 7)
-	; TeleDevices.LogDebug("OnToysDenied")
 EndEvent
 
 Event OnToysVaginalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Vaginal"
     TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
- 	; TeleDevices.LogDebug("OnToysVaginalPenetration")
 EndEvent
 
 Event OnToysAnalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Anal"
     TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
- 	; TeleDevices.LogDebug("OnToysAnalPenetration")
 EndEvent
 
 Event OnToysOralPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Oral"
     TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
- 	; TeleDevices.LogDebug("OnToysOralPenetration")
 EndEvent
 
-; Skyrim Chain Beasts Events
+            
+;              ________          _       __                    __      
+;             / ____/ /_  ____ _(_)___  / /_  ___  ____ ______/ /______
+;            / /   / __ \/ __ `/ / __ \/ __ \/ _ \/ __ `/ ___/ __/ ___/
+;           / /___/ / / / /_/ / / / / / /_/ /  __/ /_/ (__  ) /_(__  ) 
+;           \____/_/ /_/\__,_/_/_/ /_/_.___/\___/\__,_/____/\__/____/  
+
+
+Int Property Chainbeasts_Vibrate_DeviceSelector = 0 Auto
+Int Property Chainbeasts_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
+String Property Chainbeasts_Vibrate_Event = "Vaginal" Auto
+String Property Chainbeasts_Vibrate_Event_Default = "Vaginal" AutoReadOnly
+Int Property Chainbeasts_Vibrate_Pattern = 1 Auto
+Int Property Chainbeasts_Vibrate_Pattern_Default = 1 AutoReadOnly
+String Property Chainbeasts_Vibrate_Funscript = "03_Wub-Wub-Wub" Auto
+String Property Chainbeasts_Vibrate_Funscript_Default = "03_Wub-Wub-Wub" Auto
+Int Property Chainbeasts_Vibrate_Linear_Strength = 80 Auto
+Int Property Chainbeasts_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
+
+Bool _Chainbeasts_Vibrate = false
+Bool Property Chainbeasts_Vibrate_Default = true AutoReadOnly
+Bool Property Chainbeasts_Vibrate
+    Function Set(Bool enable)
+        _Chainbeasts_Vibrate = enable
+        If enable
+            RegisterForModEvent("SCB_VibeEvent", "OnSCB_VibeEvent")
+        Else
+            UnregisterForModEvent("SCB_VibeEvent")
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Chainbeasts_Vibrate
+    EndFunction
+EndProperty
 
 Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
     String[] evts = new String[1]
@@ -743,111 +885,3 @@ Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender
     StartVibration(Chainbeasts_Vibrate_DeviceSelector, 3, Chainbeasts_Vibrate_Pattern, Chainbeasts_Vibrate_Funscript, Chainbeasts_Vibrate_Linear_Strength, evts)
 	; TeleDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent
-
-; Publics
-
-Function InitDefaultOnEventHandlers()
-    EmergencyHotkey = EmergencyHotkey_Default
-    DeviousDevices_Vibrate = true
-    Toys_Vibrate = true
-    Chainbeasts_Vibrate = true
-EndFunction
-
-Function ResetIntegrationSettings()
-    TeleDevices.Notify("All settings reset to default")
-    DeviousDevices_Vibrate = DeviousDevices_Vibrate_Default
-    DeviousDevices_Vibrate_DeviceSelector = DeviousDevices_Vibrate_DeviceSelector_Default
-    DeviousDevices_Vibrate_Event_Anal = DeviousDevices_Vibrate_Event_Anal_Default
-    DeviousDevices_Vibrate_Event_Vaginal = DeviousDevices_Vibrate_Event_Vaginal_Default
-    DeviousDevices_Vibrate_Event_Nipple = DeviousDevices_Vibrate_Event_Nipple_Default
-    DeviousDevices_Vibrate_Funscript = DeviousDevices_Vibrate_Funscript_Default
-    DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
-    Sexlab_Animation = Sexlab_Animation_Default
-    Sexlab_Animation_DeviceSelector = Sexlab_Animation_DeviceSelector_Default
-    Sexlab_Animation_Funscript = Sexlab_Animation_Funscript_Default
-    Sexlab_Animation_Pattern = Sexlab_Animation_Pattern_Default
-    Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
-    Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
-    Sexlab_ActorEdge = Sexlab_ActorEdge_Default
-    Ostim_Animation_Funscript = Ostim_Animation_Funscript_Default
-    Ostim_Animation_DeviceSelector = Ostim_Animation_DeviceSelector_Default
-    Ostim_Animation_Pattern = Ostim_Animation_Pattern_Default
-    Ostim_Animation_Event_Anal = Ostim_Animation_Event_Anal_Default
-    Ostim_Animation_Event_Vaginal = Ostim_Animation_Event_Vaginal_Default
-    Ostim_Animation_Event_Nipple = Ostim_Animation_Event_Nipple_Default
-    Ostim_Animation_Event_Penetration = Ostim_Animation_Event_Penetration_Default
-    Ostim_Animation_Event_Penis = Ostim_Animation_Event_Penis_Default
-    Ostim_Animation_Speed_Control = Ostim_Animation_Speed_Control_Default
-    Toys_Animation = Toys_Animation_Default
-    Toys_Animation_DeviceSelector = Toys_Animation_DeviceSelector_Default
-    Toys_Animation_Rousing = Toys_Animation_Rousing_Default
-    Toys_Animation_Match_Tags = Toys_Animation_Match_Tags_Default
-    Toys_Animation_Event_Vaginal = Toys_Animation_Event_Vaginal_Default
-    Toys_Animation_Event_Oral = Toys_Animation_Event_Oral_Default
-    Toys_Animation_Event_Anal = Toys_Animation_Event_Anal_Default
-    Toys_Animation_Event_Nipple = Toys_Animation_Event_Nipple_Default
-    Toys_Animation_Funscript = Toys_Animation_Funscript_Default
-    Toys_Animation_Pattern = Toys_Animation_Pattern_Default
-    Toys_Animation_Linear_Strength = Toys_Animation_Linear_Strength_Default
-    Toys_Caressed = Toys_Caressed_Default
-    Toys_Climax = Toys_Climax_Default
-    Toys_Denial = Toys_Denial_Default
-    Toys_Fondle = Toys_Fondle_Default
-    Toys_Squirt = Toys_Squirt_Default
-    Toys_Vibrate = Toys_Vibrate_Default
-    Toys_Vibrate_DeviceSelector = Toys_Vibrate_DeviceSelector_Default
-    Toys_Vibrate_Event = Toys_Vibrate_Event_Default
-    Toys_Vibrate_Funscript = Toys_Vibrate_Funscript_Default
-    Toys_Vibrate_Pattern = Toys_Vibrate_Pattern_Default
-    Toys_Vibrate_Linear_Strength = Toys_Vibrate_Linear_Strength_Default
-    Toys_Vaginal_Penetration = Toys_Vaginal_Penetration_Default
-    Toys_Anal_Penetration = Toys_Anal_Penetration_Default
-    Toys_Oral_Penetration = Toys_Oral_Penetration_Default
-    Chainbeasts_Vibrate = Chainbeasts_Vibrate_Default
-    Chainbeasts_Vibrate_DeviceSelector = Chainbeasts_Vibrate_DeviceSelector_Default
-    Chainbeasts_Vibrate_Event = Chainbeasts_Vibrate_Event_Default
-    Chainbeasts_Vibrate_Funscript = Chainbeasts_Vibrate_Funscript_Default
-    Chainbeasts_Vibrate_Pattern = Chainbeasts_Vibrate_Pattern_Default
-    Chainbeasts_Vibrate_Linear_Strength = Chainbeasts_Vibrate_Linear_Strength_Default
-    EmergencyHotkey = EmergencyHotkey_Default
-EndFunction
-
-; Privates
-
-Event OnUpdate()
-    UpdateRousingControlledSexScene()
-EndEvent
-
-Function UpdateRousingControlledSexScene()
-    If _InToysScene
-        Int rousing = (Toys as ToysFramework).GetRousing()
-        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, rousing)
-    ElseIf _InSexlabScene
-        Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
-        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, arousal)
-	ElseIf _OstimSceneVibrationHandle != -1
-        TeleDevices.UpdateHandle(_OstimSceneVibrationHandle, GetOStimSpeed())
-    EndIf
-    RegisterForSingleUpdate(2)
-EndFunction
-
-Int Function StartVibration(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int speed, String[] evts)
-    String[] events = new String[1]
-    If deviceSelector == 1
-        events = evts
-    EndIf
-    If patternType == 2
-        String random_funscript = TeleDevices.GetRandomPattern(true)
-        return TeleDevices.VibratePattern(random_funscript, speed, duration_sec, events)
-    ElseIf patternType == 1
-        return TeleDevices.VibratePattern(funscript, speed, duration_sec, events)
-    Else
-        return TeleDevices.VibrateEvents(speed, duration_sec, events)
-    EndIf
-EndFunction
-
-; Version Updates
-
-Function MigrateToV12()
-    UnregisterForUpdate()
-EndFunction
