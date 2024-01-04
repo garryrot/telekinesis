@@ -156,7 +156,7 @@ Int Function VibratePattern(String pattern, Int speed, Float duration_sec = -1.0
 EndFunction
 
 Function UpdateHandle(Int handle, Int speed)
-    { Update the vibratino speed of any running scalar task }
+    { Update the vibration speed of any running scalar task }
     If Connects()
         Tele_Api.Tele_Update(handle, speed)
     EndIf

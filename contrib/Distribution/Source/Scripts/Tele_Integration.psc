@@ -44,13 +44,14 @@ Int _ToysSceneVibrationHandle = -1
 
 Function UpdateRousingControlledSexScene()
     If _InToysScene
-        Int rousing = (Toys as ToysFramework).GetRousing()
-        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, rousing)
+        Int speed = (Toys as ToysFramework).GetRousing()
+        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, speed)
     ElseIf _InSexlabScene
-        Int arousal = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
-        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, arousal)
+        Int speed = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
+        TeleDevices.UpdateHandle(_SexlabSceneVibrationHandle, speed)
 	ElseIf _OstimSceneVibrationHandle != -1
-        TeleDevices.UpdateHandle(_OstimSceneVibrationHandle, GetOStimSpeed())
+        Int speed = GetOStimSpeed()
+        TeleDevices.UpdateHandle(_OstimSceneVibrationHandle, speed)
     EndIf
     RegisterForSingleUpdate(2)
 EndFunction
