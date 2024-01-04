@@ -355,16 +355,6 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         exec: |tk| tk.status.get_known_actuator_ids(),
     })
     .def_qry_str1(ApiQryStr1 {
-        name: "device.description",
-        default: "",
-        exec: |tk, actuator_id| {
-            if let Some(actuator) = tk.status.get_actuator(actuator_id) {
-                return actuator.description();
-            }
-            String::default()
-        },
-    })
-    .def_qry_str1(ApiQryStr1 {
         name: "device.actuator",
         default: "Not Connected",
         exec: |tk, actuator_id| {

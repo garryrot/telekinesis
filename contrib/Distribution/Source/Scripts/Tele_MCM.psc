@@ -149,11 +149,7 @@ Event OnPageReset(String page)
             
             If actuatorId != ""
                 String status = Tele_Api.Qry_Str_1("device.connection.status", actuatorId)
-                String description = Tele_Api.Qry_Str_1("device.description", actuatorId);
-                If description == ""
-                    description = actuatorId
-                EndIf
-                AddHeaderOption(description)
+                AddHeaderOption(actuatorId)
                 AddTextOption(Key(i, "State"), status, OPTION_FLAG_DISABLED)                
                 AddTextOption(Key(i, "Motor"), Tele_Api.Qry_Str_1("device.actuator", actuatorId), OPTION_FLAG_DISABLED)
                 _DeviceEventOids[i] = AddInputOption(Key(i, "Body Parts"), Join(Tele_Api.Qry_Lst_1("device.settings.events", actuatorId), ","))

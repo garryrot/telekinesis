@@ -415,7 +415,7 @@ mod tests {
             scalar(2, "vib2", ActuatorType::Vibrate),
             scalar(3, "vib3", ActuatorType::Vibrate),
         ], None);
-        tk.settings_set_enabled("vib2[0].Vibrate", false);
+        tk.settings_set_enabled("vib2 (Vibrate)", false);
 
         // act
         tk.vibrate(
@@ -526,8 +526,8 @@ mod tests {
     fn settings_are_trimmed_and_lowercased() {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
-        tk.settings_set_enabled("vib1[0].Vibrate", true);
-        tk.settings_set_events("vib1[0].Vibrate", &[String::from(" SoMe EvEnT    ")]);
+        tk.settings_set_enabled("vib1 (Vibrate)", true);
+        tk.settings_set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
         tk.vibrate(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -554,11 +554,11 @@ mod tests {
             "Enough devices connected"
         );
         assert!(
-            tk.status.get_known_actuator_ids().contains(&String::from("vib1[0].Vibrate")),
+            tk.status.get_known_actuator_ids().contains(&String::from("vib1 (Vibrate)")),
             "Contains name vib1"
         );
         assert!(
-            tk.status.get_known_actuator_ids().contains(&String::from("vib2[0].Inflate")),
+            tk.status.get_known_actuator_ids().contains(&String::from("vib2 (Inflate)")),
             "Contains name vib2"
         );
     }
@@ -602,8 +602,8 @@ mod tests {
             scalar(1, "vib1", ActuatorType::Vibrate),
             scalar(2, "vib2", ActuatorType::Vibrate),
         ], None);
-        tk.settings_set_events("vib1[0].Vibrate", &[String::from("selected_event")]);
-        tk.settings_set_events("vib2[0].Vibrate", &[String::from("bogus")]);
+        tk.settings_set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
+        tk.settings_set_events("vib2 (Vibrate)", &[String::from("bogus")]);
 
         tk.vibrate(
             Task::Scalar(Speed::max()),
@@ -622,8 +622,8 @@ mod tests {
     fn event_is_trimmed_and_ignores_casing() {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
-        tk.settings_set_enabled("vib1[0].Vibrate", true);
-        tk.settings_set_events("vib1[0].Vibrate", &[String::from("some event")]);
+        tk.settings_set_enabled("vib1 (Vibrate)", true);
+        tk.settings_set_events("vib1 (Vibrate)", &[String::from("some event")]);
         tk.vibrate(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -641,12 +641,12 @@ mod tests {
     fn get_device_connected() {
         let (mut tk, _) = wait_for_connection(vec![scalar(1, "existing", ActuatorType::Vibrate)], None);
         assert_eq!(
-            tk.status.get_actuator_status("existing[0].Vibrate"),
+            tk.status.get_actuator_status("existing (Vibrate)"),
             TkConnectionStatus::Connected,
             "Existing device returns connected"
         );
         assert_eq!(
-            tk.status.get_actuator_status("not existing[0].Vibrate"),
+            tk.status.get_actuator_status("not existing (Vibrate)"),
             TkConnectionStatus::NotConnected,
             "Non-existing device returns not connected"
         );
