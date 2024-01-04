@@ -11,6 +11,8 @@
         <Import>.\contrib\Dependencies</Import>
         <Import>.\build\release-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skse</Import>
         <Import>.\build\release-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skyrim</Import>
+        <Import>.\build\debug-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skse</Import>
+        <Import>.\build\debug-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skyrim</Import>
     </Imports>
     <Folders>
         <Folder>.\contrib\Distribution\Source\Scripts</Folder>
