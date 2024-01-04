@@ -218,12 +218,12 @@ impl FakeDeviceConnector {
 
     pub fn device_demo() -> (Self, FakeConnectorCallRegistry) {
         Self::new(vec![
-            vibrator(1, "Vibator 1"),
-            vibrator(2, "Vibrator 2"),
-            vibrator(3, "Vibrator 3"),
+            vibrator(1, "Vibator A"),
+            scalars(2, "Vibrator B", ActuatorType::Vibrate, 2),
+            scalars(3, "Inflators C", ActuatorType::Inflate, 3),
             linear(4, "Linear 1"),
-            linear(5, "Linear 2"),
-            linear(6, "Linear 3"),
+            // scalars(5, "Unknown", ActuatorType::Unknown, 2),
+            scalars(6, "Oscillators", ActuatorType::Oscillate, 2),
             rotate(7, "Rotator 1"),
         ])
     }

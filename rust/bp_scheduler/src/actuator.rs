@@ -4,7 +4,6 @@ use std::{
     fmt::{self, Display},
     sync::Arc,
 };
-use tracing::error;
 
 #[derive(Clone)]
 pub struct Actuator {
@@ -39,7 +38,7 @@ impl Actuator {
         index_in_device: usize,
     ) -> String {
         if index_in_device > 0 {
-            return format!("{} ({} {})", device.name(), actuator, index_in_device);
+            return format!("{} ({} #{})", device.name(), actuator, index_in_device);
         }
         format!("{} ({})", device.name(), actuator)
     }

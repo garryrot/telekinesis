@@ -1,9 +1,10 @@
-use std::{time::Duration, sync::Arc};
+use std::{sync::Arc, time::Duration};
 
 use bp_scheduler::actuator::Actuator;
+use buttplug::core::message::ActuatorType;
 use cxx::{CxxString, CxxVector};
 
-use crate::{settings::TkDeviceSettings, connection::Task};
+use crate::{connection::Task, settings::TkDeviceSettings};
 
 pub fn sanitize_name_list(list: &[String]) -> Vec<String> {
     list.iter()
@@ -42,13 +43,14 @@ pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {
 pub struct TkParams<'a> {
     pub selector: Vec<String>,
     pub task: &'a Task,
-    pub events: Vec<String>
+    pub events: Vec<String>,
 }
 
 impl<'a> TkParams<'a> {
     pub fn filter_devices(
         &self,
-        actuators: &Vec<Arc<Actuator>>,
+        actuators: &[Arc<Actuator>],
+        actuator_types: &[ActuatorType],
     ) -> Vec<Arc<Actuator>> {
         actuators
             .iter()
@@ -56,15 +58,12 @@ impl<'a> TkParams<'a> {
                 self.selector.iter().any(|x| x == a.identifier())
                     && a.device.message_attributes().scalar_cmd().is_some()
             })
+            .filter(|a| actuator_types.iter().any(|x| x == &a.actuator))
             .cloned()
             .collect()
     }
 
-    pub fn from_input(
-        events: Vec<String>,
-        task: &'a Task,
-        devices: &[TkDeviceSettings],
-    ) -> Self {
+    pub fn from_input(events: Vec<String>, task: &'a Task, devices: &[TkDeviceSettings]) -> Self {
         let event_names = sanitize_name_list(&events);
         let actuator_ids = devices
             .iter()
@@ -77,7 +76,7 @@ impl<'a> TkParams<'a> {
         TkParams {
             selector: actuator_ids,
             task,
-            events
+            events,
         }
     }
 }

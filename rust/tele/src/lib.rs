@@ -301,12 +301,13 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     // controls
     .def_control(ApiControl {
         name: "vibrate",
-        exec: |tk, speed, time_sec, _pattern_name, events| {
+        exec: |tk, speed, time_sec, _, events| {
             tk.vibrate(
                 Task::Scalar(Speed::new(speed.into())),
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
                 None,
+                &[ActuatorType::Vibrate]
             )
         },
         default: ERROR_HANDLE,
@@ -327,6 +328,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
                 Some(fscript),
+                &[ActuatorType::Vibrate]
             ),
             None => ERROR_HANDLE,
         },
@@ -362,6 +364,16 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
                 return actuator.actuator.to_string();
             }
             String::default()
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.actuator.index",
+        default: "1",
+        exec: |tk, actuator_id| {
+            if let Some(actuator) = tk.status.get_actuator(actuator_id) {
+                return (actuator.index_in_device + 1).to_string()
+            }
+            "1".into()
         },
     })
     .def_cmd1(ApiCmd1 {

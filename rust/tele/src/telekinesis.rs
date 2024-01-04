@@ -1,8 +1,9 @@
-
 use anyhow::Error;
+use bp_fakes::FakeDeviceConnector;
+use bp_scheduler::speed::Speed;
 use bp_scheduler::ButtplugScheduler;
 use bp_scheduler::PlayerSettings;
-use bp_scheduler::speed::Speed;
+use buttplug::core::message::ActuatorType;
 use buttplug::{
     client::ButtplugClient,
     core::{
@@ -10,9 +11,7 @@ use buttplug::{
             new_json_ws_client_connector, ButtplugConnector,
             ButtplugInProcessClientConnectorBuilder,
         },
-        message::{
-            ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage,
-        },
+        message::{ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage},
     },
     server::{
         device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder,
@@ -35,11 +34,9 @@ use tracing::{debug, error, info};
 use crate::connection::Task;
 use crate::status::Status;
 use crate::{
-    connection::{
-        handle_connection, TkCommand, TkConnectionEvent,
-    },
+    connection::{handle_connection, TkCommand, TkConnectionEvent},
     input::TkParams,
-    settings::{TkConnectionType, TkSettings}
+    settings::{TkConnectionType, TkSettings},
 };
 
 pub static ERROR_HANDLE: i32 = -1;
@@ -57,7 +54,7 @@ pub struct Telekinesis {
 
 impl Telekinesis {
     pub fn connect_with<T, Fn, Fut>(
-        connector_factory: Fn,
+        connect_action: Fn,
         provided_settings: Option<TkSettings>,
         type_name: TkConnectionType,
     ) -> Result<Telekinesis, anyhow::Error>
@@ -83,12 +80,12 @@ impl Telekinesis {
             scheduler,
             client_event_sender: event_sender_client.clone(),
             status_event_sender: event_sender_internal.clone(),
-            status: Status::new(event_receiver_internal, &settings)
+            status: Status::new(event_receiver_internal, &settings),
         };
         info!(?telekinesis, "connecting...");
         telekinesis.runtime.spawn(async move {
             debug!("starting connection handling thread");
-            let client = with_connector(connector_factory().await).await;
+            let client = with_connector(connect_action().await).await;
             handle_connection(
                 event_sender_client,
                 event_sender_internal,
@@ -153,6 +150,7 @@ impl Telekinesis {
         duration: Duration,
         tags: Vec<String>,
         fscript: Option<FScript>,
+        actuator_types: &[ActuatorType],
     ) -> i32 {
         info!("vibrate");
         self.scheduler.clean_finished_tasks();
@@ -160,7 +158,9 @@ impl Telekinesis {
         let task_clone = task.clone();
         let params = TkParams::from_input(tags.clone(), &task, &self.settings.devices);
         let actuators = self.status.actuators();
-        let player = self.scheduler.create_player(params.filter_devices(&actuators));
+        let player = self
+            .scheduler
+            .create_player(params.filter_devices(&actuators, actuator_types));
         let handle = player.handle;
         let client_sender_clone = self.client_event_sender.clone();
         let status_sender_clone = self.status_event_sender.clone();
@@ -184,9 +184,7 @@ impl Telekinesis {
             };
             let event = match result {
                 Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
-                Err(err) => {
-                    TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string())
-                }
+                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
             };
             client_sender_clone.send(event.clone()).expect("never full");
             status_sender_clone.send(event.clone()).expect("never full");
@@ -251,7 +249,8 @@ impl Telekinesis {
     }
 }
 
-pub fn in_process_connector() -> impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage> {
+pub fn in_process_connector(
+) -> impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage> {
     ButtplugInProcessClientConnectorBuilder::default()
         .server(
             ButtplugServerBuilder::default()
@@ -290,6 +289,7 @@ mod tests {
     use crate::*;
     use bp_fakes::{scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
     use bp_scheduler::speed::Speed;
+    use buttplug::client::ScalarCommand;
     use buttplug::core::message::{ActuatorType, DeviceAdded};
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
@@ -311,10 +311,7 @@ mod tests {
 
     impl Telekinesis {
         pub fn await_connect(&mut self, devices: usize) {
-            assert_timeout!(
-                self.status.actuators().len() == devices,
-                "Awaiting connect"
-            );
+            assert_timeout!(self.status.actuators().len() >= devices, "Awaiting connect");
         }
     }
 
@@ -327,7 +324,13 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
-        let handle = tk.vibrate(Task::Scalar(Speed::max()), Duration::MAX, vec![], None);
+        let handle = tk.vibrate(
+            Task::Scalar(Speed::max()),
+            Duration::MAX,
+            vec![],
+            None,
+            &[ActuatorType::Vibrate],
+        );
 
         thread::sleep(Duration::from_secs(1));
         call_registry.get_device(1)[0].assert_strenth(1.0);
@@ -350,6 +353,7 @@ mod tests {
             Duration::from_secs(1),
             vec![],
             None,
+            &[ActuatorType::Vibrate],
         );
         thread::sleep(Duration::from_secs(2));
         call_registry.get_device(1)[0].assert_strenth(1.0);
@@ -378,6 +382,7 @@ mod tests {
             Duration::from_millis(1),
             vec![],
             None,
+            &[ActuatorType::Vibrate],
         );
 
         // assert
@@ -400,6 +405,7 @@ mod tests {
             Duration::from_millis(1),
             vec![String::from("does not exist")],
             None,
+            &[ActuatorType::Vibrate],
         );
         thread::sleep(Duration::from_millis(50));
 
@@ -410,11 +416,14 @@ mod tests {
     #[test]
     fn settings_only_vibrate_enabled_devices() {
         // arrange
-        let (mut tk, call_registry) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate),
-            scalar(2, "vib2", ActuatorType::Vibrate),
-            scalar(3, "vib3", ActuatorType::Vibrate),
-        ], None);
+        let (mut tk, call_registry) = wait_for_connection(
+            vec![
+                scalar(1, "vib1", ActuatorType::Vibrate),
+                scalar(2, "vib2", ActuatorType::Vibrate),
+                scalar(3, "vib3", ActuatorType::Vibrate),
+            ],
+            None,
+        );
         tk.settings_set_enabled("vib2 (Vibrate)", false);
 
         // act
@@ -423,6 +432,7 @@ mod tests {
             Duration::from_millis(1),
             vec![],
             None,
+            &[ActuatorType::Vibrate],
         );
         thread::sleep(Duration::from_secs(1));
 
@@ -468,7 +478,8 @@ mod tests {
         tk.await_connect(1);
         thread::sleep(Duration::from_secs(2));
         let known_actuator_ids = tk.status.get_known_actuator_ids();
-        tk.settings.set_enabled(known_actuator_ids.first().unwrap(), true);
+        tk.settings
+            .set_enabled(known_actuator_ids.first().unwrap(), true);
 
         let fscript = read_pattern(&pattern_path, pattern_name, true).unwrap();
         let handle = tk.vibrate(
@@ -476,6 +487,7 @@ mod tests {
             duration,
             vec![],
             Some(fscript),
+            &[ActuatorType::Vibrate],
         );
         (tk, handle)
     }
@@ -500,7 +512,13 @@ mod tests {
         for actuator in tk.status.actuators() {
             tk.settings.set_enabled(actuator.device.name(), true);
         }
-        tk.vibrate(Task::Scalar(Speed::max()), Duration::MAX, vec![], None);
+        tk.vibrate(
+            Task::Scalar(Speed::max()),
+            Duration::MAX,
+            vec![],
+            None,
+            &[ActuatorType::Vibrate],
+        );
         thread::sleep(Duration::from_secs(5));
     }
 
@@ -533,6 +551,7 @@ mod tests {
             Duration::from_millis(1),
             vec![String::from("some event")],
             None,
+            &[ActuatorType::Vibrate],
         );
 
         thread::sleep(Duration::from_millis(500));
@@ -543,22 +562,26 @@ mod tests {
     #[test]
     fn get_devices_contains_connected_devices() {
         // arrange
-        let (mut tk, _) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate),
-            scalar(2, "vib2", ActuatorType::Inflate),
-        ], None);
+        let (mut tk, _) = wait_for_connection(
+            vec![
+                scalar(1, "vib1", ActuatorType::Vibrate),
+                scalar(2, "vib2", ActuatorType::Inflate),
+            ],
+            None,
+        );
 
         // assert
-        assert_timeout!(
-            tk.status.actuators().len() == 2,
-            "Enough devices connected"
-        );
+        assert_timeout!(tk.status.actuators().len() == 2, "Enough devices connected");
         assert!(
-            tk.status.get_known_actuator_ids().contains(&String::from("vib1 (Vibrate)")),
+            tk.status
+                .get_known_actuator_ids()
+                .contains(&String::from("vib1 (Vibrate)")),
             "Contains name vib1"
         );
         assert!(
-            tk.status.get_known_actuator_ids().contains(&String::from("vib2 (Inflate)")),
+            tk.status
+                .get_known_actuator_ids()
+                .contains(&String::from("vib2 (Inflate)")),
             "Contains name vib2"
         );
     }
@@ -570,7 +593,8 @@ mod tests {
 
         let (mut tk, _) = wait_for_connection(vec![], Some(settings));
         assert!(
-            tk.status.get_known_actuator_ids()
+            tk.status
+                .get_known_actuator_ids()
                 .contains(&String::from("foreign")),
             "Contains additional device from settings"
         );
@@ -582,11 +606,14 @@ mod tests {
         let one_event = &[String::from("evt2")];
         let two_events = &[String::from("evt2"), String::from("evt3")];
 
-        let (mut tk, _) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate),
-            scalar(2, "vib2", ActuatorType::Vibrate),
-            scalar(3, "vib3", ActuatorType::Vibrate),
-        ], None);
+        let (mut tk, _) = wait_for_connection(
+            vec![
+                scalar(1, "vib1", ActuatorType::Vibrate),
+                scalar(2, "vib2", ActuatorType::Vibrate),
+                scalar(3, "vib3", ActuatorType::Vibrate),
+            ],
+            None,
+        );
 
         tk.settings_set_events("vib2", one_event);
         tk.settings_set_events("vib3", two_events);
@@ -598,10 +625,13 @@ mod tests {
 
     #[test]
     fn event_only_vibrate_selected_devices() {
-        let (mut tk, call_registry) = wait_for_connection(vec![
-            scalar(1, "vib1", ActuatorType::Vibrate),
-            scalar(2, "vib2", ActuatorType::Vibrate),
-        ], None);
+        let (mut tk, call_registry) = wait_for_connection(
+            vec![
+                scalar(1, "vib1", ActuatorType::Vibrate),
+                scalar(2, "vib2", ActuatorType::Vibrate),
+            ],
+            None,
+        );
         tk.settings_set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
         tk.settings_set_events("vib2 (Vibrate)", &[String::from("bogus")]);
 
@@ -610,6 +640,7 @@ mod tests {
             Duration::from_millis(1),
             vec![String::from("selected_event")],
             None,
+            &[ActuatorType::Vibrate],
         );
         thread::sleep(Duration::from_secs(1));
 
@@ -629,17 +660,19 @@ mod tests {
             Duration::from_millis(1),
             vec![String::from(" SoMe EvEnT    ")],
             None,
+            &[ActuatorType::Vibrate],
         );
 
         thread::sleep(Duration::from_millis(500));
         call_registry.get_device(1)[0].assert_strenth(1.0);
         call_registry.get_device(1)[1].assert_strenth(0.0);
     }
-    
+
     /// Device Status
     #[test]
     fn get_device_connected() {
-        let (mut tk, _) = wait_for_connection(vec![scalar(1, "existing", ActuatorType::Vibrate)], None);
+        let (mut tk, _) =
+            wait_for_connection(vec![scalar(1, "existing", ActuatorType::Vibrate)], None);
         assert_eq!(
             tk.status.get_actuator_status("existing (Vibrate)"),
             TkConnectionStatus::Connected,
@@ -667,6 +700,7 @@ mod tests {
             Duration::from_millis(1),
             vec![],
             None,
+            &[ActuatorType::Vibrate],
         );
         get_next_events_blocking(&tk.connection_events);
     }
@@ -684,18 +718,23 @@ mod tests {
             Duration::from_millis(100),
             vec![],
             None,
+            &[ActuatorType::Vibrate],
         );
         tk.vibrate(
             Task::Scalar(Speed::new(20)),
             Duration::from_millis(200),
             vec![],
             None,
+            &[ActuatorType::Vibrate],
         );
         get_next_events_blocking(&tk.connection_events);
         get_next_events_blocking(&tk.connection_events);
     }
 
-    fn wait_for_connection(devices: Vec<DeviceAdded>, settings: Option<TkSettings>) -> (Telekinesis, FakeConnectorCallRegistry) {
+    fn wait_for_connection(
+        devices: Vec<DeviceAdded>,
+        settings: Option<TkSettings>,
+    ) -> (Telekinesis, FakeConnectorCallRegistry) {
         let (connector, call_registry) = FakeDeviceConnector::new(devices);
         let count = connector.devices.len();
 
@@ -711,7 +750,7 @@ mod tests {
         .unwrap();
         tk.await_connect(count);
 
-        for actuator in tk.status.actuators() {   
+        for actuator in tk.status.actuators() {
             tk.settings_set_enabled(actuator.identifier(), true);
         }
         (tk, call_registry)

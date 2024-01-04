@@ -70,7 +70,7 @@ void Tele_Event_Thread() {
         }
     }
 }
-
+ 
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Loaded", PapyrusClass, Tele::ApiLoaded);
     vm->RegisterFunction("Cmd", PapyrusClass, Tele::Cmd);
