@@ -91,6 +91,29 @@ This mod is free software and can be used under the terms of the [Apache License
 
 ## 1.2.0
 
+**IMPORTANT**: All device settings have been reset to allow for multi-motor support. You need to re-enable all your devices after installing this patch.
+	
+## Features
+
+* Add support for OStim
+  * Controls the vibrators whenever a sexual scene runs
+  * Support speed control based on in-game animation speed (the thing that is controlled with -/+) and/or player rousing (the bar)
+
+* Support dynamic speed during funscript patterns
+  * In the MCM, linear speed and arousal sync are no longer disabled when choosing `Funscript` or `Random Funscript`
+
+* Support actuator (motor-specific) device control
+  * If a device has multiple motors, each motor will now show up individually in the seettings, and can be assigned custom body parts
+
+## Improvements / Fixes
+
+* Fix an issue that sometimes caused vibrations to linger after arousal-controlled sex scenes
+
+* Device errors are now displayed in-game (red) and will cause devices to go into error state
+
+* Support setting speed of running task handles with new native call `Tele_Update` 
+
+* Device connects/disconnects and actions are now dispatched as SKSE_Events to reduce script load: `Tele_Connected`, `Tele_ConnectionError`, `Tele_DeviceAdded`, `Tele_DeviceRemoved`, `Tele_DeviceActionStarted`, `Tele_DeviceActionDone`, `Tele_DeviceError`
 
 
 ## 1.1.0
