@@ -157,7 +157,7 @@ impl Telekinesis {
 
         let task_clone = task.clone();
         let params = TkParams::from_input(tags.clone(), &task, &self.settings.devices);
-        let actuators = self.status.actuators();
+        let actuators = self.status.connected_actuators();
         let player = self
             .scheduler
             .create_player(params.filter_devices(&actuators, actuator_types));
