@@ -3,7 +3,7 @@
 
 ScriptName Tele_Api hidden
 
-Bool Function Loaded() global native
+Bool Function Loaded() global Native
 Bool Function Cmd(String cmd) Global Native
 Bool Function Cmd_1(String cmd, String arg0) Global Native
 Bool Function Cmd_2(String cmd, String arg0, String arg1) Global Native

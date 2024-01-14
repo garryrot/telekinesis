@@ -256,7 +256,7 @@ Event OnPageReset(String page)
             AddTextOption("Sexlab", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
     EndIf
-
+    
     If page == " OStim"
         SetCursorFillMode(TOP_TO_BOTTOM)
         If TeleIntegration.OStim != None
@@ -266,7 +266,7 @@ Event OnPageReset(String page)
             If TeleIntegration.Ostim_Animation
                 ostim_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
-            
+
             AddHeaderOption("Devices")
             AddMenuOptionST("MENU_OSTIM_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
 

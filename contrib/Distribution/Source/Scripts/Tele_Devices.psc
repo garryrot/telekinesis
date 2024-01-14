@@ -9,26 +9,26 @@ Spell Property Tele_VibrateSpellMedium Auto
 Spell Property Tele_VibrateSpellWeak Auto
 Spell Property Tele_Stop Auto
 
-Int Property MajorVersion = 1 AutoReadOnly
-Int Property MinorVersion = 2 AutoReadOnly
-Int Property PatchVersion = 0 AutoReadOnly
-String Property Revision = "" AutoReadOnly
+Int Property MajorVersion = 1 AutoReadOnly Hidden
+Int Property MinorVersion = 2 AutoReadOnly Hidden
+Int Property PatchVersion = 1 AutoReadOnly Hidden
+String Property Revision = "" AutoReadOnly Hidden
 
-String Property Version
+String Property Version Hidden
     String Function Get()
         return MajorVersion + "." + MinorVersion + "." + PatchVersion + " " + Revision
     EndFunction
-EndProperty
+EndProperty 
 
-Bool Property LogDeviceConnects = true Auto
-Bool Property LogDeviceEvents = false Auto
-Bool Property LogDeviceEventEnd = false Auto
-Bool Property LogDebugEvents = false Auto
+Bool Property LogDeviceConnects = true Auto Hidden
+Bool Property LogDeviceEvents = false Auto Hidden
+Bool Property LogDeviceEventEnd = false Auto Hidden
+Bool Property LogDebugEvents = false Auto Hidden
 
-Bool Property ScanningForDevices = false Auto
-Int Property ConnectionType = 0 Auto
+Bool Property ScanningForDevices = false Auto Hidden
+Int Property ConnectionType = 0 Auto Hidden
 String _ErrorText
-String Property ConnectionErrorDetails
+String Property ConnectionErrorDetails Hidden
     String Function Get()
         If GetConnectionStatus() == "Failed"
             return _ErrorText
@@ -37,8 +37,8 @@ String Property ConnectionErrorDetails
     EndFunction
 EndProperty
 
-String Property WsPort = "12345" Auto
-String Property WsHost = "127.0.0.1" Auto
+String Property WsPort = "12345" Auto Hidden
+String Property WsHost = "127.0.0.1" Auto Hidden
 
 Function InitEvents()
     RegisterForModEvent("Tele_Connected", "OnConnected")

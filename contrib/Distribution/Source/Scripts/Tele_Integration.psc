@@ -6,22 +6,23 @@ ScriptName Tele_Integration extends Quest
 
 Tele_Devices Property TeleDevices Auto
 
-Actor Property PlayerRef Auto
+; Reset by OnGameLoadObserver on every start
+Actor Property PlayerRef Auto Hidden
 
 ; Type ZadLibs
-Quest Property ZadLib Auto  
+Quest Property ZadLib Auto Hidden 
 
 ; Type SexLabFramework
-Quest Property SexLab Auto 
+Quest Property SexLab Auto Hidden
 
 ; Type ToysFramework
-Quest Property Toys Auto  
+Quest Property Toys Auto Hidden
 
 ; Type SlaFrameworkScr
-Quest Property SexLabAroused Auto 
+Quest Property SexLabAroused Auto Hidden
 
 ; Type OSexIntegrationMain
-OSexIntegrationMain Property OStim Auto
+Quest Property OStim Auto Hidden
 
 Event OnInit()
     InitDefaultOnEventHandlers()
@@ -145,8 +146,8 @@ EndFunction
 
 Int _EmergencyHotkey = 211
 
-Int Property EmergencyHotkey_Default = 211 AutoReadOnly ; del
-Int Property EmergencyHotkey
+Int Property EmergencyHotkey_Default = 211 AutoReadOnly Hidden ; del
+Int Property EmergencyHotkey Hidden
     Function Set(Int keyCode)
         UnregisterForKey(_EmergencyHotkey)
         _EmergencyHotkey = keyCode
@@ -175,22 +176,22 @@ EndEvent
 
 Int _DeviousDevicesVibrateHandle = -1
 
-Int Property DeviousDevices_Vibrate_DeviceSelector = 0 Auto
-Int Property DeviousDevices_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
-String Property DeviousDevices_Vibrate_Event_Anal = "Anal" Auto
-String Property DeviousDevices_Vibrate_Event_Anal_Default = "Anal" Auto
-String Property DeviousDevices_Vibrate_Event_Vaginal = "Vaginal" Auto
-String Property DeviousDevices_Vibrate_Event_Vaginal_Default = "Vaginal" Auto
-String Property DeviousDevices_Vibrate_Event_Nipple = "Nipple" Auto
-String Property DeviousDevices_Vibrate_Event_Nipple_Default = "Nipple" Auto
-Int Property DeviousDevices_Vibrate_Pattern = 0 Auto
-Int Property DeviousDevices_Vibrate_Pattern_Default = 0 AutoReadOnly
-Bool Property DeviousDevices_Vibrate_Default = true AutoReadOnly
-String Property DeviousDevices_Vibrate_Funscript = "30_Sawtooth" Auto
-String Property DeviousDevices_Vibrate_Funscript_Default = "30_Sawtooth" Auto
+Int Property DeviousDevices_Vibrate_DeviceSelector = 0 Auto Hidden
+Int Property DeviousDevices_Vibrate_DeviceSelector_Default = 0 AutoReadOnly Hidden
+String Property DeviousDevices_Vibrate_Event_Anal = "Anal" Auto Hidden
+String Property DeviousDevices_Vibrate_Event_Anal_Default = "Anal" Auto Hidden
+String Property DeviousDevices_Vibrate_Event_Vaginal = "Vaginal" Auto Hidden
+String Property DeviousDevices_Vibrate_Event_Vaginal_Default = "Vaginal" Auto Hidden
+String Property DeviousDevices_Vibrate_Event_Nipple = "Nipple" Auto Hidden
+String Property DeviousDevices_Vibrate_Event_Nipple_Default = "Nipple" Auto Hidden
+Int Property DeviousDevices_Vibrate_Pattern = 0 Auto Hidden
+Int Property DeviousDevices_Vibrate_Pattern_Default = 0 AutoReadOnly Hidden
+Bool Property DeviousDevices_Vibrate_Default = true AutoReadOnly Hidden
+String Property DeviousDevices_Vibrate_Funscript = "30_Sawtooth" Auto Hidden
+String Property DeviousDevices_Vibrate_Funscript_Default = "30_Sawtooth" Auto Hidden
 
 Bool _DeviousDevices_Vibrate = false
-Bool Property DeviousDevices_Vibrate
+Bool Property DeviousDevices_Vibrate Hidden
     Function Set(Bool enable)
         _DeviousDevices_Vibrate = enable
         If enable
@@ -238,7 +239,6 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     EndIf
     Int strength = Math.Floor((vibrationStrength / numVibratorsMult) * 20)
     _DeviousDevicesVibrateHandle = StartVibration(DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events)
-	; TeleDevices.LogDebug("OnVibrateEffectStart strength: " + strength)
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form sender)
@@ -261,20 +261,20 @@ EndEvent
 
 Bool _InSexlabScene = false
 
-String Property Sexlab_Animation_Funscript = "" Auto
-String Property Sexlab_Animation_Funscript_Default = "" Auto
-Int Property Sexlab_Animation_DeviceSelector = 0 Auto
-Int Property Sexlab_Animation_DeviceSelector_Default = 0 AutoReadOnly
-Bool Property Sexlab_Animation_Rousing = False Auto
-Bool Property Sexlab_Animation_Rousing_Default = False AutoReadOnly
-Int Property Sexlab_Animation_Pattern = 0 Auto
-Int Property Sexlab_Animation_Pattern_Default = 0 AutoReadOnly
-Int Property Sexlab_Animation_Linear_Strength = 80 Auto
-Int Property Sexlab_Animation_Linear_Strength_Default = 80 AutoReadOnly
+String Property Sexlab_Animation_Funscript = "" Auto Hidden
+String Property Sexlab_Animation_Funscript_Default = "" Auto Hidden
+Int Property Sexlab_Animation_DeviceSelector = 0 Auto Hidden
+Int Property Sexlab_Animation_DeviceSelector_Default = 0 AutoReadOnly Hidden
+Bool Property Sexlab_Animation_Rousing = False Auto Hidden
+Bool Property Sexlab_Animation_Rousing_Default = False AutoReadOnly Hidden
+Int Property Sexlab_Animation_Pattern = 0 Auto Hidden
+Int Property Sexlab_Animation_Pattern_Default = 0 AutoReadOnly Hidden
+Int Property Sexlab_Animation_Linear_Strength = 80 Auto Hidden
+Int Property Sexlab_Animation_Linear_Strength_Default = 80 AutoReadOnly Hidden
 
 Bool _Sexlab_Animation = false
-Bool Property Sexlab_Animation_Default = true AutoReadOnly
-Bool Property Sexlab_Animation
+Bool Property Sexlab_Animation_Default = true AutoReadOnly Hidden
+Bool Property Sexlab_Animation Hidden
     Function Set(Bool enable)
         _Sexlab_Animation = enable
         If enable
@@ -292,8 +292,8 @@ Bool Property Sexlab_Animation
 EndProperty
 
 Bool _Sexlab_ActorOrgasm = false
-Bool Property Sexlab_ActorOrgasm_Default = false AutoReadOnly
-Bool Property Sexlab_ActorOrgasm
+Bool Property Sexlab_ActorOrgasm_Default = false AutoReadOnly Hidden
+Bool Property Sexlab_ActorOrgasm Hidden
     Function Set(Bool enable)
         _Sexlab_ActorOrgasm = enable
         If enable
@@ -308,8 +308,8 @@ Bool Property Sexlab_ActorOrgasm
 EndProperty
 
 Bool _Sexlab_ActorEdge = false
-Bool Property Sexlab_ActorEdge_Default = false AutoReadOnly
-Bool Property Sexlab_ActorEdge
+Bool Property Sexlab_ActorEdge_Default = false AutoReadOnly Hidden
+Bool Property Sexlab_ActorEdge Hidden
     Function Set(Bool enable)
         _Sexlab_ActorEdge = enable
         If enable
@@ -366,28 +366,28 @@ EndEvent
 
 Int _OstimMaxSpeed = 4
 
-String Property Ostim_Animation_Funscript = "" Auto
-String Property Ostim_Animation_Funscript_Default = "" Auto
-Int Property Ostim_Animation_DeviceSelector = 0 Auto
-Int Property Ostim_Animation_DeviceSelector_Default = 0 AutoReadOnly
-Int Property Ostim_Animation_Speed_Control = 1 Auto
-Int Property Ostim_Animation_Speed_Control_Default = 1 AutoReadOnly
-Int Property Ostim_Animation_Pattern = 0 Auto
-Int Property Ostim_Animation_Pattern_Default = 0 AutoReadOnly  
-String Property Ostim_Animation_Event_Anal = "Anal" Auto
-String Property Ostim_Animation_Event_Anal_Default = "Anal" Auto
-String Property Ostim_Animation_Event_Vaginal = "Vaginal" Auto
-String Property Ostim_Animation_Event_Vaginal_Default = "Vaginal" Auto
-String Property Ostim_Animation_Event_Nipple = "Nipple" Auto
-String Property Ostim_Animation_Event_Nipple_Default = "Nipple" Auto
-String Property Ostim_Animation_Event_Penetration = "Penetration" Auto
-String Property Ostim_Animation_Event_Penetration_Default = "Penetration" Auto
-String Property Ostim_Animation_Event_Penis = "Penis" Auto
-String Property Ostim_Animation_Event_Penis_Default = "Penis" Auto
+String Property Ostim_Animation_Funscript = "" Auto Hidden
+String Property Ostim_Animation_Funscript_Default = "" Auto Hidden
+Int Property Ostim_Animation_DeviceSelector = 0 Auto Hidden
+Int Property Ostim_Animation_DeviceSelector_Default = 0 AutoReadOnly Hidden
+Int Property Ostim_Animation_Speed_Control = 1 Auto Hidden
+Int Property Ostim_Animation_Speed_Control_Default = 1 AutoReadOnly Hidden
+Int Property Ostim_Animation_Pattern = 0 Auto Hidden
+Int Property Ostim_Animation_Pattern_Default = 0 AutoReadOnly Hidden
+String Property Ostim_Animation_Event_Anal = "Anal" Auto Hidden
+String Property Ostim_Animation_Event_Anal_Default = "Anal" Auto Hidden
+String Property Ostim_Animation_Event_Vaginal = "Vaginal" Auto Hidden
+String Property Ostim_Animation_Event_Vaginal_Default = "Vaginal" Auto Hidden
+String Property Ostim_Animation_Event_Nipple = "Nipple" Auto Hidden
+String Property Ostim_Animation_Event_Nipple_Default = "Nipple" Auto Hidden
+String Property Ostim_Animation_Event_Penetration = "Penetration" Auto Hidden
+String Property Ostim_Animation_Event_Penetration_Default = "Penetration" Auto Hidden
+String Property Ostim_Animation_Event_Penis = "Penis" Auto Hidden
+String Property Ostim_Animation_Event_Penis_Default = "Penis" Auto Hidden
 
 Bool _Ostim_Animation = false
-Bool Property Ostim_Animation_Default = true AutoReadOnly
-Bool Property Ostim_Animation
+Bool Property Ostim_Animation_Default = true AutoReadOnly Hidden
+Bool Property Ostim_Animation Hidden
     Function Set(Bool enable)
         _Ostim_Animation = enable
         If enable
@@ -434,7 +434,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     While i > 0
         i -= 1
         Int actorIndex = sceneActors[i]
-        If OStim.GetActor(actorIndex) == PlayerRef
+        If (OStim as OSexIntegrationMain).GetActor(actorIndex) == PlayerRef
             playerActorIndex = actorIndex
         EndIf
     EndWhile
@@ -444,7 +444,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     While j > 0
         j -= 1
         Int actorIndex = sceneTargets[j]
-        If OStim.GetActor(actorIndex) == PlayerRef
+        If (OStim as OSexIntegrationMain).GetActor(actorIndex) == PlayerRef
             playerTargetIndex = actorIndex
         EndIf
     EndWhile
@@ -551,8 +551,8 @@ EndFunction
 Bool _InToysScene = false
 
 Bool _Toys_Vaginal_Penetration = false
-Bool Property Toys_Vaginal_Penetration_Default = false AutoReadOnly
-Bool Property Toys_Vaginal_Penetration
+Bool Property Toys_Vaginal_Penetration_Default = false AutoReadOnly Hidden
+Bool Property Toys_Vaginal_Penetration Hidden
     Function Set(Bool enable)
         _Toys_Vaginal_Penetration = enable
         If enable
@@ -567,8 +567,8 @@ Bool Property Toys_Vaginal_Penetration
 EndProperty
 
 Bool _Toys_Anal_Penetration = false
-Bool Property Toys_Anal_Penetration_Default = false AutoReadOnly
-Bool Property Toys_Anal_Penetration
+Bool Property Toys_Anal_Penetration_Default = false AutoReadOnly Hidden
+Bool Property Toys_Anal_Penetration Hidden
     Function Set(Bool enable)
         _Toys_Anal_Penetration = enable
         If enable
@@ -583,8 +583,8 @@ Bool Property Toys_Anal_Penetration
 EndProperty
 
 Bool _Toys_Oral_Penetration = false
-Bool Property Toys_Oral_Penetration_Default = false AutoReadOnly
-Bool Property Toys_Oral_Penetration
+Bool Property Toys_Oral_Penetration_Default = false AutoReadOnly Hidden
+Bool Property Toys_Oral_Penetration Hidden
     Function Set(Bool enable)
         _Toys_Oral_Penetration = enable
         If enable
@@ -599,8 +599,8 @@ Bool Property Toys_Oral_Penetration
 EndProperty
 
 Bool _Toys_Fondle = false
-Bool Property Toys_Fondle_Default = false AutoReadOnly
-Bool Property Toys_Fondle
+Bool Property Toys_Fondle_Default = false AutoReadOnly Hidden
+Bool Property Toys_Fondle Hidden
     Function Set(Bool enable)
         _Toys_Fondle = enable
         If enable
@@ -617,8 +617,8 @@ Bool Property Toys_Fondle
 EndProperty
 
 Bool _Toys_Squirt = false
-Bool Property Toys_Squirt_Default = false AutoReadOnly
-Bool Property Toys_Squirt
+Bool Property Toys_Squirt_Default = false AutoReadOnly Hidden
+Bool Property Toys_Squirt Hidden
     Function Set(Bool enable)
         _Toys_Squirt = enable
         If enable
@@ -633,8 +633,8 @@ Bool Property Toys_Squirt
 EndProperty
 
 Bool _Toys_Climax = false
-Bool Property Toys_Climax_Default = false AutoReadOnly
-Bool Property Toys_Climax
+Bool Property Toys_Climax_Default = false AutoReadOnly Hidden
+Bool Property Toys_Climax Hidden
     Function Set(Bool enable)
         _Toys_Climax = enable
         If enable
@@ -650,20 +650,20 @@ Bool Property Toys_Climax
     EndFunction
 EndProperty
 
-String Property Toys_Vibrate_Funscript = "" Auto
-String Property Toys_Vibrate_Funscript_Default = "" Auto
-Int Property Toys_Vibrate_DeviceSelector = 0 Auto
-Int Property Toys_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
-String Property Toys_Vibrate_Event = "Vaginal" Auto
-String Property Toys_Vibrate_Event_Default = "Vaginal" AutoReadOnly
-Int Property Toys_Vibrate_Pattern = 0 Auto
-Int Property Toys_Vibrate_Pattern_Default = 0 AutoReadOnly
-Int Property Toys_Vibrate_Linear_Strength = 80 Auto
-Int Property Toys_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
+String Property Toys_Vibrate_Funscript = "" Auto Hidden
+String Property Toys_Vibrate_Funscript_Default = "" Auto Hidden
+Int Property Toys_Vibrate_DeviceSelector = 0 Auto Hidden
+Int Property Toys_Vibrate_DeviceSelector_Default = 0 AutoReadOnly Hidden
+String Property Toys_Vibrate_Event = "Vaginal" Auto Hidden
+String Property Toys_Vibrate_Event_Default = "Vaginal" AutoReadOnly Hidden
+Int Property Toys_Vibrate_Pattern = 0 Auto Hidden
+Int Property Toys_Vibrate_Pattern_Default = 0 AutoReadOnly Hidden
+Int Property Toys_Vibrate_Linear_Strength = 80 Auto Hidden
+Int Property Toys_Vibrate_Linear_Strength_Default = 80 AutoReadOnly Hidden
 
 Bool _Toys_Vibrate = false
-Bool Property Toys_Vibrate_Default = true AutoReadOnly
-Bool Property Toys_Vibrate
+Bool Property Toys_Vibrate_Default = true AutoReadOnly Hidden
+Bool Property Toys_Vibrate Hidden
     Function Set(Bool enable)
         _Toys_Vibrate = enable
         If enable
@@ -677,30 +677,30 @@ Bool Property Toys_Vibrate
     EndFunction
 EndProperty
 
-String Property Toys_Animation_Funscript = "" Auto
-String Property Toys_Animation_Funscript_Default = "" Auto
-Int Property Toys_Animation_DeviceSelector = 0 Auto
-Int Property Toys_Animation_DeviceSelector_Default = 0 AutoReadOnly
-Bool Property Toys_Animation_Match_Tags = false Auto
-Bool Property Toys_Animation_Match_Tags_Default = false AutoReadOnly
-String Property Toys_Animation_Event_Vaginal = "Vaginal" Auto
-String Property Toys_Animation_Event_Vaginal_Default = "Vaginal" AutoReadOnly
-String Property Toys_Animation_Event_Oral = "Oral" Auto
-String Property Toys_Animation_Event_Oral_Default = "Oral" AutoReadOnly
-String Property Toys_Animation_Event_Anal = "Anal" Auto
-String Property Toys_Animation_Event_Anal_Default = "Anal" AutoReadOnly
-String Property Toys_Animation_Event_Nipple = "Nipple" Auto
-String Property Toys_Animation_Event_Nipple_Default = "Nipple" AutoReadOnly
-Bool Property Toys_Animation_Rousing = true Auto
-Bool Property Toys_Animation_Rousing_Default = true AutoReadOnly
-Int Property Toys_Animation_Pattern = 0 Auto
-Int Property Toys_Animation_Pattern_Default = 0 AutoReadOnly
-Int Property Toys_Animation_Linear_Strength = 80 Auto
-Int Property Toys_Animation_Linear_Strength_Default = 80 AutoReadOnly
-Bool Property Toys_Animation_Default = true AutoReadOnly
+String Property Toys_Animation_Funscript = "" Auto Hidden
+String Property Toys_Animation_Funscript_Default = "" Auto Hidden
+Int Property Toys_Animation_DeviceSelector = 0 Auto Hidden
+Int Property Toys_Animation_DeviceSelector_Default = 0 AutoReadOnly Hidden
+Bool Property Toys_Animation_Match_Tags = false Auto Hidden
+Bool Property Toys_Animation_Match_Tags_Default = false AutoReadOnly Hidden
+String Property Toys_Animation_Event_Vaginal = "Vaginal" Auto Hidden
+String Property Toys_Animation_Event_Vaginal_Default = "Vaginal" AutoReadOnly Hidden
+String Property Toys_Animation_Event_Oral = "Oral" Auto Hidden
+String Property Toys_Animation_Event_Oral_Default = "Oral" AutoReadOnly Hidden
+String Property Toys_Animation_Event_Anal = "Anal" Auto Hidden
+String Property Toys_Animation_Event_Anal_Default = "Anal" AutoReadOnly Hidden
+String Property Toys_Animation_Event_Nipple = "Nipple" Auto Hidden
+String Property Toys_Animation_Event_Nipple_Default = "Nipple" AutoReadOnly Hidden
+Bool Property Toys_Animation_Rousing = true Auto Hidden
+Bool Property Toys_Animation_Rousing_Default = true AutoReadOnly Hidden
+Int Property Toys_Animation_Pattern = 0 Auto Hidden
+Int Property Toys_Animation_Pattern_Default = 0 AutoReadOnly Hidden
+Int Property Toys_Animation_Linear_Strength = 80 Auto Hidden
+Int Property Toys_Animation_Linear_Strength_Default = 80 AutoReadOnly Hidden
+Bool Property Toys_Animation_Default = true AutoReadOnly Hidden
 
 Bool _Toys_Animation = false
-Bool Property Toys_Animation
+Bool Property Toys_Animation Hidden
     Function Set(Bool enable)
         _Toys_Animation = enable
         If enable
@@ -717,8 +717,8 @@ Bool Property Toys_Animation
 EndProperty
  
 Bool _Toys_Caressed = false
-Bool Property Toys_Caressed_Default = false AutoReadOnly
-Bool Property Toys_Caressed
+Bool Property Toys_Caressed_Default = false AutoReadOnly Hidden
+Bool Property Toys_Caressed Hidden
     Function Set(Bool enable)
         _Toys_Caressed = enable
         If enable
@@ -733,8 +733,8 @@ Bool Property Toys_Caressed
 EndProperty
 
 Bool _Toys_Denial = false
-Bool Property Toys_Denial_Default = false AutoReadOnly
-Bool Property Toys_Denial
+Bool Property Toys_Denial_Default = false AutoReadOnly Hidden
+Bool Property Toys_Denial Hidden
     Function Set(Bool enable)
         _Toys_Denial = enable
         If enable
@@ -853,20 +853,20 @@ EndEvent
 ;           \____/_/ /_/\__,_/_/_/ /_/_.___/\___/\__,_/____/\__/____/  
 
 
-Int Property Chainbeasts_Vibrate_DeviceSelector = 0 Auto
-Int Property Chainbeasts_Vibrate_DeviceSelector_Default = 0 AutoReadOnly
-String Property Chainbeasts_Vibrate_Event = "Vaginal" Auto
-String Property Chainbeasts_Vibrate_Event_Default = "Vaginal" AutoReadOnly
-Int Property Chainbeasts_Vibrate_Pattern = 1 Auto
-Int Property Chainbeasts_Vibrate_Pattern_Default = 1 AutoReadOnly
-String Property Chainbeasts_Vibrate_Funscript = "03_Wub-Wub-Wub" Auto
-String Property Chainbeasts_Vibrate_Funscript_Default = "03_Wub-Wub-Wub" Auto
-Int Property Chainbeasts_Vibrate_Linear_Strength = 80 Auto
-Int Property Chainbeasts_Vibrate_Linear_Strength_Default = 80 AutoReadOnly
+Int Property Chainbeasts_Vibrate_DeviceSelector = 0 Auto Hidden
+Int Property Chainbeasts_Vibrate_DeviceSelector_Default = 0 AutoReadOnly Hidden
+String Property Chainbeasts_Vibrate_Event = "Vaginal" Auto Hidden
+String Property Chainbeasts_Vibrate_Event_Default = "Vaginal" AutoReadOnly Hidden
+Int Property Chainbeasts_Vibrate_Pattern = 1 Auto Hidden
+Int Property Chainbeasts_Vibrate_Pattern_Default = 1 AutoReadOnly Hidden
+String Property Chainbeasts_Vibrate_Funscript = "03_Wub-Wub-Wub" Auto Hidden
+String Property Chainbeasts_Vibrate_Funscript_Default = "03_Wub-Wub-Wub" Auto Hidden
+Int Property Chainbeasts_Vibrate_Linear_Strength = 80 Auto Hidden
+Int Property Chainbeasts_Vibrate_Linear_Strength_Default = 80 AutoReadOnly Hidden
 
 Bool _Chainbeasts_Vibrate = false
-Bool Property Chainbeasts_Vibrate_Default = true AutoReadOnly
-Bool Property Chainbeasts_Vibrate
+Bool Property Chainbeasts_Vibrate_Default = true AutoReadOnly Hidden
+Bool Property Chainbeasts_Vibrate Hidden
     Function Set(Bool enable)
         _Chainbeasts_Vibrate = enable
         If enable
