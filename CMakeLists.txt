@@ -6,7 +6,7 @@ message("Using toolchain file ${CMAKE_TOOLCHAIN_FILE}.")
 ########################################################################################################################
 project(
         Telekinesis
-        VERSION 1.2.0
+        VERSION 1.2.1
         DESCRIPTION "Papyrus remote control API for bluetooth toys."
         LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
@@ -57,7 +57,7 @@ ExternalProject_Add(
     DOWNLOAD_COMMAND ""
     CONFIGURE_COMMAND ""
     BUILD_COMMAND cargo build COMMAND cargo build --release
-    BINARY_DIR "${CMAKE_SOURCE_DIR}/plug"
+    BINARY_DIR "${CMAKE_SOURCE_DIR}/rust"
     INSTALL_COMMAND ""
     LOG_BUILD ON)
 
