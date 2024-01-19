@@ -24,6 +24,11 @@
 			"group": {
 				"kind": "build"
 			}
+		},
+		{
+			"type": "shell",
+			"label": "Deploy Papyrus Scripts (To Skyrim dir)",
+			"command": "./deploy-scripts-and-run.ps1",
 		}
 	]
 }
