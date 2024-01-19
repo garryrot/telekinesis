@@ -1,0 +1,79 @@
+{
+  "version": "1.0",
+  "inverted": false,
+  "range": -1,
+  "bookmark": -1,
+  "lastPosition": -1,
+  "graphDuration": -1,
+  "speedRatio": -1.0,
+  "injectionSpeed": -1,
+  "injectionBias": -1.0,
+  "scriptingMode": -1,
+  "simulatorPresets": [],
+  "activeSimulator": -1,
+  "reductionTolerance": -1.0,
+  "reductionStretch": -1.0,
+  "clips": [],
+  "actions": [
+    {
+      "pos": 0,
+      "at": 0
+    },
+    {
+      "pos": 25,
+      "at": 3000
+    },
+    {
+      "pos": 0,
+      "at": 6000
+    },
+    {
+      "pos": 25,
+      "at": 9000
+    },
+    {
+      "pos": 0,
+      "at": 12000
+    },
+    {
+      "pos": 25,
+      "at": 15000
+    },
+    {
+      "pos": 0,
+      "at": 18000
+    },
+    {
+      "pos": 25,
+      "at": 21000
+    },
+    {
+      "pos": 0,
+      "at": 24000
+    },
+    {
+      "pos": 25,
+      "at": 27000
+    },
+    {
+      "pos": 0,
+      "at": 30000
+    },
+  ],
+  "rawActions": [],
+  "metadata": {
+    "bookmarks": [],
+    "chapters": [],
+    "creator": "",
+    "description": "Full In/Out Movements",
+    "duration": -1,
+    "license": "",
+    "notes": "",
+    "performers": [],
+    "script_url": "",
+    "tags": [],
+    "title": "",
+    "type": "",
+    "video_url": ""
+  }
+}

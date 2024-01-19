@@ -20,7 +20,7 @@
       "at": 0
     },
     {
-      "pos": 100,
+      "pos": 50,
       "at": 3000
     },
     {
@@ -28,7 +28,7 @@
       "at": 6000
     },
     {
-      "pos": 100,
+      "pos": 30,
       "at": 9000
     },
     {
@@ -36,27 +36,27 @@
       "at": 12000
     },
     {
-      "pos": 100,
+      "pos": 75,
       "at": 15000
     },
     {
-      "pos": 0,
+      "pos": 40,
       "at": 18000
     },
     {
-      "pos": 100,
+      "pos": 90,
       "at": 21000
     },
     {
-      "pos": 0,
+      "pos": 10,
       "at": 24000
     },
     {
-      "pos": 100,
+      "pos": 10,
       "at": 27000
     },
     {
-      "pos": 0,
+      "pos": 55,
       "at": 30000
     },
   ],
@@ -65,7 +65,7 @@
     "bookmarks": [],
     "chapters": [],
     "creator": "",
-    "description": "In/Out Movements",
+    "description": "Full In/Out Movements",
     "duration": -1,
     "license": "",
     "notes": "",
