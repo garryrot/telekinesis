@@ -31,33 +31,48 @@ impl PatternPlayer {
         mut self,
         duration: Duration,
         fscript: FScript,
+        speed: Speed
     ) -> ButtplugClientResult {
         info!("linear pattern started");
         let mut last_result = Ok(());
-        if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
+        if speed.as_float() <= 0.0 || fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
             return last_result;
         }
+        let mut current_speed = speed;
         let waiter = self.stop_after(duration);
         while !self.cancellation_token.is_cancelled() {
-            let started = Instant::now();
+            let mut last_instant = Instant::now();
+            let mut last_at = Duration::ZERO;
+            let mut last_waiting_time = Duration::ZERO;
             for point in fscript.actions.iter() {
-                let point_as_float = Speed::from_fs(point).as_float();
-                if let Some(waiting_time) =
-                    Duration::from_millis(point.at as u64).checked_sub(started.elapsed())
-                {
-                    let token = &self.cancellation_token.clone();
-                    if let Some(result) = tokio::select! {
-                        _ = token.cancelled() => { None }
-                        result = async {
-                            let result = self.do_linear(point_as_float, waiting_time.as_millis() as u32).await;
-                            sleep(waiting_time).await;
-                            result
-                        } => {
-                            Some(result)
-                        }
-                    } {
-                        last_result = result;
+                if let Ok(update) = self.update_receiver.try_recv() {
+                    if update.as_float() > 0.0 {
+                        current_speed = update;
                     }
+                }
+                let waiting_time = Duration::from_millis(point.at as u64).saturating_sub(last_at);
+                let offset: Duration = last_instant.elapsed().saturating_sub(last_waiting_time);
+                let actual_waiting_time = waiting_time.saturating_mul((1.0 / current_speed.as_float()) as u32).saturating_sub(offset);
+
+                last_instant = Instant::now();
+                last_at = Duration::from_millis(point.at as u64);
+                last_waiting_time = actual_waiting_time;
+                if actual_waiting_time == Duration::ZERO {
+                    continue;
+                }
+
+                let token = &self.cancellation_token.clone();
+                if let Some(result) = tokio::select! {
+                    _ = token.cancelled() => { None }
+                    result = async {
+                        let result = self.do_linear(Speed::from_fs(point).as_float(), actual_waiting_time.as_millis() as u32).await;
+                        sleep(actual_waiting_time).await;
+                        result
+                    } => {
+                        Some(result)
+                    }
+                } {
+                    last_result = result;
                 }
             }
         }

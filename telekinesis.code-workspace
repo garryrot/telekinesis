@@ -7,6 +7,16 @@
     "settings": {
         "papyrus.skyrimSpecialEdition.enabled": true,
         "papyrus.fallout4.enabled": false,
-        "papyrus.skyrim.enabled": false
+        "papyrus.skyrim.enabled": false,
+        "files.associations": {
+            "exception": "cpp",
+            "memory": "cpp",
+            "typeinfo": "cpp",
+            "utility": "cpp",
+            "xmemory": "cpp",
+            "xstring": "cpp",
+            "xtr1common": "cpp",
+            "xutility": "cpp"
+        }
     }
 }

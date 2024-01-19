@@ -150,7 +150,6 @@ mod tests {
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
     use bp_fakes::*;
-    use tracing::error;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -233,11 +232,20 @@ mod tests {
             }));
         }
 
-        async fn play_linear(&mut self, funscript: FScript, duration: Duration) {
+        async fn play_linear(&mut self, funscript: FScript, duration: Duration, speed: Speed) {
             let player = self
                 .scheduler
                 .create_player(get_actuators(self.all_devices.clone()));
-            player.play_linear(duration, funscript).await.unwrap();
+            player.play_linear(duration, funscript, speed).await.unwrap();
+        }
+
+        fn play_linear_background(&mut self, funscript: FScript, duration: Duration, speed: Speed) {
+            let player = self
+                .scheduler
+                .create_player(get_actuators(self.all_devices.clone()));
+            self.handles.push(Handle::current().spawn(async move {
+                player.play_linear(duration, funscript, speed).await.unwrap();
+            }));
         }
 
         async fn await_last(&mut self) {
@@ -271,7 +279,7 @@ mod tests {
         assert!(
             timeout(
                 Duration::from_secs(1),
-                player.play_linear(fs, Duration::from_millis(50)),
+                player.play_linear(fs, Duration::from_millis(50), Speed::max()),
             )
             .await
             .is_ok(),
@@ -286,14 +294,14 @@ mod tests {
 
         // act & assert
         player
-            .play_linear(FScript::default(), Duration::from_millis(1))
+            .play_linear(FScript::default(), Duration::from_millis(1), Speed::max())
             .await;
 
         let mut fs = FScript::default();
         fs.actions.push(FSPoint { pos: 0, at: 0 });
         fs.actions.push(FSPoint { pos: 0, at: 0 });
         player
-            .play_linear(FScript::default(), Duration::from_millis(1))
+            .play_linear(FScript::default(), Duration::from_millis(1), Speed::max())
             .await;
     }
 
@@ -311,7 +319,7 @@ mod tests {
         // act
         let start = Instant::now();
         let duration = get_duration_ms(&fscript);
-        player.play_linear(fscript, duration).await;
+        player.play_linear(fscript, duration, Speed::max()).await;
 
         // assert
         client.print_device_calls(start);
@@ -336,7 +344,7 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play_linear(get_repeated_pattern(n), get_duration_ms(&fscript))
+            .play_linear(get_repeated_pattern(n), get_duration_ms(&fscript), Speed::max())
             .await;
 
         // assert
@@ -357,7 +365,7 @@ mod tests {
         // act
         let start = Instant::now();
         let duration = Duration::from_millis(800);
-        player.play_linear(fscript, duration).await;
+        player.play_linear(fscript, duration, Speed::max()).await;
 
         // assert
         client.print_device_calls(start);
@@ -382,7 +390,7 @@ mod tests {
         // act
         let start = Instant::now();
         let duration = Duration::from_millis(400);
-        player.play_linear(fscript, duration).await;
+        player.play_linear(fscript, duration, Speed::max()).await;
 
         // assert
         client.print_device_calls(start);
@@ -393,6 +401,34 @@ mod tests {
             start.elapsed().as_millis() < 425,
             "Stops after duration ends"
         );
+    }
+
+    #[tokio::test]
+    async fn test_linear_control() {
+        // arrange
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        let mut fs = FScript::default();
+        fs.actions.push(FSPoint { pos: 0, at: 0 });
+        fs.actions.push(FSPoint { pos: 100, at: 25 });
+        fs.actions.push(FSPoint { pos: 0, at: 50 });
+
+        // act
+        let start = Instant::now();
+        player.play_linear_background(fs, Duration::from_secs(1), Speed::new(10));
+        wait_ms(400).await;
+        player.scheduler.update_task(1, Speed::new(50));
+        player.await_all().await;
+
+        // assert
+        client.print_device_calls(start);
+        let calls = client.get_device_calls(1);
+        calls[0].assert_timestamp(0, start);
+        calls[1].assert_timestamp(250, start);
+        calls[2].assert_timestamp(500, start);
+        calls[3].assert_timestamp(550, start);
+        calls[4].assert_timestamp(600, start);
     }
 
     /// Scalar

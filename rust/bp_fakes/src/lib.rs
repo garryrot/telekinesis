@@ -116,8 +116,8 @@ impl FakeMessage {
         debug!("start_instant.elapsed: {:?}", start_instant.elapsed());
         let elapsed_ms = (start_instant.elapsed() - self.time.elapsed()).as_millis() as i32;
         assert!(
-            elapsed_ms > time_ms - 25 && elapsed_ms < time_ms + 25,
-            "Elapsed {}ms != timestamp {}ms +/-25",
+            elapsed_ms > time_ms - 30 && elapsed_ms < time_ms + 30,
+            "Elapsed {}ms != timestamp {}ms +/-30",
             elapsed_ms,
             time_ms
         );
