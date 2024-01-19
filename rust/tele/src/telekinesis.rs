@@ -289,7 +289,6 @@ mod tests {
     use crate::*;
     use bp_fakes::{scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
     use bp_scheduler::speed::Speed;
-    use buttplug::client::ScalarCommand;
     use buttplug::core::message::{ActuatorType, DeviceAdded};
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
@@ -448,23 +447,14 @@ mod tests {
 
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
-    fn vibrate_pattern_then_cancel() {
-        let (mut tk, handle) = test_pattern("02_Cruel-Tease", Duration::from_secs(10));
+    fn vibrate_pattern() {
+        let (mut tk, handle) = test_pattern("02_Cruel-Tease", Duration::from_secs(10), true );
         thread::sleep(Duration::from_secs(2)); // dont disconnect
         tk.stop(handle);
         thread::sleep(Duration::from_secs(10));
     }
 
-    #[test]
-    #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
-    fn vibrate_pattern_loops() {
-        let (mut tk, handle) = test_pattern("03_Wub-Wub-Wub", Duration::from_secs(20));
-        thread::sleep(Duration::from_secs(20));
-        tk.stop(handle);
-        thread::sleep(Duration::from_secs(2));
-    }
-
-    fn test_pattern(pattern_name: &str, duration: Duration) -> (Telekinesis, i32) {
+    fn test_pattern(pattern_name: &str, duration: Duration, vibration_pattern: bool) -> (Telekinesis, i32) {
         let settings = TkSettings::default();
         let pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
@@ -481,7 +471,7 @@ mod tests {
         tk.settings
             .set_enabled(known_actuator_ids.first().unwrap(), true);
 
-        let fscript = read_pattern(&pattern_path, pattern_name, true).unwrap();
+        let fscript = read_pattern(&pattern_path, pattern_name, vibration_pattern).unwrap();
         let handle = tk.vibrate(
             Task::Pattern(Speed::max(), ActuatorType::Vibrate, pattern_name.into()),
             duration,
