@@ -1,7 +1,7 @@
 ; Communication API with Telekinesis.DLL
 ; DO NOT USE DIRECTLY, use Tele_Devices instead to respect user settings
 
-ScriptName Tele_Api hidden
+ScriptName Tele_Api Hidden
 
 Bool Function Loaded() global Native
 Bool Function Cmd(String cmd) Global Native
