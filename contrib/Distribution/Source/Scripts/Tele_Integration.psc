@@ -4,7 +4,15 @@ ScriptName Tele_Integration extends Quest
     ~ Use this API to enable/disable integration features ~
 }
 
-Tele_Devices Property TeleDevices Auto
+Tele_Devices _TeleDevices = None
+Tele_Devices Property TDevices Hidden
+    Tele_Devices Function Get()
+        If _TeleDevices == None
+            _TeleDevices = (self as Quest) as Tele_Devices
+        EndIf
+        return _TeleDevices
+    EndFunction
+EndProperty 
 
 ; Reset by OnGameLoadObserver on every start
 Actor Property PlayerRef Auto Hidden
@@ -46,13 +54,13 @@ Int _ToysSceneVibrationHandle = -1
 Function UpdateRousingControlledSexScene()
     If _InToysScene
         Int speed = (Toys as ToysFramework).GetRousing()
-        TeleDevices.UpdateHandle(_ToysSceneVibrationHandle, speed)
+        TDevices.UpdateHandle(_ToysSceneVibrationHandle, speed)
     ElseIf _InSexlabScene
         Int speed = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
-        TeleDevices.UpdateHandle(_SexlabSceneVibrationHandle, speed)
+        TDevices.UpdateHandle(_SexlabSceneVibrationHandle, speed)
 	ElseIf _OstimSceneVibrationHandle != -1
         Int speed = GetOStimSpeed()
-        TeleDevices.UpdateHandle(_OstimSceneVibrationHandle, speed)
+        TDevices.UpdateHandle(_OstimSceneVibrationHandle, speed)
     EndIf
     RegisterForSingleUpdate(2)
 EndFunction
@@ -63,12 +71,12 @@ Int Function StartVibration(Int deviceSelector, Float duration_sec, Int patternT
         events = evts
     EndIf
     If patternType == 2
-        String random_funscript = TeleDevices.GetRandomPattern(true)
-        return TeleDevices.VibratePattern(random_funscript, speed, duration_sec, events)
+        String random_funscript = TDevices.GetRandomPattern(true)
+        return TDevices.VibratePattern(random_funscript, speed, duration_sec, events)
     ElseIf patternType == 1
-        return TeleDevices.VibratePattern(funscript, speed, duration_sec, events)
+        return TDevices.VibratePattern(funscript, speed, duration_sec, events)
     Else
-        return TeleDevices.VibrateEvents(speed, duration_sec, events)
+        return TDevices.VibrateEvents(speed, duration_sec, events)
     EndIf
 EndFunction
 
@@ -77,7 +85,7 @@ Function MigrateToV12()
 EndFunction
 
 Function ResetIntegrationSettings()
-    TeleDevices.Notify("All settings reset to default")
+    TDevices.Notify("All settings reset to default")
     DeviousDevices_Vibrate = DeviousDevices_Vibrate_Default
     DeviousDevices_Vibrate_DeviceSelector = DeviousDevices_Vibrate_DeviceSelector_Default
     DeviousDevices_Vibrate_Event_Anal = DeviousDevices_Vibrate_Event_Anal_Default
@@ -160,9 +168,9 @@ EndProperty
 
 Event OnKeyUp(Int keyCode, Float HoldTime)
     If keyCode == _EmergencyHotkey
-        TeleDevices.EmergencyStop()
+        TDevices.EmergencyStop()
     Else
-        TeleDevices.LogDebug("Unregistered keypress code: " + KeyCode)
+        TDevices.LogDebug("Unregistered keypress code: " + KeyCode)
     EndIf
 EndEvent
 
@@ -248,7 +256,7 @@ Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form
     If ZadLib == None
         return ; Should not happen
     EndIf
-    TeleDevices.StopHandle(_DeviousDevicesVibrateHandle)
+    TDevices.StopHandle(_DeviousDevicesVibrateHandle)
 EndEvent
 
 
@@ -343,17 +351,17 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
 		return
 	EndIf
 	_InSexlabScene = False
-    TeleDevices.StopHandle(_SexlabSceneVibrationHandle)
+    TDevices.StopHandle(_SexlabSceneVibrationHandle)
 EndEvent
 
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
-	TeleDevices.Vibrate(Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0))
-    ; TeleDevices.LogDebug("OnDeviceActorOrgasm")
+	TDevices.Vibrate(Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0))
+    ; TDevices.LogDebug("OnDeviceActorOrgasm")
 EndEvent
 
 Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
-	TeleDevices.Vibrate(Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0))
-    ; TeleDevices.LogDebug("OnDeviceEdgedActor")
+	TDevices.Vibrate(Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0))
+    ; TDevices.LogDebug("OnDeviceEdgedActor")
 EndEvent
 
 
@@ -399,7 +407,7 @@ Bool Property Ostim_Animation Hidden
             UnregisterForModEvent("OStim_SceneChanged")
             UnregisterForModEvent("OStim_End")
             If _OstimSceneVibrationHandle != -1
-                TeleDevices.StopHandle(_OstimSceneVibrationHandle)
+                TDevices.StopHandle(_OstimSceneVibrationHandle)
             EndIf
             _OstimSceneVibrationHandle = -1
         EndIf
@@ -416,7 +424,7 @@ EndEvent
 
 Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
     If _OstimSceneVibrationHandle != -1
-        TeleDevices.StopHandle(_OstimSceneVibrationHandle)
+        TDevices.StopHandle(_OstimSceneVibrationHandle)
         _OstimSceneVibrationHandle = -1
     EndIf
 EndEvent
@@ -480,7 +488,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
         _OstimSceneVibrationHandle = -1
     EndIf
     If oldHandle != -1
-        TeleDevices.StopHandle(oldHandle)
+        TDevices.StopHandle(oldHandle)
     EndIf
 EndEvent
 
@@ -759,17 +767,17 @@ EndEvent
 Int _ToysFondleHandle = -1
 Event OnToysFondleStart(string eventName, string argString, float argNum, form sender)
     ; Fondle started - successfully increased rousing
-	_ToysFondleHandle = TeleDevices.Vibrate(40, -1)
+	_ToysFondleHandle = TDevices.Vibrate(40, -1)
 EndEvent
 
 Event OnToysFondleEnd(string eventName, string argString, float argNum, form sender)
     ; Fondle animation has ended (no player controls locking). Anim duration is 10 to 18 seconds.
-	TeleDevices.StopHandle(_ToysFondleHandle)
+	TDevices.StopHandle(_ToysFondleHandle)
 EndEvent
 
 Event OnToysSquirt(string eventName, string argString, float argNum, form sender)
     ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
-	TeleDevices.Vibrate(100, 12.0)
+	TDevices.Vibrate(100, 12.0)
 EndEvent
 
 Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bool playerConsent, Form actInPos1, Form actInPos2, Form actInPos3, Form actInPos4, Form actInPos5)
@@ -811,38 +819,38 @@ EndFunction
 
 Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
     _InToysScene = false
-    TeleDevices.StopHandle(_ToysSceneVibrationHandle)
+    TDevices.StopHandle(_ToysSceneVibrationHandle)
 EndEvent
 
 Event OnToysClimax(string eventName, string argString, float argNum, form sender)
     ; Simultaneous Orgasm. Both player & NPC have climaxed. This can happen multiple times. Sent in addition to other climax events. This event always first
-	TeleDevices.Vibrate(80, 5)
+	TDevices.Vibrate(80, 5)
 EndEvent
 
 Event OnToysClimaxSimultaneous(string eventName, string argString, float argNum, form sender)
-	TeleDevices.Vibrate(100, 7)
+	TDevices.Vibrate(100, 7)
 EndEvent
 
 Event OnToysDenied(string eventName, string argString, float argNum, form sender)
-	TeleDevices.Vibrate(0, 7)
+	TDevices.Vibrate(0, 7)
 EndEvent
 
 Event OnToysVaginalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Vaginal"
-    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
+    TDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
 EndEvent
 
 Event OnToysAnalPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Anal"
-    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
+    TDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
 EndEvent
 
 Event OnToysOralPenetration(string eventName, string argString, float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Oral"
-    TeleDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
+    TDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
 EndEvent
 
             
@@ -884,5 +892,9 @@ Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender
     String[] evts = new String[1]
     evts[0] = Chainbeasts_Vibrate_Event
     StartVibration(Chainbeasts_Vibrate_DeviceSelector, 3, Chainbeasts_Vibrate_Pattern, Chainbeasts_Vibrate_Funscript, Chainbeasts_Vibrate_Linear_Strength, evts)
-	; TeleDevices.LogDebug("OnSCB_VibeEvent")
+	; TDevices.LogDebug("OnSCB_VibeEvent")
 EndEvent
+
+; Depracted
+
+Tele_Devices Property TeleDevices Auto

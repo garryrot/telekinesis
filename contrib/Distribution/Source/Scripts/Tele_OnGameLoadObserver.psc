@@ -12,38 +12,38 @@ Event OnPlayerLoadGame()
 EndEvent
 
 Function LoadTelekinesis(Tele_Devices devices)
-    Tele_Integration teleIntegration = GetOwningQuest() as Tele_Integration
+    Tele_Integration integration = GetOwningQuest() as Tele_Integration
 
     If Game.GetModByName("Devious Devices - Expansion.esm") != 255
-        teleIntegration.ZadLib = Quest.GetQuest("zadQuest")
+        integration.ZadLib = Quest.GetQuest("zadQuest")
     Else
-        teleIntegration.ZadLib = None
+        integration.ZadLib = None
     EndIf
 
     If Game.GetModByName("SexLab.esm") != 255
-        teleIntegration.SexLab = Quest.GetQuest("SexLabQuestFramework")
+        integration.SexLab = Quest.GetQuest("SexLabQuestFramework")
     Else
-        teleIntegration.SexLab = None
+        integration.SexLab = None
     EndIf
 
     If Game.GetModByName("Toys.esm") != 255
-        teleIntegration.Toys = Quest.GetQuest("ToysFramework")
+        integration.Toys = Quest.GetQuest("ToysFramework")
     Else
-        teleIntegration.Toys = None
+        integration.Toys = None
     EndIf
 
     If Game.GetModByName("SexLabAroused.esm") != 255
-        teleIntegration.SexLabAroused = Quest.GetQuest("sla_Framework")
+        integration.SexLabAroused = Quest.GetQuest("sla_Framework")
     Else
-        teleIntegration.SexLabAroused = None
+        integration.SexLabAroused = None
     EndIf
        
     If Game.GetModByName("OStim.esp") != 255
-        teleIntegration.OStim = OUtils.GetOStim() as Quest
+        integration.OStim = OUtils.GetOStim() as Quest
     Else
-        teleIntegration.OStim = None
+        integration.OStim = None
     EndIf
-
-    teleIntegration.PlayerRef = Game.GetPlayer()
+    
+    integration.PlayerRef = Game.GetPlayer()
     devices.ConnectAndScanForDevices()
 EndFunction

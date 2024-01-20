@@ -1,7 +1,24 @@
 ScriptName Tele_MCM extends SKI_ConfigBase 
 
-Tele_Devices Property TeleDevices Auto
-Tele_Integration Property TeleIntegration Auto
+Tele_Integration _TIntegration = None
+Tele_Integration Property TIntegration Hidden
+    Tele_Integration Function Get()
+        If (_TIntegration == None)
+            _TIntegration = (self as Quest) as Tele_Integration
+        Endif
+        return _TIntegration
+    EndFunction 
+EndProperty
+
+Tele_Devices _TDevices = None
+Tele_Devices Property TDevices Hidden
+    Tele_Devices Function Get()
+        If (_TDevices == None)
+            _TDevices = (self as Quest) as Tele_Devices
+        Endif
+        return _TDevices
+    EndFunction
+EndProperty 
 
 String[] _ConnectionMenuOptions
 String[] _DeviceSelectorOptions ; 0 = All, 1 = Match Tags
@@ -30,20 +47,20 @@ EndEvent
 
 Event OnVersionUpdate(int aVersion)
     If CurrentVersion < aVersion
-        TeleDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + aVersion)
+        TDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + aVersion)
     EndIf
 
     If CurrentVersion > 0 && CurrentVersion < 10
         ; Update from 1.0.0 Beta
-        TeleIntegration.ResetIntegrationSettings()
+        TIntegration.ResetIntegrationSettings()
     EndIf
 
     If CurrentVersion < 12
         ; Update from 1.1.0
         InitLocals()
-        TeleDevices.LogDebug("Resetting device settings, please re-enable them.")
-        TeleDevices.MigrateToV12()
-        TeleIntegration.MigrateToV12()
+        TDevices.LogDebug("Resetting device settings, please re-enable them.")
+        TDevices.MigrateToV12()
+        TIntegration.MigrateToV12()
     EndIf
 EndEvent
 
@@ -98,48 +115,48 @@ Event OnPageReset(String page)
     If page == "General" || page == ""
         SetCursorFillMode(TOP_TO_BOTTOM)
 
-        AddTextOption("Version", TeleDevices.Version, OPTION_FLAG_DISABLED)
+        AddTextOption("Version", TDevices.Version, OPTION_FLAG_DISABLED)
         If ! Tele_Api.Loaded()
             AddTextOption("Connction", "SKSE plugin not loaded", OPTION_FLAG_DISABLED)
             return
         EndIf
 
         AddHeaderOption("Connection")
-        AddMenuOptionST("CONNECTION_MENU", "Connection", _ConnectionMenuOptions[TeleDevices.ConnectionType])
+        AddMenuOptionST("CONNECTION_MENU", "Connection", _ConnectionMenuOptions[TDevices.ConnectionType])
         Int connection_ws_flags = OPTION_FLAG_DISABLED
-        If (TeleDevices.ConnectionType == 1)
+        If (TDevices.ConnectionType == 1)
             connection_ws_flags = OPTION_FLAG_NONE
         EndIf
 
-        String status = TeleDevices.GetConnectionStatus()
+        String status = TDevices.GetConnectionStatus()
         If status == "Failed"
             status = "<font color='#fc0303'>Failed</font>" 
         EndIf
         AddTextOptionST("CONNECTION_STATUS", "Status", status)
-        AddInputOptionST("CONNECTION_HOST", "Intiface Host", TeleDevices.WsHost, connection_ws_flags)
-        AddInputOptionST("CONNECTION_PORT", "Intiface Port", TeleDevices.WsPort, connection_ws_flags)
+        AddInputOptionST("CONNECTION_HOST", "Intiface Host", TDevices.WsHost, connection_ws_flags)
+        AddInputOptionST("CONNECTION_PORT", "Intiface Port", TDevices.WsPort, connection_ws_flags)
         AddTextOptionST("ACTION_RECONNECT", "Reconnect...", "Click me")
 
         AddHeaderOption("Emergency")
         AddTextOptionST("EMERGENCY_STOP", "Stop all devices", "Click me")
-        AddKeyMapOptionST("EMERGENCY_HOTKEY", "'Stop all' hotkey",  TeleIntegration.EmergencyHotkey)
+        AddKeyMapOptionST("EMERGENCY_HOTKEY", "'Stop all' hotkey",  TIntegration.EmergencyHotkey)
 
         SetCursorPosition(1)
         AddEmptyOption()
     EndIf
     If page == "Devices"
         SetCursorFillMode(TOP_TO_BOTTOM)
-        If ! TeleDevices.Connects()
+        If ! TDevices.Connects()
             AddHeaderOption("Connection Disabled...")
             return
         EndIf
   
         AddHeaderOption("Discovery")
-        AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TeleDevices.ScanningForDevices)
+        AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TDevices.ScanningForDevices)
         _DeviceNames = Tele_Api.Qry_Lst("devices")
         Int len = _DeviceNames.Length
         If len > 20
-            TeleDevices.LogError("Too many devices, ignoring some in MCM")
+            TDevices.LogError("Too many devices, ignoring some in MCM")
             len = 20
         EndIf
 
@@ -160,7 +177,7 @@ Event OnPageReset(String page)
                 EndIf
 
                 bool connects = false
-                If TeleDevices.Connects()
+                If TDevices.Connects()
                     connects = Tele_Api.Qry_Bool_1("device.settings.enabled", actuatorId)
                 EndIf
                 _UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), connects, flags)
@@ -177,37 +194,37 @@ Event OnPageReset(String page)
     If page == "Devious Devices"
         SetCursorFillMode(TOP_TO_BOTTOM)
 
-        If TeleIntegration.ZadLib != None
+        If TIntegration.ZadLib != None
             AddHeaderOption("In-Game Vibrators")
-            AddToggleOptionST("OPTION_DEVIOUS_DEVICES_VIBRATE", "Enable Vibrators", TeleIntegration.DeviousDevices_Vibrate)
+            AddToggleOptionST("OPTION_DEVIOUS_DEVICES_VIBRATE", "Enable Vibrators", TIntegration.DeviousDevices_Vibrate)
             Int devious_devices_vibrate_selector_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.DeviousDevices_Vibrate
+            If TIntegration.DeviousDevices_Vibrate
                 devious_devices_vibrate_selector_flag = OPTION_FLAG_NONE
             EndIf
 
             AddHeaderOption("Devices")
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_DeviceSelector], devious_devices_vibrate_selector_flag)
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.DeviousDevices_Vibrate_DeviceSelector], devious_devices_vibrate_selector_flag)
 
             Int devious_devices_vibrate_event_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_DeviceSelector == 1
+            If TIntegration.DeviousDevices_Vibrate && TIntegration.DeviousDevices_Vibrate_DeviceSelector == 1
                 devious_devices_vibrate_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event 'Anal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Anal, devious_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event 'Vaginal Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
-            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event 'Nipple Device'", TeleIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_ANAL", "Event 'Anal Device'", TIntegration.DeviousDevices_Vibrate_Event_Anal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_VAGINAL", "Event 'Vaginal Device'", TIntegration.DeviousDevices_Vibrate_Event_Vaginal, devious_devices_vibrate_event_flag)
+            AddInputOptionST("OPTION_DEVIOUS_EVENT_NIPPLE", "Event 'Nipple Device'", TIntegration.DeviousDevices_Vibrate_Event_Nipple, devious_devices_vibrate_event_flag)
         
             AddHeaderOption("Actions")
             Int devious_devices_vibrate_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.DeviousDevices_Vibrate
+            If TIntegration.DeviousDevices_Vibrate
                 devious_devices_vibrate_pattern_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_Pattern], devious_devices_vibrate_pattern_flag)
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TIntegration.DeviousDevices_Vibrate_Pattern], devious_devices_vibrate_pattern_flag)
         
             Int devious_devices_vibrate_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.DeviousDevices_Vibrate && TeleIntegration.DeviousDevices_Vibrate_Pattern == 1
+            If TIntegration.DeviousDevices_Vibrate && TIntegration.DeviousDevices_Vibrate_Pattern == 1
                 devious_devices_vibrate_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.DeviousDevices_Vibrate_Funscript, devious_devices_vibrate_funscript_flag)
+            AddMenuOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TIntegration.DeviousDevices_Vibrate_Funscript, devious_devices_vibrate_funscript_flag)
             AddTextOptionST("MENU_DEVIOUS_DEVICES_VIBRATE_STRENGTH", "Strength", "Controlled by DD", OPTION_FLAG_DISABLED)
         Else
             AddTextOption("Devious Devices", "Mod not found", OPTION_FLAG_DISABLED)
@@ -216,42 +233,42 @@ Event OnPageReset(String page)
 
     If page == "Sexlab"
         SetCursorFillMode(TOP_TO_BOTTOM)
-        If TeleIntegration.SexLab != None
+        If TIntegration.SexLab != None
             AddHeaderOption("Sexlab Animations")
-            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Enable Vibrators", TeleIntegration.Sexlab_Animation)
+            AddToggleOptionST("OPTION_SEXLAB_ANIMATION", "Enable Vibrators", TIntegration.Sexlab_Animation)
             Int sexlab_animation_selector_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Sexlab_Animation
+            If TIntegration.Sexlab_Animation
                 sexlab_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
             
             AddHeaderOption("Devices")
-            AddMenuOptionST("MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Sexlab_Animation_DeviceSelector], sexlab_animation_selector_flag)
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Sexlab_Animation_DeviceSelector], sexlab_animation_selector_flag)
             AddHeaderOption("Actions")
-            If TeleIntegration.SexLabAroused != None
+            If TIntegration.SexLabAroused != None
                 Int sexlab_animation_rousing_flag = OPTION_FLAG_DISABLED
-                If TeleIntegration.Sexlab_Animation
+                If TIntegration.Sexlab_Animation
                     sexlab_animation_rousing_flag = OPTION_FLAG_NONE
                 EndIf    
-                AddToggleOptionST("OPTION_SEXLAB_ANIMATION_ROUSING", "Arousal = Vibration Strength", TeleIntegration.Sexlab_Animation_Rousing, sexlab_animation_rousing_flag)
+                AddToggleOptionST("OPTION_SEXLAB_ANIMATION_ROUSING", "Arousal = Vibration Strength", TIntegration.Sexlab_Animation_Rousing, sexlab_animation_rousing_flag)
             Else
                 AddTextOption("Arousal = Vibration Strength", "Requires SLA", OPTION_FLAG_DISABLED)
             EndIf
 
             Int sexlab_animation_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Sexlab_Animation
+            If TIntegration.Sexlab_Animation
                 sexlab_animation_pattern_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_SEXLAB_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Sexlab_Animation_Pattern], sexlab_animation_pattern_flag)
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TIntegration.Sexlab_Animation_Pattern], sexlab_animation_pattern_flag)
         
             Int sexlab_animation_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Sexlab_Animation && TeleIntegration.Sexlab_Animation_Pattern == 1
+            If TIntegration.Sexlab_Animation && TIntegration.Sexlab_Animation_Pattern == 1
                 sexlab_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_SEXLAB_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Sexlab_Animation_Funscript, sexlab_animation_funscript_flag)
+            AddMenuOptionST("MENU_SEXLAB_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TIntegration.Sexlab_Animation_Funscript, sexlab_animation_funscript_flag)
         
             AddHeaderOption("Extra Actions")
-            AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Pause on Actor Edge", TeleIntegration.Sexlab_ActorEdge)
-            AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Strong Vibration on Orgasm", TeleIntegration.Sexlab_ActorOrgasm)
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Pause on Actor Edge", TIntegration.Sexlab_ActorEdge)
+            AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Strong Vibration on Orgasm", TIntegration.Sexlab_ActorOrgasm)
         Else
             AddTextOption("Sexlab", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
@@ -259,46 +276,46 @@ Event OnPageReset(String page)
     
     If page == " OStim"
         SetCursorFillMode(TOP_TO_BOTTOM)
-        If TeleIntegration.OStim != None
+        If TIntegration.OStim != None
             AddHeaderOption("Ostim Animations")
-            AddToggleOptionST("OPTION_OSTIM_ANIMATION", "Enable Vibrators", TeleIntegration.Ostim_Animation)
+            AddToggleOptionST("OPTION_OSTIM_ANIMATION", "Enable Vibrators", TIntegration.Ostim_Animation)
             Int ostim_animation_selector_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation
+            If TIntegration.Ostim_Animation
                 ostim_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
 
             AddHeaderOption("Devices")
-            AddMenuOptionST("MENU_OSTIM_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
 
             Int ostim_animation_event_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_DeviceSelector == 1
+            If TIntegration.Ostim_Animation && TIntegration.Ostim_Animation_DeviceSelector == 1
                 ostim_animation_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("OSTIM_EVENT_VAGINAL", "Event Vaginal Stimulation", TeleIntegration.Ostim_Animation_Event_Vaginal, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_ANAL", "Event Anal Stimulation", TeleIntegration.Ostim_Animation_Event_Anal, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_NIPPLE", "Event Nipple Stimulation", TeleIntegration.Ostim_Animation_Event_Nipple, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_PENIS", "Event Penis Stimulation", TeleIntegration.Ostim_Animation_Event_Penis, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_VAGINAL", "Event Vaginal Stimulation", TIntegration.Ostim_Animation_Event_Vaginal, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_ANAL", "Event Anal Stimulation", TIntegration.Ostim_Animation_Event_Anal, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_NIPPLE", "Event Nipple Stimulation", TIntegration.Ostim_Animation_Event_Nipple, ostim_animation_event_flag)
+            AddInputOptionST("OSTIM_EVENT_PENIS", "Event Penis Stimulation", TIntegration.Ostim_Animation_Event_Penis, ostim_animation_event_flag)
             ; Enable for thrusters
-            ; AddInputOptionST("OSTIM_EVENT_PENETRATION", "Event Penetrating", TeleIntegration.Ostim_Animation_Event_Penetration, ostim_animation_event_flag)
+            ; AddInputOptionST("OSTIM_EVENT_PENETRATION", "Event Penetrating", TIntegration.Ostim_Animation_Event_Penetration, ostim_animation_event_flag)
 
             AddHeaderOption("Actions")
             Int ostim_animation_speed_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation
+            If TIntegration.Ostim_Animation
                 ostim_animation_speed_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_OSTIM_ANIMATION_SPEED", "Strength", _OstimSpeedOptions[TeleIntegration.Ostim_Animation_Speed_Control], ostim_animation_speed_flag)
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_SPEED", "Strength", _OstimSpeedOptions[TIntegration.Ostim_Animation_Speed_Control], ostim_animation_speed_flag)
 
             Int ostim_animation_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation
+            If TIntegration.Ostim_Animation
                 ostim_animation_pattern_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_OSTIM_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Ostim_Animation_Pattern], ostim_animation_pattern_flag)
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TIntegration.Ostim_Animation_Pattern], ostim_animation_pattern_flag)
         
             Int ostim_animation_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Ostim_Animation && TeleIntegration.Ostim_Animation_Pattern == 1
+            If TIntegration.Ostim_Animation && TIntegration.Ostim_Animation_Pattern == 1
                 ostim_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_OSTIM_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Ostim_Animation_Funscript, ostim_animation_funscript_flag)
+            AddMenuOptionST("MENU_OSTIM_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TIntegration.Ostim_Animation_Funscript, ostim_animation_funscript_flag)
         Else
             AddTextOption("OStim", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
@@ -306,94 +323,94 @@ Event OnPageReset(String page)
 
     If page == "Toys & Love"
         SetCursorFillMode(TOP_TO_BOTTOM)
-        If TeleIntegration.Toys != None
+        If TIntegration.Toys != None
             AddHeaderOption("In-Game Vibrators")
-            AddToggleOptionST("OPTION_TOYS_VIBRATE", "Enable", TeleIntegration.Toys_Vibrate)    
+            AddToggleOptionST("OPTION_TOYS_VIBRATE", "Enable", TIntegration.Toys_Vibrate)    
 
             AddHeaderOption("Devices")
             Int toys_vibrate_selector_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Vibrate
+            If TIntegration.Toys_Vibrate
                 toys_vibrate_selector_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_TOYS_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Toys_Vibrate_DeviceSelector], toys_vibrate_selector_flag)
+            AddMenuOptionST("MENU_TOYS_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Toys_Vibrate_DeviceSelector], toys_vibrate_selector_flag)
         
             Int toys_vibrate_event_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_DeviceSelector == 1
+            If TIntegration.Toys_Vibrate && TIntegration.Toys_Vibrate_DeviceSelector == 1
                 toys_vibrate_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("INPUT_TOYS_VIBRATE_EVENT", "Match Event", TeleIntegration.Toys_Vibrate_Event, toys_vibrate_event_flag)
+            AddInputOptionST("INPUT_TOYS_VIBRATE_EVENT", "Match Event", TIntegration.Toys_Vibrate_Event, toys_vibrate_event_flag)
         
             AddHeaderOption("Actions")
             Int toys_vibrate_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Vibrate
+            If TIntegration.Toys_Vibrate
                 toys_vibrate_pattern_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_TOYS_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Toys_Vibrate_Pattern], toys_vibrate_pattern_flag)
+            AddMenuOptionST("MENU_TOYS_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TIntegration.Toys_Vibrate_Pattern], toys_vibrate_pattern_flag)
         
             Int toys_vibrate_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Vibrate && TeleIntegration.Toys_Vibrate_Pattern == 1
+            If TIntegration.Toys_Vibrate && TIntegration.Toys_Vibrate_Pattern == 1
                 toys_vibrate_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_TOYS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Toys_Vibrate_Funscript, toys_vibrate_funscript_flag)
+            AddMenuOptionST("MENU_TOYS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TIntegration.Toys_Vibrate_Funscript, toys_vibrate_funscript_flag)
         
             Int toys_vibrate_linear_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Vibrate
+            If TIntegration.Toys_Vibrate
                 toys_vibrate_linear_flag = OPTION_FLAG_NONE
             EndIf
-            AddSliderOptionST("SLIDER_TOYS_VIBRATE_LINEAR_STRENGTH", "Strength", TeleIntegration.Toys_Vibrate_Linear_Strength, "{0}", toys_vibrate_linear_flag)
+            AddSliderOptionST("SLIDER_TOYS_VIBRATE_LINEAR_STRENGTH", "Strength", TIntegration.Toys_Vibrate_Linear_Strength, "{0}", toys_vibrate_linear_flag)
             
             SetCursorPosition(1)
             AddHeaderOption("Love Animations")
-            AddToggleOptionST("OPTION_TOYS_ANIMATION", "Enable", TeleIntegration.Toys_Animation)
+            AddToggleOptionST("OPTION_TOYS_ANIMATION", "Enable", TIntegration.Toys_Animation)
 
             AddHeaderOption("Devices")
             Int toys_animation_selector_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation
+            If TIntegration.Toys_Animation
                 toys_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_TOYS_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Toys_Animation_DeviceSelector], toys_animation_selector_flag)
+            AddMenuOptionST("MENU_TOYS_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Toys_Animation_DeviceSelector], toys_animation_selector_flag)
 
             Int toys_animation_event_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_DeviceSelector == 1
+            If TIntegration.Toys_Animation && TIntegration.Toys_Animation_DeviceSelector == 1
                 toys_animation_event_flag = OPTION_FLAG_NONE
             EndIf
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_VAGINAL", "Event Vaginal Stimulation", TeleIntegration.Toys_Animation_Event_Vaginal, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ANAL", "Event Anal Stimulation", TeleIntegration.Toys_Animation_Event_Anal, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ORAL", "Event Oral Stimulation", TeleIntegration.Toys_Animation_Event_Oral, toys_animation_event_flag)
-            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_NIPPLE", "Event Nipple Stimulation", TeleIntegration.Toys_Animation_Event_Nipple, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_VAGINAL", "Event Vaginal Stimulation", TIntegration.Toys_Animation_Event_Vaginal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ANAL", "Event Anal Stimulation", TIntegration.Toys_Animation_Event_Anal, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_ORAL", "Event Oral Stimulation", TIntegration.Toys_Animation_Event_Oral, toys_animation_event_flag)
+            AddInputOptionST("INPUT_TOYS_ANIMATION_EVENT_NIPPLE", "Event Nipple Stimulation", TIntegration.Toys_Animation_Event_Nipple, toys_animation_event_flag)
 
             AddHeaderOption("Actions")
             Int toys_animation_rousing = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation
+            If TIntegration.Toys_Animation
                 toys_animation_rousing = OPTION_FLAG_NONE
             EndIf
-            AddToggleOptionST("OPTION_TOYS_ANIMATION_ROUSING", "Rousing = Vibration Strength", TeleIntegration.Toys_Animation_Rousing, toys_animation_rousing)
+            AddToggleOptionST("OPTION_TOYS_ANIMATION_ROUSING", "Rousing = Vibration Strength", TIntegration.Toys_Animation_Rousing, toys_animation_rousing)
 
             Int toys_animation_pattern_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation
+            If TIntegration.Toys_Animation
                 toys_animation_pattern_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_TOYS_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Toys_Animation_Pattern], toys_animation_pattern_flag)
+            AddMenuOptionST("MENU_TOYS_ANIMATION_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TIntegration.Toys_Animation_Pattern], toys_animation_pattern_flag)
         
             Int toys_animation_funscript_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation && TeleIntegration.Toys_Animation_Pattern == 1
+            If TIntegration.Toys_Animation && TIntegration.Toys_Animation_Pattern == 1
                 toys_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_TOYS_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Toys_Animation_Funscript, toys_animation_funscript_flag)
+            AddMenuOptionST("MENU_TOYS_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TIntegration.Toys_Animation_Funscript, toys_animation_funscript_flag)
         
             Int toys_animation_linear_flag = OPTION_FLAG_DISABLED
-            If TeleIntegration.Toys_Animation && ! TeleIntegration.Toys_Animation_Rousing && TeleIntegration.Toys_Animation_Pattern == 0
+            If TIntegration.Toys_Animation && ! TIntegration.Toys_Animation_Rousing && TIntegration.Toys_Animation_Pattern == 0
                 toys_animation_linear_flag = OPTION_FLAG_NONE
             EndIf
-            AddSliderOptionST("SLIDER_TOYS_ANIMATION_LINEAR_STRENGTH", "Strength (Linear)", TeleIntegration.Toys_Animation_Linear_Strength, "{0}", toys_animation_linear_flag)
+            AddSliderOptionST("SLIDER_TOYS_ANIMATION_LINEAR_STRENGTH", "Strength (Linear)", TIntegration.Toys_Animation_Linear_Strength, "{0}", toys_animation_linear_flag)
 
             AddHeaderOption("Extra Actions")
-            AddToggleOptionST("OPTION_TOYS_DENIAL", "Pause on Denial", TeleIntegration.Toys_Denial)
-            AddToggleOptionST("OPTION_TOYS_VAGINAL_PENETRATION", "Strong Vaginal Penetration", TeleIntegration.Toys_Vaginal_Penetration)
-            AddToggleOptionST("OPTION_TOYS_ANAL_PENETRATION", "Strong Anal Penetration", TeleIntegration.Toys_Anal_Penetration)
-            AddToggleOptionST("OPTION_TOYS_ORAL_PENETRATION", "Strong Vaginal Penetration", TeleIntegration.Toys_Oral_Penetration)
-            AddToggleOptionST("OPTION_TOYS_FONDLE", "Vibration on Fondle", TeleIntegration.Toys_Fondle)
-            AddToggleOptionST("OPTION_TOYS_SQUIRT", "Vibration on Squirt", TeleIntegration.Toys_Squirt)
+            AddToggleOptionST("OPTION_TOYS_DENIAL", "Pause on Denial", TIntegration.Toys_Denial)
+            AddToggleOptionST("OPTION_TOYS_VAGINAL_PENETRATION", "Strong Vaginal Penetration", TIntegration.Toys_Vaginal_Penetration)
+            AddToggleOptionST("OPTION_TOYS_ANAL_PENETRATION", "Strong Anal Penetration", TIntegration.Toys_Anal_Penetration)
+            AddToggleOptionST("OPTION_TOYS_ORAL_PENETRATION", "Strong Vaginal Penetration", TIntegration.Toys_Oral_Penetration)
+            AddToggleOptionST("OPTION_TOYS_FONDLE", "Vibration on Fondle", TIntegration.Toys_Fondle)
+            AddToggleOptionST("OPTION_TOYS_SQUIRT", "Vibration on Squirt", TIntegration.Toys_Squirt)
         Else
             AddTextOption("Toys & Love", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
@@ -403,39 +420,39 @@ Event OnPageReset(String page)
         SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddHeaderOption("Gemmed Beasts")
-        AddToggleOptionST("OPTION_CHAINBEASTS_VIBRATE", "Enable", TeleIntegration.Chainbeasts_Vibrate)
+        AddToggleOptionST("OPTION_CHAINBEASTS_VIBRATE", "Enable", TIntegration.Chainbeasts_Vibrate)
         Int chainbeasts_vibrate_selector_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Chainbeasts_Vibrate
+        If TIntegration.Chainbeasts_Vibrate
             chainbeasts_vibrate_selector_flag = OPTION_FLAG_NONE
         EndIf
         
         AddHeaderOption("Devices")
-        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector], chainbeasts_vibrate_selector_flag)
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Chainbeasts_Vibrate_DeviceSelector], chainbeasts_vibrate_selector_flag)
 
         Int chainbeasts_vibrate_event_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_DeviceSelector == 1
+        If TIntegration.Chainbeasts_Vibrate && TIntegration.Chainbeasts_Vibrate_DeviceSelector == 1
             chainbeasts_vibrate_event_flag = OPTION_FLAG_NONE
         EndIf
-        AddInputOptionST("INPUT_CHAINBEASTS_VIBRATE_EVENT", "Match Event", TeleIntegration.Chainbeasts_Vibrate_Event, chainbeasts_vibrate_event_flag)
+        AddInputOptionST("INPUT_CHAINBEASTS_VIBRATE_EVENT", "Match Event", TIntegration.Chainbeasts_Vibrate_Event, chainbeasts_vibrate_event_flag)
 
         AddHeaderOption("Action")
         Int chainbeasts_vibrate_pattern_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Chainbeasts_Vibrate
+        If TIntegration.Chainbeasts_Vibrate
             chainbeasts_vibrate_pattern_flag = OPTION_FLAG_NONE
         EndIf
-        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_Pattern], chainbeasts_vibrate_pattern_flag)
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TIntegration.Chainbeasts_Vibrate_Pattern], chainbeasts_vibrate_pattern_flag)
 
         Int chainbeast_vibrate_funscript_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Chainbeasts_Vibrate && TeleIntegration.Chainbeasts_Vibrate_Pattern == 1
+        If TIntegration.Chainbeasts_Vibrate && TIntegration.Chainbeasts_Vibrate_Pattern == 1
             chainbeast_vibrate_funscript_flag = OPTION_FLAG_NONE
         EndIf
-        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TeleIntegration.Chainbeasts_Vibrate_Funscript, chainbeast_vibrate_funscript_flag)
+        AddMenuOptionST("MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TIntegration.Chainbeasts_Vibrate_Funscript, chainbeast_vibrate_funscript_flag)
 
         Int chainbeasts_vibrate_linear_flag = OPTION_FLAG_DISABLED
-        If TeleIntegration.Chainbeasts_Vibrate
+        If TIntegration.Chainbeasts_Vibrate
             chainbeasts_vibrate_linear_flag = OPTION_FLAG_NONE
         EndIf
-	    AddSliderOptionST("SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH", "Strength", TeleIntegration.Chainbeasts_Vibrate_Linear_Strength, "{0}", chainbeasts_vibrate_linear_flag)
+	    AddSliderOptionST("SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH", "Strength", TIntegration.Chainbeasts_Vibrate_Linear_Strength, "{0}", chainbeasts_vibrate_linear_flag)
     EndIf
     
     If page == "Funscript Patterns"
@@ -445,7 +462,6 @@ Event OnPageReset(String page)
         While j < _VibrateFunscriptNames.Length && j < 63
             String vibrate_pattern = _VibrateFunscriptNames[j]
             _TestVibratePatternOid[j] = AddTextOption(vibrate_pattern, "(test me)")
-		    SetTextOptionValue(_TestVibratePatternOid[j], "running...")
             j += 1
         EndWhile
 
@@ -454,8 +470,7 @@ Event OnPageReset(String page)
         Int i = 0
         While i < _StrokeFunscriptNames.Length && i < 63
             String stroker_pattern = _StrokeFunscriptNames[i]
-            _TestStrokePatternOid[j] = AddTextOption(stroker_pattern, "(test me)")
-		    SetTextOptionValue(_TestStrokePatternOid[j], "running...")
+            _TestStrokePatternOid[i] = AddTextOption(stroker_pattern, "(test me)")
             i += 1
         EndWhile
     Endif
@@ -464,10 +479,10 @@ Event OnPageReset(String page)
         SetCursorFillMode(TOP_TO_BOTTOM)
 
         AddHeaderOption("Logging")
-        AddToggleOptionST("OPTION_LOG_CONNECTS", "Device connects/disconnects", TeleDevices.LogDeviceConnects)
-        AddToggleOptionST("OPTION_LOG_EVENTS", "Device Starts Moving", TeleDevices.LogDeviceEvents)
-        AddToggleOptionST("OPTION_LOG_EVENTS_ENDS", "Device Stops Moving", TeleDevices.LogDeviceEvents)
-        AddToggleOptionST("OPTION_LOG_DEBUG", "Other messages", TeleDevices.LogDebugEvents)
+        AddToggleOptionST("OPTION_LOG_CONNECTS", "Device connects/disconnects", TDevices.LogDeviceConnects)
+        AddToggleOptionST("OPTION_LOG_EVENTS", "Device Starts Moving", TDevices.LogDeviceEvents)
+        AddToggleOptionST("OPTION_LOG_EVENTS_ENDS", "Device Stops Moving", TDevices.LogDeviceEvents)
+        AddToggleOptionST("OPTION_LOG_DEBUG", "Other messages", TDevices.LogDebugEvents)
 
         AddHeaderOption("Spells")
         AddToggleOptionST("ACTION_ADD_SPELLS_TO_PLAYER", "Learn debug spells", _DebugSpellsAdded)
@@ -484,21 +499,21 @@ EndEvent
 ; General
 State CONNECTION_MENU
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleDevices.ConnectionType)
+        SetMenuDialogStartIndex(TDevices.ConnectionType)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_ConnectionMenuOptions)
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleDevices.ConnectionType = index
+        TDevices.ConnectionType = index
         SetMenuOptionValueST(_ConnectionMenuOptions[index])
         Debug.MessageBox("Please reconnect now!")
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleDevices.ConnectionType = 0
-        SetMenuOptionValueST(_ConnectionMenuOptions[TeleDevices.ConnectionType])
+        TDevices.ConnectionType = 0
+        SetMenuOptionValueST(_ConnectionMenuOptions[TDevices.ConnectionType])
     EndEvent
 
     Event OnHighlightST()
@@ -516,9 +531,9 @@ State CONNECTION_STATUS
 
     Event OnHighlightST()
         String errorDetails = ""
-        String status = TeleDevices.GetConnectionStatus()
+        String status = TDevices.GetConnectionStatus()
         If status == "Failed"
-            errorDetails = "\nConnection failed, double check parameters or check 'My Games/Skyrim Special Edition/SKSE/Telekinesis.log' \nError: " + TeleDevices.ConnectionErrorDetails
+            errorDetails = "\nConnection failed, double check parameters or check 'My Games/Skyrim Special Edition/SKSE/Telekinesis.log' \nError: " + TDevices.ConnectionErrorDetails
         EndIf
         SetInfoText("Connection Status: " + status + errorDetails)
     EndEvent
@@ -526,11 +541,11 @@ EndState
 
 State CONNECTION_HOST
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleDevices.WsHost)
+		SetInputDialogStartText(TDevices.WsHost)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleDevices.WsHost = value
+		TDevices.WsHost = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -541,11 +556,11 @@ EndState
 
 State CONNECTION_PORT
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleDevices.WsPort)
+		SetInputDialogStartText(TDevices.WsPort)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleDevices.WsPort = value
+		TDevices.WsPort = value
         Tele_Api.Cmd_1("connection.websocket", "127.0.0.1:12345")
 		SetInputOptionValueST(value)
 	EndEvent
@@ -558,7 +573,7 @@ EndState
 State ACTION_RECONNECT
     Event OnSelectST()
         SetTextOptionValueST("Reconnecting now...")
-        TeleDevices.Reconnect()
+        TDevices.Reconnect()
     EndEvent
 
     Event OnHighlightST()
@@ -579,13 +594,13 @@ EndState
 
 State EMERGENCY_HOTKEY
     Event OnKeyMapChangeST(int newKeyCode, string conflictControl, string conflictName)
-        TeleIntegration.EmergencyHotkey = newKeyCode
-        SetKeyMapOptionValueST(TeleIntegration.EmergencyHotkey)
+        TIntegration.EmergencyHotkey = newKeyCode
+        SetKeyMapOptionValueST(TIntegration.EmergencyHotkey)
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.EmergencyHotkey = TeleIntegration.EmergencyHotkey_Default
-        SetKeyMapOptionValueST(TeleIntegration.EmergencyHotkey)
+        TIntegration.EmergencyHotkey = TIntegration.EmergencyHotkey_Default
+        SetKeyMapOptionValueST(TIntegration.EmergencyHotkey)
     EndEvent
 
     Event OnHighlightST()
@@ -597,18 +612,18 @@ EndState
 
 State ACTION_SCAN_FOR_DEVICES
     Event OnSelectST()
-        If TeleDevices.ScanningForDevices
+        If TDevices.ScanningForDevices
             Tele_Api.Cmd("stop_scan")
         Else
             Tele_Api.Cmd("start_scan")
         EndIf
-        TeleDevices.ScanningForDevices = !TeleDevices.ScanningForDevices
-        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+        TDevices.ScanningForDevices = !TDevices.ScanningForDevices
+        SetToggleOptionValueST(TDevices.ScanningForDevices)
     EndEvent
     
     Event OnDefaultST()
-        TeleDevices.ScanningForDevices = true
-        SetToggleOptionValueST(TeleDevices.ScanningForDevices)
+        TDevices.ScanningForDevices = true
+        SetToggleOptionValueST(TDevices.ScanningForDevices)
     EndEvent
 
     Event OnHighlightST()
@@ -620,14 +635,14 @@ EndState
 
 State OPTION_DEVIOUS_DEVICES_VIBRATE
     Event OnSelectST()
-        TeleIntegration.DeviousDevices_Vibrate = !TeleIntegration.DeviousDevices_Vibrate
-        SetToggleOptionValueST(TeleIntegration.DeviousDevices_Vibrate)
+        TIntegration.DeviousDevices_Vibrate = !TIntegration.DeviousDevices_Vibrate
+        SetToggleOptionValueST(TIntegration.DeviousDevices_Vibrate)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.DeviousDevices_Vibrate = TeleIntegration.DeviousDevices_Vibrate_Default
-        SetToggleOptionValueST(TeleIntegration.DeviousDevices_Vibrate)
+        TIntegration.DeviousDevices_Vibrate = TIntegration.DeviousDevices_Vibrate_Default
+        SetToggleOptionValueST(TIntegration.DeviousDevices_Vibrate)
         ForcePageReset()
     EndEvent
 
@@ -638,20 +653,20 @@ EndState
 
 State MENU_DEVIOUS_DEVICES_VIBRATE_DEVICE_SELECTOR
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.DeviousDevices_Vibrate_DeviceSelector)
+        SetMenuDialogStartIndex(TIntegration.DeviousDevices_Vibrate_DeviceSelector)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_DeviceSelectorOptions)
     EndEvent
 
     event OnMenuAcceptST(int index)
-        TeleIntegration.DeviousDevices_Vibrate_DeviceSelector = index
+        TIntegration.DeviousDevices_Vibrate_DeviceSelector = index
         SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.DeviousDevices_Vibrate_DeviceSelector = TeleIntegration.DeviousDevices_Vibrate_DeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.DeviousDevices_Vibrate_DeviceSelector])
+        TIntegration.DeviousDevices_Vibrate_DeviceSelector = TIntegration.DeviousDevices_Vibrate_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.DeviousDevices_Vibrate_DeviceSelector])
         ForcePageReset()
     EndEvent
 
@@ -663,11 +678,11 @@ EndState
 
 State OPTION_DEVIOUS_EVENT_ANAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.DeviousDevices_Vibrate_Event_Anal)
+		SetInputDialogStartText(TIntegration.DeviousDevices_Vibrate_Event_Anal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.DeviousDevices_Vibrate_Event_Anal = value
+		TIntegration.DeviousDevices_Vibrate_Event_Anal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -678,11 +693,11 @@ EndState
 
 State OPTION_DEVIOUS_EVENT_NIPPLE
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.DeviousDevices_Vibrate_Event_Nipple)
+		SetInputDialogStartText(TIntegration.DeviousDevices_Vibrate_Event_Nipple)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.DeviousDevices_Vibrate_Event_Nipple = value
+		TIntegration.DeviousDevices_Vibrate_Event_Nipple = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -693,11 +708,11 @@ EndState
 
 State OPTION_DEVIOUS_EVENT_VAGINAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal)
+		SetInputDialogStartText(TIntegration.DeviousDevices_Vibrate_Event_Vaginal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.DeviousDevices_Vibrate_Event_Vaginal = value
+		TIntegration.DeviousDevices_Vibrate_Event_Vaginal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -714,7 +729,7 @@ State MENU_DEVIOUS_DEVICES_VIBRATE_PATTERN
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.DeviousDevices_Vibrate_Pattern = index
+        TIntegration.DeviousDevices_Vibrate_Pattern = index
         SetMenuOptionValueST(_PatternSelectorOptions[index])
         ForcePageReset()
     EndEvent
@@ -737,7 +752,7 @@ State MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.DeviousDevices_Vibrate_Funscript = _VibrateFunscriptNames[index]
+        TIntegration.DeviousDevices_Vibrate_Funscript = _VibrateFunscriptNames[index]
         SetMenuOptionValueST(_VibrateFunscriptNames[index])
     EndEvent
 
@@ -754,14 +769,14 @@ EndState
 
 State OPTION_SEXLAB_ANIMATION
     Event OnSelectST()
-        TeleIntegration.Sexlab_Animation = !TeleIntegration.Sexlab_Animation
-        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation)
+        TIntegration.Sexlab_Animation = !TIntegration.Sexlab_Animation
+        SetToggleOptionValueST(TIntegration.Sexlab_Animation)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Sexlab_Animation = TeleIntegration.Sexlab_Animation_Default
-        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation)
+        TIntegration.Sexlab_Animation = TIntegration.Sexlab_Animation_Default
+        SetToggleOptionValueST(TIntegration.Sexlab_Animation)
         ForcePageReset()
     EndEvent
 
@@ -772,20 +787,20 @@ EndState
 
 State MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.Sexlab_Animation_DeviceSelector)
+        SetMenuDialogStartIndex(TIntegration.Sexlab_Animation_DeviceSelector)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_DeviceSelectorOptions)
     EndEvent
 
     event OnMenuAcceptST(int index)
-        TeleIntegration.Sexlab_Animation_DeviceSelector = index
+        TIntegration.Sexlab_Animation_DeviceSelector = index
         SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.Sexlab_Animation_DeviceSelector = TeleIntegration.Sexlab_Animation_DeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Sexlab_Animation_DeviceSelector])
+        TIntegration.Sexlab_Animation_DeviceSelector = TIntegration.Sexlab_Animation_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.Sexlab_Animation_DeviceSelector])
         ForcePageReset()
     EndEvent
 
@@ -804,7 +819,7 @@ State MENU_SEXLAB_ANIMATION_PATTERN
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Sexlab_Animation_Pattern = index
+        TIntegration.Sexlab_Animation_Pattern = index
         SetMenuOptionValueST(_PatternSelectorOptions[index])
         ForcePageReset()
     EndEvent
@@ -827,7 +842,7 @@ State MENU_SEXLAB_ANIMATION_FUNSCRIPT
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Sexlab_Animation_Funscript = _VibrateFunscriptNames[index]
+        TIntegration.Sexlab_Animation_Funscript = _VibrateFunscriptNames[index]
         SetMenuOptionValueST(_VibrateFunscriptNames[index])
     EndEvent
 
@@ -842,14 +857,14 @@ EndState
 
 State OPTION_SEXLAB_ANIMATION_ROUSING
     Event OnSelectST()
-        TeleIntegration.Sexlab_Animation_Rousing = !TeleIntegration.Sexlab_Animation_Rousing
-        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation_Rousing)
+        TIntegration.Sexlab_Animation_Rousing = !TIntegration.Sexlab_Animation_Rousing
+        SetToggleOptionValueST(TIntegration.Sexlab_Animation_Rousing)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Sexlab_Animation_Rousing = TeleIntegration.Sexlab_Animation_Rousing_Default
-        SetToggleOptionValueST(TeleIntegration.Sexlab_Animation_Rousing)
+        TIntegration.Sexlab_Animation_Rousing = TIntegration.Sexlab_Animation_Rousing_Default
+        SetToggleOptionValueST(TIntegration.Sexlab_Animation_Rousing)
         ForcePageReset()
     EndEvent
 
@@ -860,13 +875,13 @@ EndState
 
 State OPTION_SEXLAB_ACTOR_ORGASM
     Event OnSelectST()
-        TeleIntegration.Sexlab_ActorOrgasm = !TeleIntegration.Sexlab_ActorOrgasm
-        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorOrgasm)
+        TIntegration.Sexlab_ActorOrgasm = !TIntegration.Sexlab_ActorOrgasm
+        SetToggleOptionValueST(TIntegration.Sexlab_ActorOrgasm)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Sexlab_ActorOrgasm = TeleIntegration.Sexlab_ActorOrgasm_Default
-        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorOrgasm)
+        TIntegration.Sexlab_ActorOrgasm = TIntegration.Sexlab_ActorOrgasm_Default
+        SetToggleOptionValueST(TIntegration.Sexlab_ActorOrgasm)
     EndEvent
 
     Event OnHighlightST()
@@ -876,13 +891,13 @@ EndState
 
 State OPTION_SEXLAB_ACTOR_EDGE
     Event OnSelectST()
-        TeleIntegration.Sexlab_ActorEdge = !TeleIntegration.Sexlab_ActorEdge
-        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorEdge)
+        TIntegration.Sexlab_ActorEdge = !TIntegration.Sexlab_ActorEdge
+        SetToggleOptionValueST(TIntegration.Sexlab_ActorEdge)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Sexlab_ActorEdge = TeleIntegration.Sexlab_ActorEdge_Default
-        SetToggleOptionValueST(TeleIntegration.Sexlab_ActorEdge)
+        TIntegration.Sexlab_ActorEdge = TIntegration.Sexlab_ActorEdge_Default
+        SetToggleOptionValueST(TIntegration.Sexlab_ActorEdge)
     EndEvent
 
     Event OnHighlightST()
@@ -894,14 +909,14 @@ EndState
 
 State OPTION_OSTIM_ANIMATION
     Event OnSelectST()
-        TeleIntegration.Ostim_Animation = !TeleIntegration.Ostim_Animation
-        SetToggleOptionValueST(TeleIntegration.Ostim_Animation)
+        TIntegration.Ostim_Animation = !TIntegration.Ostim_Animation
+        SetToggleOptionValueST(TIntegration.Ostim_Animation)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Ostim_Animation = TeleIntegration.Ostim_Animation_Default
-        SetToggleOptionValueST(TeleIntegration.Ostim_Animation)
+        TIntegration.Ostim_Animation = TIntegration.Ostim_Animation_Default
+        SetToggleOptionValueST(TIntegration.Ostim_Animation)
         ForcePageReset()
     EndEvent
 
@@ -912,20 +927,20 @@ EndState
 
 State MENU_OSTIM_ANIMATION_DEVICE_SELECTOR
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.Ostim_Animation_DeviceSelector)
+        SetMenuDialogStartIndex(TIntegration.Ostim_Animation_DeviceSelector)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_DeviceSelectorOptions)
     EndEvent
 
     event OnMenuAcceptST(int index)
-        TeleIntegration.Ostim_Animation_DeviceSelector = index
+        TIntegration.Ostim_Animation_DeviceSelector = index
         SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.Ostim_Animation_DeviceSelector = TeleIntegration.Ostim_Animation_DeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Ostim_Animation_DeviceSelector])
+        TIntegration.Ostim_Animation_DeviceSelector = TIntegration.Ostim_Animation_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector])
         ForcePageReset()
     EndEvent
 
@@ -944,13 +959,13 @@ State MENU_OSTIM_ANIMATION_SPEED
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Ostim_Animation_Speed_Control = index
+        TIntegration.Ostim_Animation_Speed_Control = index
         SetMenuOptionValueST(_OstimSpeedOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        SetMenuOptionValueST(_OstimSpeedOptions[TeleIntegration.Ostim_Animation_Speed_Control_Default])
+        SetMenuOptionValueST(_OstimSpeedOptions[TIntegration.Ostim_Animation_Speed_Control_Default])
         ForcePageReset()
     EndEvent
 
@@ -970,7 +985,7 @@ State MENU_OSTIM_ANIMATION_PATTERN
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Ostim_Animation_Pattern = index
+        TIntegration.Ostim_Animation_Pattern = index
         SetMenuOptionValueST(_PatternSelectorOptions[index])
         ForcePageReset()
     EndEvent
@@ -993,7 +1008,7 @@ State MENU_OSTIM_ANIMATION_FUNSCRIPT
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Ostim_Animation_Funscript = _VibrateFunscriptNames[index]
+        TIntegration.Ostim_Animation_Funscript = _VibrateFunscriptNames[index]
         SetMenuOptionValueST(_VibrateFunscriptNames[index])
     EndEvent
 
@@ -1008,11 +1023,11 @@ EndState
 
 State OSTIM_EVENT_ANAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Anal)
+		SetInputDialogStartText(TIntegration.Ostim_Animation_Event_Anal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Ostim_Animation_Event_Anal = value
+		TIntegration.Ostim_Animation_Event_Anal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1023,11 +1038,11 @@ EndState
 
 State OSTIM_EVENT_NIPPLE
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Nipple)
+		SetInputDialogStartText(TIntegration.Ostim_Animation_Event_Nipple)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Ostim_Animation_Event_Nipple = value
+		TIntegration.Ostim_Animation_Event_Nipple = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1038,11 +1053,11 @@ EndState
 
 State OSTIM_EVENT_VAGINAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Vaginal)
+		SetInputDialogStartText(TIntegration.Ostim_Animation_Event_Vaginal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Ostim_Animation_Event_Vaginal = value
+		TIntegration.Ostim_Animation_Event_Vaginal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1053,11 +1068,11 @@ EndState
 
 State OSTIM_EVENT_PENETRATION
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Vaginal)
+		SetInputDialogStartText(TIntegration.Ostim_Animation_Event_Vaginal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Ostim_Animation_Event_Vaginal = value
+		TIntegration.Ostim_Animation_Event_Vaginal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1068,11 +1083,11 @@ EndState
 
 State OSTIM_EVENT_PENIS
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Ostim_Animation_Event_Penis)
+		SetInputDialogStartText(TIntegration.Ostim_Animation_Event_Penis)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Ostim_Animation_Event_Penis = value
+		TIntegration.Ostim_Animation_Event_Penis = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1085,14 +1100,14 @@ EndState
 
 State OPTION_TOYS_VIBRATE
     Event OnSelectST()
-        TeleIntegration.Toys_Vibrate = !TeleIntegration.Toys_Vibrate
-        SetToggleOptionValueST(TeleIntegration.Toys_Vibrate)
+        TIntegration.Toys_Vibrate = !TIntegration.Toys_Vibrate
+        SetToggleOptionValueST(TIntegration.Toys_Vibrate)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Vibrate = TeleIntegration.Toys_Vibrate_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Vibrate)
+        TIntegration.Toys_Vibrate = TIntegration.Toys_Vibrate_Default
+        SetToggleOptionValueST(TIntegration.Toys_Vibrate)
         ForcePageReset()
     EndEvent
 
@@ -1103,20 +1118,20 @@ EndState
 
 State MENU_TOYS_VIBRATE_DEVICE_SELECTOR
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.Toys_Vibrate_DeviceSelector)
+        SetMenuDialogStartIndex(TIntegration.Toys_Vibrate_DeviceSelector)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_DeviceSelectorOptions)
     EndEvent
 
     event OnMenuAcceptST(int index)
-        TeleIntegration.Toys_Vibrate_DeviceSelector = index
+        TIntegration.Toys_Vibrate_DeviceSelector = index
         SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.Toys_Vibrate_DeviceSelector = TeleIntegration.Toys_Vibrate_DeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Toys_Vibrate_DeviceSelector])
+        TIntegration.Toys_Vibrate_DeviceSelector = TIntegration.Toys_Vibrate_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.Toys_Vibrate_DeviceSelector])
         ForcePageReset()
     EndEvent
 
@@ -1128,11 +1143,11 @@ EndState
 
 State INPUT_TOYS_VIBRATE_EVENT
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Toys_Vibrate_Event)
+		SetInputDialogStartText(TIntegration.Toys_Vibrate_Event)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Toys_Vibrate_Event = value
+		TIntegration.Toys_Vibrate_Event = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1149,7 +1164,7 @@ State MENU_TOYS_VIBRATE_PATTERN
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Toys_Vibrate_Pattern = index
+        TIntegration.Toys_Vibrate_Pattern = index
         SetMenuOptionValueST(_PatternSelectorOptions[index])
         ForcePageReset()
     EndEvent
@@ -1172,7 +1187,7 @@ State MENU_TOYS_VIBRATE_FUNSCRIPT
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Toys_Vibrate_Funscript = _VibrateFunscriptNames[index]
+        TIntegration.Toys_Vibrate_Funscript = _VibrateFunscriptNames[index]
         SetMenuOptionValueST(_VibrateFunscriptNames[index])
     EndEvent
 
@@ -1187,20 +1202,20 @@ EndState
 
 State SLIDER_TOYS_VIBRATE_LINEAR_STRENGTH
 	Event OnSliderOpenST()
-		SetSliderDialogStartValue(TeleIntegration.Toys_Vibrate_Linear_Strength)
-		SetSliderDialogDefaultValue(TeleIntegration.Toys_Vibrate_Linear_Strength_Default)
+		SetSliderDialogStartValue(TIntegration.Toys_Vibrate_Linear_Strength)
+		SetSliderDialogDefaultValue(TIntegration.Toys_Vibrate_Linear_Strength_Default)
 		SetSliderDialogRange(0, 100)
 		SetSliderDialogInterval(1)
 	EndEvent
 
 	Event OnSliderAcceptST(float value)
-		TeleIntegration.Toys_Vibrate_Linear_Strength = value as int
-		SetSliderOptionValueST(TeleIntegration.Toys_Vibrate_Linear_Strength)
+		TIntegration.Toys_Vibrate_Linear_Strength = value as int
+		SetSliderOptionValueST(TIntegration.Toys_Vibrate_Linear_Strength)
 	EndEvent
 
 	Event OnDefaultST()
-		TeleIntegration.Toys_Vibrate_Linear_Strength = TeleIntegration.Toys_Vibrate_Linear_Strength_Default
-		SetSliderOptionValueST(TeleIntegration.Toys_Vibrate_Linear_Strength)
+		TIntegration.Toys_Vibrate_Linear_Strength = TIntegration.Toys_Vibrate_Linear_Strength_Default
+		SetSliderOptionValueST(TIntegration.Toys_Vibrate_Linear_Strength)
 	EndEvent
 
 	Event OnHighlightST()
@@ -1210,14 +1225,14 @@ EndState
 
 State OPTION_TOYS_ANIMATION
     Event OnSelectST()
-        TeleIntegration.Toys_Animation = !TeleIntegration.Toys_Animation
-        SetToggleOptionValueST(TeleIntegration.Toys_Animation)
+        TIntegration.Toys_Animation = !TIntegration.Toys_Animation
+        SetToggleOptionValueST(TIntegration.Toys_Animation)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Animation = TeleIntegration.Toys_Animation_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Animation)
+        TIntegration.Toys_Animation = TIntegration.Toys_Animation_Default
+        SetToggleOptionValueST(TIntegration.Toys_Animation)
         ForcePageReset()
     EndEvent
 
@@ -1228,20 +1243,20 @@ EndState
 
 State MENU_TOYS_ANIMATION_DEVICE_SELECTOR
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.Toys_Animation_DeviceSelector)
+        SetMenuDialogStartIndex(TIntegration.Toys_Animation_DeviceSelector)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_DeviceSelectorOptions)
     EndEvent
 
     event OnMenuAcceptST(int index)
-        TeleIntegration.Toys_Animation_DeviceSelector = index
+        TIntegration.Toys_Animation_DeviceSelector = index
         SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.Toys_Animation_DeviceSelector = TeleIntegration.Toys_Animation_DeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Toys_Animation_DeviceSelector])
+        TIntegration.Toys_Animation_DeviceSelector = TIntegration.Toys_Animation_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.Toys_Animation_DeviceSelector])
         ForcePageReset()
     EndEvent
 
@@ -1253,11 +1268,11 @@ EndState
 
 State INPUT_TOYS_ANIMATION_EVENT_VAGINAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_Vaginal)
+		SetInputDialogStartText(TIntegration.Toys_Animation_Event_Vaginal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Toys_Animation_Event_Vaginal = value
+		TIntegration.Toys_Animation_Event_Vaginal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1268,11 +1283,11 @@ EndState
 
 State INPUT_TOYS_ANIMATION_EVENT_ORAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_ORAL)
+		SetInputDialogStartText(TIntegration.Toys_Animation_Event_ORAL)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Toys_Animation_Event_ORAL = value
+		TIntegration.Toys_Animation_Event_ORAL = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1283,11 +1298,11 @@ EndState
 
 State INPUT_TOYS_ANIMATION_EVENT_ANAL
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_Anal)
+		SetInputDialogStartText(TIntegration.Toys_Animation_Event_Anal)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Toys_Animation_Event_Anal = value
+		TIntegration.Toys_Animation_Event_Anal = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1298,11 +1313,11 @@ EndState
 
 State INPUT_TOYS_ANIMATION_EVENT_NIPPLE
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Toys_Animation_Event_Nipple)
+		SetInputDialogStartText(TIntegration.Toys_Animation_Event_Nipple)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Toys_Animation_Event_Nipple = value
+		TIntegration.Toys_Animation_Event_Nipple = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1313,14 +1328,14 @@ EndState
 
 State OPTION_TOYS_ANIMATION_ROUSING
     Event OnSelectST()
-        TeleIntegration.Toys_Animation_Rousing = !TeleIntegration.Toys_Animation_Rousing
-        SetToggleOptionValueST(TeleIntegration.Toys_Animation_Rousing)
+        TIntegration.Toys_Animation_Rousing = !TIntegration.Toys_Animation_Rousing
+        SetToggleOptionValueST(TIntegration.Toys_Animation_Rousing)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Animation_Rousing = TeleIntegration.Toys_Animation_Rousing_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Animation_Rousing)
+        TIntegration.Toys_Animation_Rousing = TIntegration.Toys_Animation_Rousing_Default
+        SetToggleOptionValueST(TIntegration.Toys_Animation_Rousing)
         ForcePageReset()
     EndEvent
 
@@ -1337,7 +1352,7 @@ State MENU_TOYS_ANIMATION_PATTERN
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Toys_Animation_Pattern = index
+        TIntegration.Toys_Animation_Pattern = index
         SetMenuOptionValueST(_PatternSelectorOptions[index])
         ForcePageReset()
     EndEvent
@@ -1360,7 +1375,7 @@ State MENU_TOYS_ANIMATION_FUNSCRIPT
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Toys_Animation_Funscript = _VibrateFunscriptNames[index]
+        TIntegration.Toys_Animation_Funscript = _VibrateFunscriptNames[index]
         SetMenuOptionValueST(_VibrateFunscriptNames[index])
     EndEvent
 
@@ -1375,20 +1390,20 @@ EndState
 
 State SLIDER_TOYS_ANIMATION_LINEAR_STRENGTH
 	Event OnSliderOpenST()
-		SetSliderDialogStartValue(TeleIntegration.Toys_Animation_Linear_Strength)
-		SetSliderDialogDefaultValue(TeleIntegration.Toys_Animation_Linear_Strength_Default)
+		SetSliderDialogStartValue(TIntegration.Toys_Animation_Linear_Strength)
+		SetSliderDialogDefaultValue(TIntegration.Toys_Animation_Linear_Strength_Default)
 		SetSliderDialogRange(0, 100)
 		SetSliderDialogInterval(1)
 	EndEvent
 
 	Event OnSliderAcceptST(float value)
-		TeleIntegration.Toys_Animation_Linear_Strength = value as int
-		SetSliderOptionValueST(TeleIntegration.Toys_Animation_Linear_Strength)
+		TIntegration.Toys_Animation_Linear_Strength = value as int
+		SetSliderOptionValueST(TIntegration.Toys_Animation_Linear_Strength)
 	EndEvent
 
 	Event OnDefaultST()
-		TeleIntegration.Toys_Animation_Linear_Strength = TeleIntegration.Toys_Animation_Linear_Strength_Default
-		SetSliderOptionValueST(TeleIntegration.Toys_Animation_Linear_Strength)
+		TIntegration.Toys_Animation_Linear_Strength = TIntegration.Toys_Animation_Linear_Strength_Default
+		SetSliderOptionValueST(TIntegration.Toys_Animation_Linear_Strength)
 	EndEvent
 
 	Event OnHighlightST()
@@ -1398,13 +1413,13 @@ EndState
 
 State OPTION_TOYS_DENIAL
     Event OnSelectST()
-        TeleIntegration.Toys_Denial = !TeleIntegration.Toys_Denial
-        SetToggleOptionValueST(TeleIntegration.Toys_Denial)
+        TIntegration.Toys_Denial = !TIntegration.Toys_Denial
+        SetToggleOptionValueST(TIntegration.Toys_Denial)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Denial = TeleIntegration.Toys_Denial_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Denial)
+        TIntegration.Toys_Denial = TIntegration.Toys_Denial_Default
+        SetToggleOptionValueST(TIntegration.Toys_Denial)
     EndEvent
 
     Event OnHighlightST()
@@ -1414,13 +1429,13 @@ EndState
 
 State OPTION_TOYS_VAGINAL_PENETRATION
     Event OnSelectST()
-        TeleIntegration.Toys_Vaginal_Penetration = !TeleIntegration.Toys_Vaginal_Penetration
-        SetToggleOptionValueST(TeleIntegration.Toys_Vaginal_Penetration)
+        TIntegration.Toys_Vaginal_Penetration = !TIntegration.Toys_Vaginal_Penetration
+        SetToggleOptionValueST(TIntegration.Toys_Vaginal_Penetration)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Vaginal_Penetration = TeleIntegration.Toys_Vaginal_Penetration_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Vaginal_Penetration)
+        TIntegration.Toys_Vaginal_Penetration = TIntegration.Toys_Vaginal_Penetration_Default
+        SetToggleOptionValueST(TIntegration.Toys_Vaginal_Penetration)
     EndEvent
 
     Event OnHighlightST()
@@ -1432,13 +1447,13 @@ EndState
 
 State OPTION_TOYS_ANAL_PENETRATION
     Event OnSelectST()
-        TeleIntegration.Toys_Anal_Penetration = !TeleIntegration.Toys_Anal_Penetration
-        SetToggleOptionValueST(TeleIntegration.Toys_Anal_Penetration)
+        TIntegration.Toys_Anal_Penetration = !TIntegration.Toys_Anal_Penetration
+        SetToggleOptionValueST(TIntegration.Toys_Anal_Penetration)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Anal_Penetration = TeleIntegration.Toys_Anal_Penetration_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Anal_Penetration)
+        TIntegration.Toys_Anal_Penetration = TIntegration.Toys_Anal_Penetration_Default
+        SetToggleOptionValueST(TIntegration.Toys_Anal_Penetration)
     EndEvent
 
     Event OnHighlightST()
@@ -1450,13 +1465,13 @@ EndState
 
 State OPTION_TOYS_ORAL_PENETRATION
     Event OnSelectST()
-        TeleIntegration.Toys_Oral_Penetration = !TeleIntegration.Toys_Oral_Penetration
-        SetToggleOptionValueST(TeleIntegration.Toys_Oral_Penetration)
+        TIntegration.Toys_Oral_Penetration = !TIntegration.Toys_Oral_Penetration
+        SetToggleOptionValueST(TIntegration.Toys_Oral_Penetration)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Oral_Penetration = TeleIntegration.Toys_Oral_Penetration_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Oral_Penetration)
+        TIntegration.Toys_Oral_Penetration = TIntegration.Toys_Oral_Penetration_Default
+        SetToggleOptionValueST(TIntegration.Toys_Oral_Penetration)
     EndEvent
 
     Event OnHighlightST()
@@ -1468,13 +1483,13 @@ EndState
 
 State OPTION_TOYS_FONDLE
     Event OnSelectST()
-        TeleIntegration.Toys_Fondle = !TeleIntegration.Toys_Fondle
-        SetToggleOptionValueST(TeleIntegration.Toys_Fondle)
+        TIntegration.Toys_Fondle = !TIntegration.Toys_Fondle
+        SetToggleOptionValueST(TIntegration.Toys_Fondle)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Fondle = TeleIntegration.Toys_Fondle_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Fondle)
+        TIntegration.Toys_Fondle = TIntegration.Toys_Fondle_Default
+        SetToggleOptionValueST(TIntegration.Toys_Fondle)
     EndEvent
 
     Event OnHighlightST()
@@ -1484,13 +1499,13 @@ EndState
 
 State OPTION_TOYS_SQUIRT
     Event OnSelectST()
-        TeleIntegration.Toys_Squirt = !TeleIntegration.Toys_Squirt
-        SetToggleOptionValueST(TeleIntegration.Toys_Squirt)
+        TIntegration.Toys_Squirt = !TIntegration.Toys_Squirt
+        SetToggleOptionValueST(TIntegration.Toys_Squirt)
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Toys_Squirt = TeleIntegration.Toys_Squirt_Default
-        SetToggleOptionValueST(TeleIntegration.Toys_Squirt)
+        TIntegration.Toys_Squirt = TIntegration.Toys_Squirt_Default
+        SetToggleOptionValueST(TIntegration.Toys_Squirt)
     EndEvent
 
     Event OnHighlightST()
@@ -1502,14 +1517,14 @@ EndState
 
 State OPTION_CHAINBEASTS_VIBRATE
     Event OnSelectST()
-        TeleIntegration.Chainbeasts_Vibrate = !TeleIntegration.Chainbeasts_Vibrate
-        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
+        TIntegration.Chainbeasts_Vibrate = !TIntegration.Chainbeasts_Vibrate
+        SetToggleOptionValueST(TIntegration.Chainbeasts_Vibrate)
         ForcePageReset()
     EndEvent
     
     Event OnDefaultST()
-        TeleIntegration.Chainbeasts_Vibrate = TeleIntegration.Chainbeasts_Vibrate_Default
-        SetToggleOptionValueST(TeleIntegration.Chainbeasts_Vibrate)
+        TIntegration.Chainbeasts_Vibrate = TIntegration.Chainbeasts_Vibrate_Default
+        SetToggleOptionValueST(TIntegration.Chainbeasts_Vibrate)
         ForcePageReset()
     EndEvent
 
@@ -1520,20 +1535,20 @@ EndState
 
 State MENU_CHAINBEASTS_VIBRATE_DEVICE_SELECTOR
     Event OnMenuOpenST()
-        SetMenuDialogStartIndex(TeleIntegration.Chainbeasts_Vibrate_DeviceSelector)
+        SetMenuDialogStartIndex(TIntegration.Chainbeasts_Vibrate_DeviceSelector)
         SetMenuDialogDefaultIndex(0)
         SetMenuDialogOptions(_DeviceSelectorOptions)
     EndEvent
 
     event OnMenuAcceptST(int index)
-        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = index
+        TIntegration.Chainbeasts_Vibrate_DeviceSelector = index
         SetMenuOptionValueST(_DeviceSelectorOptions[index])
         ForcePageReset()
     EndEvent
 
     Event OnDefaultST()
-        TeleIntegration.Chainbeasts_Vibrate_DeviceSelector = TeleIntegration.Chainbeasts_Vibrate_DeviceSelector_Default
-        SetMenuOptionValueST(_DeviceSelectorOptions[TeleIntegration.Chainbeasts_Vibrate_DeviceSelector])
+        TIntegration.Chainbeasts_Vibrate_DeviceSelector = TIntegration.Chainbeasts_Vibrate_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.Chainbeasts_Vibrate_DeviceSelector])
         ForcePageReset()
     EndEvent
 
@@ -1545,11 +1560,11 @@ EndState
 
 State INPUT_CHAINBEASTS_VIBRATE_EVENT
 	Event OnInputOpenST()
-		SetInputDialogStartText(TeleIntegration.Chainbeasts_Vibrate_Event)
+		SetInputDialogStartText(TIntegration.Chainbeasts_Vibrate_Event)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
-		TeleIntegration.Chainbeasts_Vibrate_Event = value
+		TIntegration.Chainbeasts_Vibrate_Event = value
 		SetInputOptionValueST(value)
 	EndEvent
 
@@ -1566,7 +1581,7 @@ State MENU_CHAINBEASTS_VIBRATE_PATTERN
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Chainbeasts_Vibrate_Pattern = index
+        TIntegration.Chainbeasts_Vibrate_Pattern = index
         SetMenuOptionValueST(_PatternSelectorOptions[index])
         ForcePageReset()
     EndEvent
@@ -1589,7 +1604,7 @@ State MENU_CHAINBEASTS_VIBRATE_FUNSCRIPT
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TeleIntegration.Chainbeasts_Vibrate_Funscript = _VibrateFunscriptNames[index]
+        TIntegration.Chainbeasts_Vibrate_Funscript = _VibrateFunscriptNames[index]
         SetMenuOptionValueST(_VibrateFunscriptNames[index])
     EndEvent
 
@@ -1604,20 +1619,20 @@ EndState
 
 State SLIDER_CHAINBEASTS_VIBRATE_LINEAR_STRENGTH
 	Event OnSliderOpenST()
-		SetSliderDialogStartValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
-		SetSliderDialogDefaultValue(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default)
+		SetSliderDialogStartValue(TIntegration.Chainbeasts_Vibrate_Linear_Strength)
+		SetSliderDialogDefaultValue(TIntegration.Chainbeasts_Vibrate_Linear_Strength_Default)
 		SetSliderDialogRange(0, 100)
 		SetSliderDialogInterval(1)
 	EndEvent
 
 	Event OnSliderAcceptST(float value)
-		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = value as int
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
+		TIntegration.Chainbeasts_Vibrate_Linear_Strength = value as int
+		SetSliderOptionValueST(TIntegration.Chainbeasts_Vibrate_Linear_Strength)
 	EndEvent
 
 	Event OnDefaultST()
-		TeleIntegration.Chainbeasts_Vibrate_Linear_Strength = TeleIntegration.Chainbeasts_Vibrate_Linear_Strength_Default
-		SetSliderOptionValueST(TeleIntegration.Chainbeasts_Vibrate_Linear_Strength)
+		TIntegration.Chainbeasts_Vibrate_Linear_Strength = TIntegration.Chainbeasts_Vibrate_Linear_Strength_Default
+		SetSliderOptionValueST(TIntegration.Chainbeasts_Vibrate_Linear_Strength)
 	EndEvent
 
 	Event OnHighlightST()
@@ -1629,12 +1644,12 @@ EndState
 
 State OPTION_LOG_CONNECTS
     Event OnSelectST()
-        TeleDevices.LogDeviceConnects = !TeleDevices.LogDeviceConnects
-        SetToggleOptionValueST(TeleDevices.LogDeviceConnects)
+        TDevices.LogDeviceConnects = !TDevices.LogDeviceConnects
+        SetToggleOptionValueST(TDevices.LogDeviceConnects)
     EndEvent
     
     Event OnDefaultST()
-        SetToggleOptionValueST(TeleDevices.LogDeviceConnects)
+        SetToggleOptionValueST(TDevices.LogDeviceConnects)
     EndEvent
 
     Event OnHighlightST()
@@ -1644,12 +1659,12 @@ EndState
 
 State OPTION_LOG_EVENTS_ENDS
     Event OnSelectST()
-        TeleDevices.LogDeviceEventEnd = !TeleDevices.LogDeviceEventEnd
-        SetToggleOptionValueST(TeleDevices.LogDeviceEventEnd)
+        TDevices.LogDeviceEventEnd = !TDevices.LogDeviceEventEnd
+        SetToggleOptionValueST(TDevices.LogDeviceEventEnd)
     EndEvent
     
     Event OnDefaultST()
-        SetToggleOptionValueST(TeleDevices.LogDeviceEventEnd)
+        SetToggleOptionValueST(TDevices.LogDeviceEventEnd)
     EndEvent
 
     Event OnHighlightST()
@@ -1659,12 +1674,12 @@ EndState
 
 State OPTION_LOG_EVENTS
     Event OnSelectST()
-        TeleDevices.LogDeviceEvents = !TeleDevices.LogDeviceEvents
-        SetToggleOptionValueST(TeleDevices.LogDeviceEvents)
+        TDevices.LogDeviceEvents = !TDevices.LogDeviceEvents
+        SetToggleOptionValueST(TDevices.LogDeviceEvents)
     EndEvent
     
     Event OnDefaultST()
-        SetToggleOptionValueST(TeleDevices.LogDeviceEvents)
+        SetToggleOptionValueST(TDevices.LogDeviceEvents)
     EndEvent
 
     Event OnHighlightST()
@@ -1674,13 +1689,13 @@ EndState
 
 State OPTION_LOG_DEBUG
     Event OnSelectST()
-        TeleDevices.LogDebugEvents = !TeleDevices.LogDebugEvents
-        SetToggleOptionValueST(TeleDevices.LogDebugEvents)
+        TDevices.LogDebugEvents = !TDevices.LogDebugEvents
+        SetToggleOptionValueST(TDevices.LogDebugEvents)
     EndEvent
     
     Event OnDefaultST()
-        TeleDevices.LogDebugEvents = false
-        SetToggleOptionValueST(TeleDevices.LogDebugEvents)
+        TDevices.LogDebugEvents = false
+        SetToggleOptionValueST(TDevices.LogDebugEvents)
     EndEvent
 
     Event OnHighlightST()
@@ -1692,31 +1707,31 @@ State ACTION_ADD_SPELLS_TO_PLAYER
     Event OnSelectST()
         Actor player = Game.GetPlayer()
         If ! _DebugSpellsAdded
-            If ! player.HasSpell(TeleDevices.Tele_VibrateSpellWeak)
-                player.AddSpell(TeleDevices.Tele_VibrateSpellWeak)
+            If ! player.HasSpell(TDevices.Tele_VibrateSpellWeak)
+                player.AddSpell(TDevices.Tele_VibrateSpellWeak)
             EndIf
-            If ! player.HasSpell(TeleDevices.Tele_VibrateSpellMedium)
-                player.AddSpell(TeleDevices.Tele_VibrateSpellMedium)
+            If ! player.HasSpell(TDevices.Tele_VibrateSpellMedium)
+                player.AddSpell(TDevices.Tele_VibrateSpellMedium)
             EndIf
-            If ! player.HasSpell(TeleDevices.Tele_VibrateSpellStrong)
-                player.AddSpell(TeleDevices.Tele_VibrateSpellStrong)
+            If ! player.HasSpell(TDevices.Tele_VibrateSpellStrong)
+                player.AddSpell(TDevices.Tele_VibrateSpellStrong)
             EndIf
-            If ! player.HasSpell(TeleDevices.Tele_Stop)
-                player.AddSpell(TeleDevices.Tele_Stop)
+            If ! player.HasSpell(TDevices.Tele_Stop)
+                player.AddSpell(TDevices.Tele_Stop)
             EndIf
             _DebugSpellsAdded = true
         Else
-            If player.HasSpell(TeleDevices.Tele_VibrateSpellWeak)
-                player.RemoveSpell(TeleDevices.Tele_VibrateSpellWeak)
+            If player.HasSpell(TDevices.Tele_VibrateSpellWeak)
+                player.RemoveSpell(TDevices.Tele_VibrateSpellWeak)
             EndIf
-            If player.HasSpell(TeleDevices.Tele_VibrateSpellMedium)
-                player.RemoveSpell(TeleDevices.Tele_VibrateSpellMedium)
+            If player.HasSpell(TDevices.Tele_VibrateSpellMedium)
+                player.RemoveSpell(TDevices.Tele_VibrateSpellMedium)
             EndIf
-            If player.HasSpell(TeleDevices.Tele_VibrateSpellStrong)
-                player.RemoveSpell(TeleDevices.Tele_VibrateSpellStrong)
+            If player.HasSpell(TDevices.Tele_VibrateSpellStrong)
+                player.RemoveSpell(TDevices.Tele_VibrateSpellStrong)
             EndIf
-            If player.HasSpell(TeleDevices.Tele_Stop)
-                player.RemoveSpell(TeleDevices.Tele_Stop)
+            If player.HasSpell(TDevices.Tele_Stop)
+                player.RemoveSpell(TDevices.Tele_Stop)
             EndIf
             _DebugSpellsAdded = false
         EndIf
@@ -1790,7 +1805,8 @@ Event OnOptionSelect(int oid)
         If (oid == _TestVibratePatternOid[i])
             String patternName = _VibrateFunscriptNames[i]
             String[] allEvents = new String[1]
-            TeleDevices.VibratePattern(patternName, 100, 30, allEvents)
+            TDevices.VibratePattern(patternName, 100, 30, allEvents)
+		    SetTextOptionValue(_TestVibratePatternOid[i], "running...")
         EndIf
         i += 1
     EndWhile
@@ -1798,7 +1814,8 @@ Event OnOptionSelect(int oid)
     While (i < _TestStrokePatternOid.Length)
         If (oid == _TestStrokePatternOid[i])
             String patternName = _StrokeFunscriptNames[i]
-            Debug.MessageBox("Not supported yet")
+            String[] allEvents = new String[1]
+		    SetTextOptionValue(_TestStrokePatternOid[i], "running...")
         EndIf
         i += 1
     EndWhile
@@ -1847,3 +1864,8 @@ String Function Join(String[] segments, String separator)
     EndWhile
     return joined
 EndFunction
+
+; Deprecated
+
+Tele_Devices Property TeleDevices Auto
+Tele_Integration Property TeleIntegration Auto
