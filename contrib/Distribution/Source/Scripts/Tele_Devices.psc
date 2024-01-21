@@ -118,6 +118,21 @@ Function Disconnect()
     EndIf
 EndFunction
 
+Int Function LinearPattern(String pattern, Int speed, Float duration_sec = -1.0, String[] events)
+    { Move all specified devices for the given duration
+        - Pattern: The name of the funscript (without file ending)
+        - Speed (The speed coefficient in percent, 100 = the original timing of the funscript, 10 = ten times slower) 
+        - Duration_sec (Duratation in seconds. You can specify split seconds)
+        - Move only devices that match the  
+      Returns an Int handle to stop the  early, see StopHandle(Int) }
+    If Connects()
+        Int handle = Tele_Api.Tele_Control("linear.pattern", InRange(speed, 1, 100), duration_sec, pattern, events)
+        Trace("(Linear) speed='" + speed + "' duration='" + duration_sec + "' pattern=" + pattern + " events=" + events + " handle=" + handle)
+        return handle
+    EndIf
+    return -1
+EndFunction
+
 Int Function Vibrate(Int speed, Float duration_sec = -1.0)
     { Vibrate all specified devices for the given duration
         - speed (Percentage from 0=off to 100=full power)
@@ -156,7 +171,7 @@ Int Function VibratePattern(String pattern, Int speed, Float duration_sec = -1.0
 EndFunction
 
 Function UpdateHandle(Int handle, Int speed)
-    { Update the vibration speed of any running scalar task }
+    { Update the vibration strength or movement speed of any running task }
     If Connects()
         Tele_Api.Tele_Update(handle, speed)
     EndIf

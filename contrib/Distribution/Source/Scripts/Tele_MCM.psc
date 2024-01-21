@@ -1815,6 +1815,7 @@ Event OnOptionSelect(int oid)
         If (oid == _TestStrokePatternOid[i])
             String patternName = _StrokeFunscriptNames[i]
             String[] allEvents = new String[1]
+            TDevices.LinearPattern(patternName, 100, 30, allEvents)
 		    SetTextOptionValue(_TestStrokePatternOid[i], "running...")
         EndIf
         i += 1
