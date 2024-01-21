@@ -3,12 +3,13 @@ use std::{sync::Arc, time::Duration};
 use bp_scheduler::actuator::Actuator;
 use buttplug::core::message::ActuatorType;
 use cxx::{CxxString, CxxVector};
+use tracing::debug;
 
-use crate::{connection::Task, settings::TkDeviceSettings};
+use crate::settings::TkDeviceSettings;
 
 pub fn sanitize_name_list(list: &[String]) -> Vec<String> {
     list.iter()
-        .map(|e| String::from(e.to_lowercase().trim()))
+        .map(|e| e.to_lowercase().trim().to_owned())
         .collect()
 }
 
@@ -39,44 +40,35 @@ pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {
         .collect()
 }
 
-#[derive(Clone, Debug)]
-pub struct TkParams<'a> {
-    pub selector: Vec<String>,
-    pub task: &'a Task,
-    pub events: Vec<String>,
-}
+pub struct TkParams {}
 
-impl<'a> TkParams<'a> {
+impl TkParams {
     pub fn filter_devices(
-        &self,
         actuators: &[Arc<Actuator>],
+        input_body_parts: &[String],
         actuator_types: &[ActuatorType],
+        device_settings: &[TkDeviceSettings]
     ) -> Vec<Arc<Actuator>> {
-        actuators
-            .iter()
-            .filter(|a| {
-                self.selector.iter().any(|x| x == a.identifier())
-                    && a.device.message_attributes().scalar_cmd().is_some()
-            })
-            .filter(|a| actuator_types.iter().any(|x| x == &a.actuator))
-            .cloned()
-            .collect()
+        let body_parts = sanitize_name_list(input_body_parts);
+        let selected = device_settings.iter().filter( |setting| { 
+            if ! setting.enabled {
+                return false;
+            }
+            if body_parts.is_empty() {
+                return true;
+            }
+            setting.events.iter().any( |y| body_parts.contains(y) )
+        }).map( |x| x.actuator_id.to_owned() ).collect::<Vec<String>>();
+        
+        let used = actuators
+                .iter()
+                .filter( |x| actuator_types.iter().any(|y| y == &x.actuator) )
+                .filter( |x| selected.contains( & x.identifier().to_owned() ) )
+                .cloned()
+                .collect();
+        debug!("connected: {:?}", actuators.iter().map( |x| x.identifier() ).collect::<Vec<&str>>());
+        debug!("used: {:?}", used );
+        used
     }
 
-    pub fn from_input(events: Vec<String>, task: &'a Task, devices: &[TkDeviceSettings]) -> Self {
-        let event_names = sanitize_name_list(&events);
-        let actuator_ids = devices
-            .iter()
-            .filter(|d| {
-                d.enabled
-                    && (event_names.is_empty() || d.events.iter().any(|e| event_names.contains(e)))
-            })
-            .map(|d| d.actuator_id.clone())
-            .collect();
-        TkParams {
-            selector: actuator_ids,
-            task,
-            events,
-        }
-    }
 }

@@ -307,7 +307,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
                 None,
-                &[ActuatorType::Vibrate]
+                &[ActuatorType::Vibrate],
             )
         },
         default: ERROR_HANDLE,
@@ -328,16 +328,31 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
                 Some(fscript),
-                &[ActuatorType::Vibrate]
+                &[ActuatorType::Vibrate],
             ),
             None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
     })
-    .def_update(ApiUpdate { 
-        exec: |tk, handle, speed| {
-            tk.update(handle, Speed::new(speed.into()))
-        }
+    .def_control(ApiControl {
+        name: "linear.pattern",
+        exec: |tk, speed, time_sec, pattern_name, events| match read_pattern(
+            &tk.settings.pattern_path,
+            pattern_name,
+            false,
+        ) {
+            Some(fscript) => tk.linear(
+                Task::Linear(Speed::new(speed.into()), pattern_name.into()),
+                get_duration_from_secs(time_sec),
+                read_input_string(events),
+                fscript,
+            ),
+            None => ERROR_HANDLE,
+        },
+        default: ERROR_HANDLE,
+    })
+    .def_update(ApiUpdate {
+        exec: |tk, handle, speed| tk.update(handle, Speed::new(speed.into())),
     })
     .def_stop(ApiStop {
         exec: Telekinesis::stop,
@@ -371,7 +386,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         default: "1",
         exec: |tk, actuator_id| {
             if let Some(actuator) = tk.status.get_actuator(actuator_id) {
-                return (actuator.index_in_device + 1).to_string()
+                return (actuator.index_in_device + 1).to_string();
             }
             "1".into()
         },

@@ -1,10 +1,17 @@
 use std::{
+    fmt::{self, Display},
     sync::Arc,
-    time::Duration, fmt::{Display, self}
+    time::Duration,
 };
 
-use bp_scheduler::{actuator::{Actuator, get_actuators}, speed::Speed};
-use buttplug::{client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent}, core::message::ActuatorType};
+use bp_scheduler::{
+    actuator::{get_actuators, Actuator},
+    speed::Speed,
+};
+use buttplug::{
+    client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent},
+    core::message::ActuatorType,
+};
 use crossbeam_channel::Sender;
 use futures::StreamExt;
 use tokio::runtime::Handle;
@@ -12,7 +19,7 @@ use tracing::{error, info, span, Level};
 
 use crate::settings::TkConnectionType;
 
-/// Global commands on connection level, i.e. connection handling 
+/// Global commands on connection level, i.e. connection handling
 /// or emergency stop
 #[derive(Clone, Debug)]
 pub enum TkCommand {
@@ -25,7 +32,8 @@ pub enum TkCommand {
 #[derive(Clone, Debug)]
 pub enum Task {
     Scalar(Speed),
-    Pattern(Speed, ActuatorType, String)
+    Pattern(Speed, ActuatorType, String),
+    Linear(Speed, String),
 }
 
 #[derive(Clone, Debug)]
@@ -61,8 +69,8 @@ pub async fn handle_connection(
                             let error = err.to_string();
                             error!("connection failure {}", error);
                             let failure = TkConnectionEvent::ConnectionFailure(err.to_string());
-                            try_send_event( &sender_clone, failure.clone() );
-                            try_send_event( &event_sender_internal, failure );
+                            try_send_event(&sender_clone, failure.clone());
+                            try_send_event(&event_sender_internal, failure);
                         } else {
                             let settings = connection_type.to_string();
                             info!(settings, "connection success");
@@ -109,7 +117,7 @@ pub async fn handle_connection(
                 let name = device.name();
                 let index = device.index();
                 let actuators = get_actuators(vec![device.clone()]);
-                info!( name, index, ?actuators, "device connected");
+                info!(name, index, ?actuators, "device connected");
 
                 let added = TkConnectionEvent::DeviceAdded(device);
                 try_send_event(&sender_interla_clone, added.clone());
@@ -118,8 +126,8 @@ pub async fn handle_connection(
             ButtplugClientEvent::DeviceRemoved(device) => {
                 let name = device.name();
                 let index = device.index();
-                info!( name, index, "device disconnected");    
-                
+                info!(name, index, "device disconnected");
+
                 let removed = TkConnectionEvent::DeviceRemoved(device);
                 try_send_event(&sender_interla_clone, removed.clone());
                 try_send_event(&event_sender, removed);
@@ -141,8 +149,9 @@ fn try_send_event(sender: &Sender<TkConnectionEvent>, evt: TkConnectionEvent) {
 impl Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Task::Scalar(speed) => write!(f, "Linear({}%)", speed),
-            Task::Pattern(speed, actuator, pattern) => write!(f, "Pattern({}, {}, {})", speed, actuator, pattern)
+            Task::Scalar(speed) => write!(f, "Constant({}%)", speed),
+            Task::Pattern(speed, actuator, pattern) => write!(f, "Pattern({}, {}, {})", speed, actuator, pattern),
+            Task::Linear(speed, pattern) => write!(f, "Linear({}, {})", speed, pattern),
         }
     }
 }

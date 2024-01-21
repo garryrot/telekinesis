@@ -32,10 +32,10 @@ use tokio::{runtime::Runtime, sync::mpsc::channel};
 use tracing::{debug, error, info};
 
 use crate::connection::Task;
+use crate::input::TkParams;
 use crate::status::Status;
 use crate::{
     connection::{handle_connection, TkCommand, TkConnectionEvent},
-    input::TkParams,
     settings::{TkConnectionType, TkSettings},
 };
 
@@ -117,10 +117,15 @@ impl Telekinesis {
                     TkConnectionType::WebSocket(endpoint),
                 )
             }
-            _ => Telekinesis::connect_with(
+            TkConnectionType::InProcess => Telekinesis::connect_with(
                 || async move { in_process_connector() },
                 Some(settings),
                 TkConnectionType::InProcess,
+            ),
+            TkConnectionType::Test => Telekinesis::connect_with(
+                || async move { FakeDeviceConnector::device_demo().0 },
+                Some(settings),
+                TkConnectionType::Test,
             ),
         }
     }
@@ -143,12 +148,11 @@ impl Telekinesis {
         true
     }
 
-    #[instrument(skip(self, fscript))]
     pub fn vibrate(
         &mut self,
         task: Task,
         duration: Duration,
-        tags: Vec<String>,
+        body_parts: Vec<String>,
         fscript: Option<FScript>,
         actuator_types: &[ActuatorType],
     ) -> i32 {
@@ -156,11 +160,14 @@ impl Telekinesis {
         self.scheduler.clean_finished_tasks();
 
         let task_clone = task.clone();
-        let params = TkParams::from_input(tags.clone(), &task, &self.settings.devices);
         let actuators = self.status.connected_actuators();
-        let player = self
-            .scheduler
-            .create_player(params.filter_devices(&actuators, actuator_types));
+        let player = self.scheduler.create_player(TkParams::filter_devices(
+            &actuators,
+            &body_parts,
+            actuator_types,
+            &self.settings.devices,
+        ));
+
         let handle = player.handle;
         let client_sender_clone = self.client_event_sender.clone();
         let status_sender_clone = self.status_event_sender.clone();
@@ -170,7 +177,7 @@ impl Telekinesis {
                 .send(TkConnectionEvent::ActionStarted(
                     task_clone.clone(),
                     player.actuators.clone(),
-                    tags,
+                    body_parts,
                     player.handle,
                 ))
                 .expect("never full");
@@ -181,6 +188,54 @@ impl Telekinesis {
                         .play_scalar_pattern(duration, fscript.unwrap(), speed)
                         .await
                 }
+                Task::Linear(_, _) => panic!(),
+            };
+            let event = match result {
+                Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
+                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
+            };
+            client_sender_clone.send(event.clone()).expect("never full");
+            status_sender_clone.send(event.clone()).expect("never full");
+        });
+        handle
+    }
+
+    pub fn linear(
+        &mut self,
+        task: Task,
+        duration: Duration,
+        body_parts: Vec<String>,
+        fscript: FScript,
+    ) -> i32 {
+        info!("linear");
+
+        self.scheduler.clean_finished_tasks();
+        let task_clone = task.clone();
+
+        let actuators = self.status.connected_actuators();
+        let player = self.scheduler.create_player(TkParams::filter_devices(
+            &actuators,
+            &body_parts,
+            &[ActuatorType::Position],
+            &self.settings.devices,
+        ));
+        let handle = player.handle;
+
+        let client_sender_clone = self.client_event_sender.clone();
+        let status_sender_clone = self.status_event_sender.clone();
+        self.runtime.spawn(async move {
+            let now = Instant::now();
+            client_sender_clone
+                .send(TkConnectionEvent::ActionStarted(
+                    task_clone.clone(),
+                    player.actuators.clone(),
+                    body_parts,
+                    player.handle,
+                ))
+                .expect("never full");
+            let result = match task {
+                Task::Linear(speed, _) => player.play_linear(duration, fscript, speed).await,
+                _ => panic!(),
             };
             let event = match result {
                 Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
@@ -448,13 +503,17 @@ mod tests {
     #[test]
     #[ignore = "Requires one (1) vibrator to be connected via BTLE (vibrates it)"]
     fn vibrate_pattern() {
-        let (mut tk, handle) = test_pattern("02_Cruel-Tease", Duration::from_secs(10), true );
+        let (mut tk, handle) = test_pattern("02_Cruel-Tease", Duration::from_secs(10), true);
         thread::sleep(Duration::from_secs(2)); // dont disconnect
         tk.stop(handle);
         thread::sleep(Duration::from_secs(10));
     }
 
-    fn test_pattern(pattern_name: &str, duration: Duration, vibration_pattern: bool) -> (Telekinesis, i32) {
+    fn test_pattern(
+        pattern_name: &str,
+        duration: Duration,
+        vibration_pattern: bool,
+    ) -> (Telekinesis, i32) {
         let settings = TkSettings::default();
         let pattern_path =
             String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");

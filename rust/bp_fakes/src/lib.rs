@@ -1,13 +1,16 @@
-use buttplug::{core::{
-    connector::{ButtplugConnector, ButtplugConnectorError, ButtplugConnectorResult},
-    message::*,
-    message::{ActuatorType, ClientDeviceMessageAttributes},
-    message::{self, ButtplugMessage, DeviceList},
-    message::{ButtplugMessageSpecVersion, ServerInfo},
-}, client::{ButtplugClient, ButtplugClientDevice}};
-use buttplug::util::async_manager;
 use buttplug::server::device::configuration::{
     ServerDeviceMessageAttributesBuilder, ServerGenericDeviceMessageAttributes,
+};
+use buttplug::util::async_manager;
+use buttplug::{
+    client::{ButtplugClient, ButtplugClientDevice},
+    core::{
+        connector::{ButtplugConnector, ButtplugConnectorError, ButtplugConnectorResult},
+        message::*,
+        message::{self, ButtplugMessage, DeviceList},
+        message::{ActuatorType, ClientDeviceMessageAttributes},
+        message::{ButtplugMessageSpecVersion, ServerInfo},
+    },
 };
 
 use tokio::sync::mpsc::channel;
@@ -64,11 +67,8 @@ impl FakeMessage {
         match self.message.clone() {
             message::ButtplugSpecV3ClientMessage::ScalarCmd(cmd) => {
                 for (index, expected) in strengths.iter() {
-                    let sub_cmd: &ScalarSubcommand = cmd
-                        .scalars()
-                        .iter()
-                        .find(|x| &x.index() == index)
-                        .unwrap();
+                    let sub_cmd: &ScalarSubcommand =
+                        cmd.scalars().iter().find(|x| &x.index() == index).unwrap();
                     assert_eq!(expected, &sub_cmd.scalar(), "actuator #{}", index);
                     assert_eq!(strengths.len(), cmd.scalars().len(), "same amonut of calls")
                 }
@@ -261,15 +261,6 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
                 // assure that other thread has registered listener when the test devices
                 // are added. Quick and dirty but its just test code anyways
                 sleep(Duration::from_millis(10)).await;
-                for device in devices {
-                    if send
-                        .send(ButtplugSpecV3ServerMessage::DeviceAdded(device))
-                        .await
-                        .is_err()
-                    {
-                        panic!();
-                    }
-                }
             });
             Ok(())
         }
@@ -287,6 +278,8 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
         let msg_id = msg.id();
         let msg_clone = msg.clone();
         let sender = self.server_outbound_sender.clone();
+
+        let devices_added = self.devices.clone();
         match msg {
             ButtplugCurrentSpecClientMessage::RequestServerInfo(_) => async move {
                 sender
@@ -300,8 +293,20 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
             }
             .boxed(),
             ButtplugCurrentSpecClientMessage::RequestDeviceList(_) => async move {
+                let mut device_list = vec![];
+                for device_added in devices_added {
+                    let attributes = device_added.device_messages().clone();
+                    device_list.push(DeviceMessageInfo::new(
+                        device_added.device_index(),
+                        device_added.device_name(),
+                        &None,
+                        &None,
+                        attributes,
+                    ));
+                }
+
                 let mut response: ButtplugSpecV3ServerMessage =
-                    ButtplugSpecV3ServerMessage::DeviceList(DeviceList::new(vec![]));
+                    ButtplugSpecV3ServerMessage::DeviceList(DeviceList::new(device_list));
                 response.set_id(msg_id);
                 sender
                     .send(response)
@@ -447,11 +452,14 @@ pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
     let client = ButtplugClient::new("FakeClient");
     client.connect(connector).await.unwrap();
 
-    if devices_len > 0 {
-        let _ = client.event_stream().next().await.unwrap();
+    let mut devices = vec![];
+    let mut event_stream = client.event_stream();
+    for _ in 0..devices_len {
+        match event_stream.next().await.unwrap() {
+            buttplug::client::ButtplugClientEvent::DeviceAdded(device) => devices.push(device),
+            _ => panic!()
+        };
     }
-
-    let devices = client.devices();
     ButtplugTestClient {
         client,
         call_registry,
@@ -462,7 +470,8 @@ pub async fn get_test_client(devices: Vec<DeviceAdded>) -> ButtplugTestClient {
 impl ButtplugTestClient {
     pub fn get_device(&self, device_id: u32) -> Arc<ButtplugClientDevice> {
         self.created_devices
-            .iter().find(|d| d.index() == device_id)
+            .iter()
+            .find(|d| d.index() == device_id)
             .unwrap()
             .clone()
     }
@@ -476,8 +485,7 @@ impl ButtplugTestClient {
             println!("Device: {}", device.index());
             let call_registry = &self.call_registry;
             for i in 0..call_registry.get_device(device.index()).len() {
-                let fake_call: FakeMessage =
-                    call_registry.get_device(device.index())[i].clone();
+                let fake_call: FakeMessage = call_registry.get_device(device.index())[i].clone();
 
                 let s = self.get_value(&fake_call);
                 let t = (test_start.elapsed() - fake_call.time.elapsed()).as_millis();
@@ -511,9 +519,7 @@ impl ButtplugTestClient {
 #[cfg(test)]
 pub mod tests {
     use buttplug::{
-        client::{
-             LinearCommand, RotateCommand, ScalarCommand,
-        },
+        client::{LinearCommand, RotateCommand, ScalarCommand},
         core::message::ActuatorType,
     };
     use tracing::Level;
