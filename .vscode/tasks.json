@@ -8,7 +8,7 @@
 			"problemMatcher": [
 				"$PapyrusCompiler"
 			],
-			"label": "Compile Papyrus Scripts (Debug)",
+			"label": "Compile Papyrus (Debug)",
 			"group": {
 				"kind": "build"
 			}
@@ -20,7 +20,7 @@
 			"problemMatcher": [
 				"$PapyrusCompiler"
 			],
-			"label": "Compile Papyrus Scripts (Release)",
+			"label": "Compile Papyrus (Release)",
 			"group": {
 				"kind": "build"
 			}
@@ -29,6 +29,11 @@
 			"type": "shell",
 			"label": "Deploy Papyrus Scripts (To Skyrim dir)",
 			"command": "./deploy-scripts-and-run.ps1",
+			"dependsOn": "Compile Papyrus (Release)",
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			}
 		}
 	]
 }
