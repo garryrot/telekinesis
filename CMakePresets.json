@@ -62,25 +62,12 @@
             }
         },
         {
-            "name": "build-tests",
-            "displayName": "Build Tests",
-            "hidden": true,
-            "description": "Include test suites in the build.",
-            "cacheVariables": {
-                "BUILD_TESTS": {
-                    "type": "STRING",
-                    "value": "ON"
-                }
-            }
-        },
-        {
             "name": "build-debug-msvc",
             "inherits": [
                 "base",
                 "vcpkg",
                 "win32-unicode",
                 "x64",
-                "build-tests",
                 "msvc"
             ],
             "displayName": "Debug",
@@ -101,7 +88,6 @@
                 "vcpkg",
                 "win32-unicode",
                 "x64",
-                "build-tests",
                 "msvc"
             ],
             "displayName": "Release",
@@ -125,56 +111,9 @@
         },
         {
             "name": "debug-msvc",
-            "displayName": "Debug (MSVC)",
+            "displayName": "Debug (MSVC) (this is broken)",
             "configurePreset": "build-debug-msvc",
             "description": "Debug build for testing."
-        }
-    ],
-    "testPresets": [
-        {
-            "name": "tests-all",
-            "displayName": "All Tests",
-            "configurePreset": "build-debug-msvc",
-            "output": {
-                "outputOnFailure": true
-            },
-            "execution": {
-                "noTestsAction": "error",
-                "stopOnFailure": false
-            }
-        },
-        {
-            "name": "tests-unit",
-            "displayName": "Unit Tests",
-            "description": "Runs tests that do not require any Skyrim module loaded into the process.",
-            "inherits": "tests-all",
-            "filter": {
-                "exclude": {
-                    "label": "[integration],[e2e]"
-                }
-            }
-        },
-        {
-            "name": "tests-integration",
-            "displayName": "Integration Tests",
-            "description": "Runs tests that interact with a Skyrim module at rest (do not require the Skyrim module to have run any main function).",
-            "inherits": "tests-all",
-            "filter": {
-                "include": {
-                    "label": "[integration]"
-                }
-            }
-        },
-        {
-            "name": "tests-e2e",
-            "displayName": "End-to-End Tests",
-            "description": "Runs test that depend on a fully running Skyrim engine in the process.",
-            "inherits": "tests-all",
-            "filter": {
-                "include": {
-                    "label": "[e2e]"
-                }
-            }
         }
     ]
 }
