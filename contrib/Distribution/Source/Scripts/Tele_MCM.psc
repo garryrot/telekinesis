@@ -23,6 +23,7 @@ EndProperty
 String[] _ConnectionMenuOptions
 String[] _DeviceSelectorOptions ; 0 = All, 1 = Match Tags
 String[] _PatternSelectorOptions
+String[] _PatternSelectorOptionsStroker
 String[] _OstimSpeedOptions
 
 Int[] _UseDeviceOids
@@ -37,7 +38,7 @@ String[] _DeviceNames
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 12
+    return 14
 EndFunction
 
 Event OnConfigInit()
@@ -45,22 +46,28 @@ Event OnConfigInit()
     InitLocals()
 EndEvent
 
-Event OnVersionUpdate(int aVersion)
-    If CurrentVersion < aVersion
-        TDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + aVersion)
+Event OnVersionUpdate(int newVersion)
+    If CurrentVersion < newVersion
+        TDevices.LogDebug("Updating MCM from " + CurrentVersion + " to " + newVersion)
     EndIf
 
-    If CurrentVersion > 0 && CurrentVersion < 10
-        ; Update from 1.0.0 Beta
+    If CurrentVersion > 0 && CurrentVersion < 10 
+        ; Older than 1.0.0 Beta
         TIntegration.ResetIntegrationSettings()
     EndIf
 
-    If CurrentVersion < 12
-        ; Update from 1.1.0
+    If CurrentVersion < 12 
+        ; Older than 1.2.0
         InitLocals()
         TDevices.LogDebug("Resetting device settings, please re-enable them.")
         TDevices.MigrateToV12()
         TIntegration.MigrateToV12()
+    EndIf
+
+    If CurrentVersion < 14
+        ;  Older than 1.3.0
+        InitLocals()
+        TIntegration.InitDefaultListeners()
     EndIf
 EndEvent
 
@@ -90,6 +97,10 @@ Function InitLocals()
     _PatternSelectorOptions[0] = "Linear"
     _PatternSelectorOptions[1] = "Funscript"
     _PatternSelectorOptions[2] = "Random Funscript"
+
+    _PatternSelectorOptionsStroker = new String[2]
+    _PatternSelectorOptionsStroker[0] = "Funscript"
+    _PatternSelectorOptionsStroker[1] = "Random Funscript"
     
     _OstimSpeedOptions = new String[4]
     _OstimSpeedOptions[0] = "Constant"
@@ -240,8 +251,6 @@ Event OnPageReset(String page)
             If TIntegration.Sexlab_Animation
                 sexlab_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
-            
-            AddHeaderOption("Devices")
             AddMenuOptionST("MENU_SEXLAB_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Sexlab_Animation_DeviceSelector], sexlab_animation_selector_flag)
             AddHeaderOption("Actions")
             If TIntegration.SexLabAroused != None
@@ -269,6 +278,39 @@ Event OnPageReset(String page)
             AddHeaderOption("Extra Actions")
             AddToggleOptionST("OPTION_SEXLAB_ACTOR_EDGE", "Pause on Actor Edge", TIntegration.Sexlab_ActorEdge)
             AddToggleOptionST("OPTION_SEXLAB_ACTOR_ORGASM", "Strong Vibration on Orgasm", TIntegration.Sexlab_ActorOrgasm)
+
+            SetCursorPosition(1)
+            AddHeaderOption("")
+            AddToggleOptionST("OPTION_SEXLAB_STROKER", "Enable Strokers", TIntegration.Sexlab_Stroker)
+            Int sexlab_stroker_selector_flag = OPTION_FLAG_DISABLED
+            If TIntegration.Sexlab_Stroker
+                sexlab_stroker_selector_flag = OPTION_FLAG_NONE
+            EndIf
+
+            AddMenuOptionST("MENU_SEXLAB_STROKER_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Sexlab_Stroker_DeviceSelector], sexlab_stroker_selector_flag)
+      
+            AddHeaderOption("Actions")
+            If TIntegration.SexLabAroused != None
+                Int sexlab_stroker_rousing_flag = OPTION_FLAG_DISABLED
+                If TIntegration.Sexlab_Stroker
+                    sexlab_stroker_rousing_flag = OPTION_FLAG_NONE
+                EndIf    
+                AddToggleOptionST("OPTION_SEXLAB_STROKER_ROUSING", "Arousal = Stroker Speed", TIntegration.Sexlab_Stroker_Rousing, sexlab_stroker_rousing_flag)
+            Else
+                AddTextOption("Arousal = Stroker Speed", "Requires SLA", OPTION_FLAG_DISABLED)
+            EndIf
+
+            Int sexlab_stroker_pattern_flag = OPTION_FLAG_DISABLED
+            If TIntegration.Sexlab_Stroker
+                sexlab_stroker_pattern_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_SEXLAB_STROKER_PATTERN", "Stroker Pattern", _PatternSelectorOptionsStroker[TIntegration.Sexlab_Stroker_Pattern], sexlab_stroker_pattern_flag)
+        
+            Int sexlab_stroker_funscript_flag = OPTION_FLAG_DISABLED
+            If TIntegration.Sexlab_Stroker && TIntegration.Sexlab_Stroker_Pattern == 0
+                sexlab_stroker_funscript_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_SEXLAB_STROKER_FUNSCRIPT", "Stroker Funscript", TIntegration.Sexlab_Stroker_Funscript, sexlab_stroker_funscript_flag)
         Else
             AddTextOption("Sexlab", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
@@ -284,19 +326,7 @@ Event OnPageReset(String page)
                 ostim_animation_selector_flag = OPTION_FLAG_NONE
             EndIf
 
-            AddHeaderOption("Devices")
             AddMenuOptionST("MENU_OSTIM_ANIMATION_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
-
-            Int ostim_animation_event_flag = OPTION_FLAG_DISABLED
-            If TIntegration.Ostim_Animation && TIntegration.Ostim_Animation_DeviceSelector == 1
-                ostim_animation_event_flag = OPTION_FLAG_NONE
-            EndIf
-            AddInputOptionST("OSTIM_EVENT_VAGINAL", "Event Vaginal Stimulation", TIntegration.Ostim_Animation_Event_Vaginal, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_ANAL", "Event Anal Stimulation", TIntegration.Ostim_Animation_Event_Anal, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_NIPPLE", "Event Nipple Stimulation", TIntegration.Ostim_Animation_Event_Nipple, ostim_animation_event_flag)
-            AddInputOptionST("OSTIM_EVENT_PENIS", "Event Penis Stimulation", TIntegration.Ostim_Animation_Event_Penis, ostim_animation_event_flag)
-            ; Enable for thrusters
-            ; AddInputOptionST("OSTIM_EVENT_PENETRATION", "Event Penetrating", TIntegration.Ostim_Animation_Event_Penetration, ostim_animation_event_flag)
 
             AddHeaderOption("Actions")
             Int ostim_animation_speed_flag = OPTION_FLAG_DISABLED
@@ -316,6 +346,43 @@ Event OnPageReset(String page)
                 ostim_animation_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_OSTIM_ANIMATION_FUNSCRIPT", "Vibrate Funscript", TIntegration.Ostim_Animation_Funscript, ostim_animation_funscript_flag)
+
+            AddHeaderOption("Body Parts")
+            Int ostim_event_flag = OPTION_FLAG_DISABLED
+            If TIntegration.Ostim_Animation_DeviceSelector == 1 || TIntegration.Ostim_Stroker_DeviceSelector == 1
+                ostim_event_flag = OPTION_FLAG_NONE
+            EndIf
+            AddInputOptionST("OSTIM_EVENT_VAGINAL", "Event Vaginal Stimulation", TIntegration.Ostim_Animation_Event_Vaginal, ostim_event_flag)
+            AddInputOptionST("OSTIM_EVENT_ANAL", "Event Anal Stimulation", TIntegration.Ostim_Animation_Event_Anal, ostim_event_flag)
+            AddInputOptionST("OSTIM_EVENT_NIPPLE", "Event Nipple Stimulation", TIntegration.Ostim_Animation_Event_Nipple, ostim_event_flag)
+   
+            SetCursorPosition(1)
+            AddHeaderOption("")
+            AddToggleOptionST("OPTION_OSTIM_STROKER", "Enable Strokers", TIntegration.Ostim_Stroker)
+            Int ostim_stroker_speed_flag = OPTION_FLAG_DISABLED
+            If TIntegration.Ostim_Stroker
+                ostim_stroker_speed_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_OSTIM_STROKER_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
+
+            AddHeaderOption("Actions")
+            AddMenuOptionST("MENU_OSTIM_STROKER_SPEED", "Speed", _OstimSpeedOptions[TIntegration.Ostim_Animation_Speed_Control], ostim_stroker_speed_flag)
+
+            Int ostim_stroker_pattern_flag = OPTION_FLAG_DISABLED
+            If TIntegration.Ostim_Stroker
+                ostim_stroker_pattern_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_OSTIM_STROKER_PATTERN", "Stroker Pattern", _PatternSelectorOptions[TIntegration.Ostim_Stroker_Pattern], ostim_stroker_pattern_flag)
+        
+            Int ostim_stroker_funscript_flag = OPTION_FLAG_DISABLED
+            If TIntegration.Ostim_Stroker && TIntegration.Ostim_Stroker_Pattern == 0
+                ostim_stroker_funscript_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_OSTIM_STROKER_FUNSCRIPT", "Stroker Funscript", TIntegration.Ostim_Stroker_Funscript, ostim_stroker_funscript_flag)
+
+            AddHeaderOption("")
+            AddInputOptionST("OSTIM_EVENT_PENIS", "Event Penis Stimulation", TIntegration.Ostim_Animation_Event_Penis, ostim_event_flag)
+            AddInputOptionST("OSTIM_EVENT_PENETRATION", "Event Penetrating", TIntegration.Ostim_Animation_Event_Penetration, ostim_event_flag)
         Else
             AddTextOption("OStim", "Mod not found", OPTION_FLAG_DISABLED)
         EndIf
@@ -905,6 +972,112 @@ State OPTION_SEXLAB_ACTOR_EDGE
     EndEvent
 EndState
 
+State OPTION_SEXLAB_STROKER
+    Event OnSelectST()
+        TIntegration.Sexlab_Stroker = !TIntegration.Sexlab_Stroker
+        SetToggleOptionValueST(TIntegration.Sexlab_Stroker)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TIntegration.Sexlab_Stroker = TIntegration.Sexlab_Stroker_Default
+        SetToggleOptionValueST(TIntegration.Sexlab_Stroker)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices during sexlab player animation")
+    EndEvent
+EndState
+
+State MENU_SEXLAB_STROKER_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TIntegration.Sexlab_Stroker_DeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TIntegration.Sexlab_Stroker_DeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TIntegration.Sexlab_Stroker_DeviceSelector = TIntegration.Sexlab_Stroker_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.Sexlab_Stroker_DeviceSelector])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String txt = "Set to 'Match Body Parts' when you only want to move strokers that match any of the sexlab animation tags\n"
+        txt += "Note: Will match any tag, but Anal, Boobjob, Vaginal, Masturbation, Oral are probably the events you want to associate with your devices"
+        SetInfoText(txt)
+    EndEvent
+EndState
+
+State MENU_SEXLAB_STROKER_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptionsStroker)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TIntegration.Sexlab_Stroker_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptionsStroker[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptionsStroker[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Funscript': Stroker is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+State MENU_SEXLAB_STROKER_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_StrokeFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TIntegration.Sexlab_Stroker_Funscript = _StrokeFunscriptNames[index]
+        SetMenuOptionValueST(_StrokeFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_StrokeFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+    EndEvent
+EndState
+
+State OPTION_SEXLAB_STROKER_ROUSING
+    Event OnSelectST()
+        TIntegration.Sexlab_Stroker_Rousing = !TIntegration.Sexlab_Stroker_Rousing
+        SetToggleOptionValueST(TIntegration.Sexlab_Stroker_Rousing)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TIntegration.Sexlab_Stroker_Rousing = TIntegration.Sexlab_Stroker_Rousing_Default
+        SetToggleOptionValueST(TIntegration.Sexlab_Stroker_Rousing)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Vibration strength is controlled by SLA Arousal: 10 = 10% strength, 100 = 100% strength...")
+    EndEvent
+EndState
+
 ; OStim
 
 State OPTION_OSTIM_ANIMATION
@@ -948,6 +1121,102 @@ State MENU_OSTIM_ANIMATION_DEVICE_SELECTOR
         String txt = "By default vibrate 'All' devices on sexual OStim scenes (anything involving vagina,anal,nipple or penis)\n" 
         txt += "'Match Body Parts' will only vibrate devices that match specific body parts (configured below and in 'Devices' Page)\n"
         SetInfoText(txt)
+    EndEvent
+EndState
+
+State MENU_OSTIM_STROKER_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TIntegration.Ostim_Stroker_DeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TIntegration.Ostim_Stroker_DeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TIntegration.Ostim_Stroker_DeviceSelector = TIntegration.Ostim_Stroker_DeviceSelector_Default
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.Ostim_Stroker_DeviceSelector])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String txt = "By default strokes 'All' devices on sexual OStim scenes (anything involving vagina,anal,nipple or penis)\n" 
+        txt += "'Match Body Parts' will only stroke devices that match specific body parts (configured below and in 'Devices' Page)\n"
+        SetInfoText(txt)
+    EndEvent
+EndState
+
+State MENU_OSTIM_STROKER_SPEED
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_OstimSpeedOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TIntegration.Ostim_Stroker_Speed_Control = index
+        SetMenuOptionValueST(_OstimSpeedOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_OstimSpeedOptions[TIntegration.Ostim_Stroker_Speed_Control_Default])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String txt = "Configure dynamic speed based on either animation speed, excitement or both combined. Default: Speed\n"
+        txt += "Speed: Animation Speed 1/4 = 25%, Animation Speed 2/4 = 50%...\n"
+        txt += "Excitement: Excitement 1% = 1%, Excitement 50% = 50%"
+        SetInfoText(txt)
+    EndEvent
+EndState
+
+State MENU_OSTIM_STROKER_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptionsStroker)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TIntegration.Ostim_Stroker_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptionsStroker[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptionsStroker[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+State MENU_OSTIM_STROKER_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_VibrateFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TIntegration.Ostim_Stroker_Funscript = _VibrateFunscriptNames[index]
+        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
     EndEvent
 EndState
 
@@ -1032,7 +1301,7 @@ State OSTIM_EVENT_ANAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game anal stimulation of the player. Default: Anal")
+        SetInfoText("The event that is triggered on in-game anal stimulation of the player. Default: Anal")
     EndEvent
 EndState
 
@@ -1047,7 +1316,7 @@ State OSTIM_EVENT_NIPPLE
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game nipple stimulation of the player. Default: Nipple")
+        SetInfoText("The event that is triggered on in-game nipple stimulation of the player. Default: Nipple")
     EndEvent
 EndState
 
@@ -1062,13 +1331,13 @@ State OSTIM_EVENT_VAGINAL
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game vaginal stimulation of the player. Default: Vaginal")
+        SetInfoText("The event that is triggered for in-game vaginal stimulation of the player. Default: Vaginal")
     EndEvent
 EndState
 
 State OSTIM_EVENT_PENETRATION
 	Event OnInputOpenST()
-		SetInputDialogStartText(TIntegration.Ostim_Animation_Event_Vaginal)
+		SetInputDialogStartText(TIntegration.Ostim_Animation_Event_Penetration)
 	EndEvent
 	
 	Event OnInputAcceptST(String value)
@@ -1077,7 +1346,7 @@ State OSTIM_EVENT_PENETRATION
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered when the player penetrates an in-game character. Default: Penetration")
+        SetInfoText("Triggered when the player penetrates an in-game character, i.e NPC fucking the player. Default: Penetration")
     EndEvent
 EndState
 
@@ -1092,7 +1361,25 @@ State OSTIM_EVENT_PENIS
 	EndEvent
 
     Event OnHighlightST()
-        SetInfoText("The device event that is triggered for in-game penis stimulation of the player, active or passive. Default: Penis")
+        SetInfoText("Triggered on in-game penis stimulation, i.e. Player penetrating an NPC or an NPC pleasuring the player. Default: Penis")
+    EndEvent
+EndState
+
+State OPTION_OSTIM_STROKER
+    Event OnSelectST()
+        TIntegration.Ostim_Stroker = !TIntegration.Ostim_Stroker
+        SetToggleOptionValueST(TIntegration.Ostim_Stroker)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TIntegration.Ostim_Stroker = TIntegration.Ostim_Stroker_Default
+        SetToggleOptionValueST(TIntegration.Ostim_Stroker)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Move devices during OStim player animation")
     EndEvent
 EndState
 

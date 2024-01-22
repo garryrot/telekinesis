@@ -236,21 +236,12 @@ EndFunction
 
 String[] Function GetPatternNames(Bool vibrator)
     If Tele_Api.Loaded()
-        return Tele_Api.Qry_Lst("patterns.vibrator")
+        If vibrator
+            return Tele_Api.Qry_Lst("patterns.vibrator")
+        EndIf
+        return Tele_Api.Qry_Lst("patterns.stroker")
     EndIf
-    
-    String[] defaultPatterns = new String[4]
-    defaultPatterns[0] = "01_Tease"
-    defaultPatterns[1] = "02_Cruel-Tease"
-    defaultPatterns[2] = "03_Wub-Wub-Wub"
-    defaultPatterns[3] = "30_Sawtooth"
-    defaultPatterns[4] = "30_Sawtooth-Fast"
-    defaultPatterns[5] = "31_Sawtooth-Fast"
-    defaultPatterns[6] = "35_On-Off"
-    defaultPatterns[7] = "36_On-Off-Fast"
-    defaultPatterns[8] = "40_Square"
-    defaultPatterns[9] = "50_Sine"
-    return defaultPatterns
+    return new String[1]
 EndFunction
 
 String Function GetRandomPattern(Bool vibrator)

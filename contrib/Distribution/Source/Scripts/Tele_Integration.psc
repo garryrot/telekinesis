@@ -34,11 +34,18 @@ Quest Property OStim Auto Hidden
 
 Event OnInit()
     InitDefaultOnEventHandlers()
+    InitDefaultListeners()
 EndEvent
 
 Event OnUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
+
+Function InitDefaultListeners()
+    InitDeviousDevicesHandlers()
+    InitOstimHandlers()
+    InitSexlabHandlers()
+EndFunction
 
 Function InitDefaultOnEventHandlers()
     EmergencyHotkey = EmergencyHotkey_Default
@@ -48,21 +55,49 @@ Function InitDefaultOnEventHandlers()
 EndFunction
 
 Int _SexlabSceneVibrationHandle = -1
+Int _SexlabSceneStrokerHandle = -1
 Int _OstimSceneVibrationHandle = -1
+Int _OstimSceneStrokerHandle = -1
 Int _ToysSceneVibrationHandle = -1
 
 Function UpdateRousingControlledSexScene()
+    TDevices.LogDebug("UpdateRousingControlledSexScene StrokerHandle: " + _OstimSceneStrokerHandle + " SexlabStroker:" + _SexlabSceneVibrationHandle)
     If _InToysScene
         Int speed = (Toys as ToysFramework).GetRousing()
         TDevices.UpdateHandle(_ToysSceneVibrationHandle, speed)
-    ElseIf _InSexlabScene
+    EndIf
+    If _InSexlabScene && _SexlabSceneVibrationHandle != -1
         Int speed = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
         TDevices.UpdateHandle(_SexlabSceneVibrationHandle, speed)
-	ElseIf _OstimSceneVibrationHandle != -1
+    EndIf
+    If _InSexlabScene && _SexlabSceneStrokerHandle != -1
+        Int speed = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
+        TDevices.UpdateHandle(_SexlabSceneStrokerHandle, speed)
+    EndIf
+    If _OstimSceneVibrationHandle != -1
         Int speed = GetOStimSpeed()
         TDevices.UpdateHandle(_OstimSceneVibrationHandle, speed)
     EndIf
+    If _OstimSceneStrokerHandle != -1
+        Int speed = GetOStimSpeed()
+        If speed < 10
+            speed = 10
+        EndIf
+        TDevices.UpdateHandle(_OstimSceneStrokerHandle, speed)
+    EndIf
     RegisterForSingleUpdate(2)
+EndFunction
+
+Int Function StartStroke(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int speed, String[] evts)
+    TDevices.LogDebug("StartStroke")
+    String[] events = new String[1]
+    If deviceSelector == 1
+        events = evts
+    EndIf
+    If patternType == 1
+        funscript = TDevices.GetRandomPattern(false)
+    EndIf
+    return TDevices.LinearPattern(funscript, speed, duration_sec, events)
 EndFunction
 
 Int Function StartVibration(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int speed, String[] evts)
@@ -100,6 +135,18 @@ Function ResetIntegrationSettings()
     Sexlab_Animation_Linear_Strength = Sexlab_Animation_Linear_Strength_Default
     Sexlab_ActorOrgasm = Sexlab_ActorOrgasm_Default
     Sexlab_ActorEdge = Sexlab_ActorEdge_Default
+    Sexlab_Stroker = Sexlab_Stroker_Default
+    Sexlab_Stroker_DeviceSelector = Sexlab_Stroker_DeviceSelector_Default
+    Sexlab_Stroker_Funscript = Sexlab_Stroker_Funscript_Default
+    Sexlab_Stroker_Pattern = Sexlab_Stroker_Pattern_Default
+    Sexlab_Stroker_Linear_Strength = Sexlab_Stroker_Linear_Strength_Default
+    Ostim_Stroker = Ostim_Stroker_Default
+    Ostim_Stroker_DeviceSelector = Ostim_Stroker_DeviceSelector_Default
+    Ostim_Stroker_Funscript = Ostim_Stroker_Funscript_Default
+    Ostim_Stroker_Speed_Control = Ostim_Stroker_Speed_Control_Default
+    Ostim_Stroker_Pattern = Ostim_Stroker_Pattern_Default
+    Ostim_Stroker_Pattern = Ostim_Stroker_Pattern_Default
+    Ostim_Stroker_Funscript = Ostim_Stroker_Funscript_Default
     Ostim_Animation_Funscript = Ostim_Animation_Funscript_Default
     Ostim_Animation_DeviceSelector = Ostim_Animation_DeviceSelector_Default
     Ostim_Animation_Pattern = Ostim_Animation_Pattern_Default
@@ -198,17 +245,15 @@ Bool Property DeviousDevices_Vibrate_Default = true AutoReadOnly Hidden
 String Property DeviousDevices_Vibrate_Funscript = "30_Sawtooth" Auto Hidden
 String Property DeviousDevices_Vibrate_Funscript_Default = "30_Sawtooth" Auto Hidden
 
+Function InitDeviousDevicesHandlers()
+    RegisterForModEvent("DeviceVibrateEffectStart", "OnVibrateEffectStart")
+    RegisterForModEvent("DeviceVibrateEffectStop", "OnVibrateEffectStop")
+EndFunction
+
 Bool _DeviousDevices_Vibrate = false
 Bool Property DeviousDevices_Vibrate Hidden
     Function Set(Bool enable)
         _DeviousDevices_Vibrate = enable
-        If enable
-            RegisterForModEvent("DeviceVibrateEffectStart", "OnVibrateEffectStart")
-            RegisterForModEvent("DeviceVibrateEffectStop", "OnVibrateEffectStop")
-        Else
-            UnregisterForModEvent("DeviceVibrateEffectStart")
-            UnregisterForModEvent("DeviceVibrateEffectStop")
-        EndIf
     EndFunction
     Bool Function Get()
         return _DeviousDevices_Vibrate
@@ -216,12 +261,13 @@ Bool Property DeviousDevices_Vibrate Hidden
 EndProperty
 
 Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationStrength, Form sender)
+    If !_DeviousDevices_Vibrate || ZadLib == None
+        return
+    EndIf
     If PlayerRef.GetLeveledActorBase().GetName() != actorName
         return ; Not the player
     EndIf
-    If ZadLib == None
-        return ; Should not happen
-    EndIf
+    TDevices.LogDebug("OnVibrateEffectStart"+ eventName + "," + actorName + "," + vibrationStrength + "," + sender)
 
     ; Reverse DD multi device calculation to get the actual strength
     String[] events = new String[3]
@@ -250,12 +296,13 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
 EndEvent
 
 Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form sender)
+    If !_DeviousDevices_Vibrate || ZadLib == None
+        return
+    EndIf
     If PlayerRef.GetLeveledActorBase().GetName() != actorName
         return ; Not the player
     EndIf
-    If ZadLib == None
-        return ; Should not happen
-    EndIf
+    TDevices.LogDebug("OnVibrateEffectStop" + eventName + "," + actorName + "," + argNum + "," + sender)
     TDevices.StopHandle(_DeviousDevicesVibrateHandle)
 EndEvent
 
@@ -279,23 +326,47 @@ Int Property Sexlab_Animation_Pattern = 0 Auto Hidden
 Int Property Sexlab_Animation_Pattern_Default = 0 AutoReadOnly Hidden
 Int Property Sexlab_Animation_Linear_Strength = 80 Auto Hidden
 Int Property Sexlab_Animation_Linear_Strength_Default = 80 AutoReadOnly Hidden
+String Property Sexlab_Stroker_Funscript = "" Auto Hidden
+String Property Sexlab_Stroker_Funscript_Default = "" Auto Hidden
+Int Property Sexlab_Stroker_DeviceSelector = 0 Auto Hidden
+Int Property Sexlab_Stroker_DeviceSelector_Default = 0 AutoReadOnly Hidden
+Bool Property Sexlab_Stroker_Rousing = False Auto Hidden
+Bool Property Sexlab_Stroker_Rousing_Default = False AutoReadOnly Hidden
+Int Property Sexlab_Stroker_Pattern = 0 Auto Hidden
+Int Property Sexlab_Stroker_Pattern_Default = 0 AutoReadOnly Hidden
+Int Property Sexlab_Stroker_Linear_Strength = 80 Auto Hidden
+Int Property Sexlab_Stroker_Linear_Strength_Default = 80 AutoReadOnly Hidden
+
+Function InitSexlabHandlers()
+    RegisterForModEvent("HookAnimationStart", "OnSexlabAnimationStart")
+    RegisterForModEvent("HookAnimationEnd", "OnSexlabAnimationEnd")
+EndFunction
 
 Bool _Sexlab_Animation = false
 Bool Property Sexlab_Animation_Default = true AutoReadOnly Hidden
 Bool Property Sexlab_Animation Hidden
     Function Set(Bool enable)
         _Sexlab_Animation = enable
-        If enable
-            RegisterForModEvent("HookAnimationStart", "OnSexlabAnimationStart")
-            RegisterForModEvent("HookAnimationEnd", "OnSexlabAnimationEnd")
-        Else
+        If !enable
             _InSexlabScene = False
-            UnregisterForModEvent("HookAnimationStart")
-            UnregisterForModEvent("HookAnimationEnd")
         EndIf
     EndFunction
     Bool Function Get()
         return _Sexlab_Animation
+    EndFunction
+EndProperty
+
+Bool _Sexlab_Stroker = false
+Bool Property Sexlab_Stroker_Default = true AutoReadOnly Hidden
+Bool Property Sexlab_Stroker Hidden
+    Function Set(Bool enable)
+        _Sexlab_Stroker = enable
+        If !enable
+            _InSexlabScene = False
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Sexlab_Stroker
     EndFunction
 EndProperty
 
@@ -335,11 +406,24 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
 	If !hasPlayer
 		return
 	EndIf
+    If !Sexlab_Animation && !Sexlab_Stroker
+        return
+    EndIf
+    TDevices.LogDebug("OnSexlabAnimationStart")
     sslThreadController controller = (Sexlab as SexLabFramework).GetController(threadID)
     sslBaseAnimation animation = controller.Animation
 
-    _SexlabSceneVibrationHandle = StartVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, animation.GetTags())
-    If Sexlab_Animation_Rousing
+    If Sexlab_Animation
+        _SexlabSceneVibrationHandle = StartVibration(Sexlab_Animation_DeviceSelector, -1, Sexlab_Animation_Pattern, Sexlab_Animation_Funscript, Sexlab_Animation_Linear_Strength, animation.GetTags())
+    EndIf
+    If Sexlab_Stroker
+        Int speed = Sexlab_Stroker_Linear_Strength
+        If Sexlab_Stroker_Rousing
+            speed = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
+        EndIf
+        _SexlabSceneStrokerHandle = StartStroke(Sexlab_Stroker_DeviceSelector, -1, Sexlab_Stroker_Pattern, Sexlab_Stroker_Funscript, speed, animation.GetTags())
+    EndIf
+    If Sexlab_Animation_Rousing || Sexlab_Stroker_Rousing
         _InSexlabScene = True
         UnregisterForUpdate()
         UpdateRousingControlledSexScene()
@@ -350,18 +434,22 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
 	If !hasPlayer
 		return
 	EndIf
+    TDevices.LogDebug("OnSexlabAnimationEnd")
 	_InSexlabScene = False
-    TDevices.StopHandle(_SexlabSceneVibrationHandle)
+    If _SexlabSceneVibrationHandle != -1
+        TDevices.StopHandle(_SexlabSceneVibrationHandle)
+    EndIf
+    If _SexlabSceneStrokerHandle != -1
+        TDevices.StopHandle(_SexlabSceneStrokerHandle)
+    EndIf
 EndEvent
 
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
 	TDevices.Vibrate(Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0))
-    ; TDevices.LogDebug("OnDeviceActorOrgasm")
 EndEvent
 
 Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
 	TDevices.Vibrate(Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0))
-    ; TDevices.LogDebug("OnDeviceEdgedActor")
 EndEvent
 
 
@@ -392,20 +480,27 @@ String Property Ostim_Animation_Event_Penetration = "Penetration" Auto Hidden
 String Property Ostim_Animation_Event_Penetration_Default = "Penetration" Auto Hidden
 String Property Ostim_Animation_Event_Penis = "Penis" Auto Hidden
 String Property Ostim_Animation_Event_Penis_Default = "Penis" Auto Hidden
+Int Property Ostim_Stroker_DeviceSelector = 0 Auto Hidden
+Int Property Ostim_Stroker_DeviceSelector_Default = 0 AutoReadOnly Hidden
+String Property Ostim_Stroker_Funscript = "" Auto Hidden
+String Property Ostim_Stroker_Funscript_Default = "" AutoReadOnly Hidden
+Int Property Ostim_Stroker_Speed_Control = 1 Auto Hidden
+Int Property Ostim_Stroker_Speed_Control_Default = 1 AutoReadOnly Hidden
+Int Property Ostim_Stroker_Pattern = 0 Auto Hidden
+Int Property Ostim_Stroker_Pattern_Default = 0 AutoReadOnly Hidden
+
+Function InitOstimHandlers()
+    RegisterForModEvent("OStim_Start", "OnOStimStart")
+    RegisterForModEvent("OStim_SceneChanged", "OnOStimSceneChanged")
+    RegisterForModEvent("OStim_End", "OnOstimEnd") 
+EndFunction
 
 Bool _Ostim_Animation = false
 Bool Property Ostim_Animation_Default = true AutoReadOnly Hidden
 Bool Property Ostim_Animation Hidden
     Function Set(Bool enable)
         _Ostim_Animation = enable
-        If enable
-            RegisterForModEvent("OStim_Start", "OnOStimStart")
-            RegisterForModEvent("OStim_SceneChanged", "OnOStimSceneChanged")
-            RegisterForModEvent("OStim_End", "OnOstimEnd") 
-        Else
-            UnregisterForModEvent("OStim_Start")
-            UnregisterForModEvent("OStim_SceneChanged")
-            UnregisterForModEvent("OStim_End")
+        If !enable
             If _OstimSceneVibrationHandle != -1
                 TDevices.StopHandle(_OstimSceneVibrationHandle)
             EndIf
@@ -417,20 +512,48 @@ Bool Property Ostim_Animation Hidden
     EndFunction
 EndProperty
 
+Bool _Ostim_Stroker = false
+Bool Property Ostim_Stroker_Default = false AutoReadOnly Hidden
+Bool Property Ostim_Stroker Hidden
+    Function Set(Bool enable)
+        _Ostim_Stroker = enable
+        If !enable
+            If _OstimSceneStrokerHandle != -1
+                TDevices.StopHandle(_OstimSceneStrokerHandle)
+            EndIf
+            _OstimSceneStrokerHandle = -1
+        EndIf
+    EndFunction
+    Bool Function Get()
+        return _Ostim_Stroker
+    EndFunction
+EndProperty
+
 Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
+    TDevices.LogDebug("OnOStimStart")
     UnregisterForUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
 
 Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
+    TDevices.LogDebug("OnOstimEnd")
     If _OstimSceneVibrationHandle != -1
         TDevices.StopHandle(_OstimSceneVibrationHandle)
         _OstimSceneVibrationHandle = -1
     EndIf
+    If _OstimSceneStrokerHandle != -1
+        TDevices.StopHandle(_OstimSceneStrokerHandle)
+        _OstimSceneStrokerHandle = -1
+    EndIf
+    UnregisterForUpdate()
 EndEvent
 
 Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form sender)
+    TDevices.LogDebug("OnOStimSceneChanged")
     If OThread.GetScene(0) != sceneID
+        return
+    EndIf
+    If ! _Ostim_Animation && ! _Ostim_Stroker 
         return
     EndIf
 
@@ -482,12 +605,27 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     _OstimMaxSpeed = OMetadata.GetMaxSpeed(sceneID)
 
     Int oldHandle = _OstimSceneVibrationHandle
+    Int oldStrokerHandle = _OstimSceneStrokerHandle
+
     If hasVaginalStim || hasAnalStim || hasNippleStim || hasPenisStim || isPenetrated
-        _OstimSceneVibrationHandle = StartVibration(Ostim_Animation_DeviceSelector, -1, Ostim_Animation_Pattern, Ostim_Animation_Funscript, GetOStimSpeed(), evts)
+        If _Ostim_Animation
+            _OstimSceneVibrationHandle = StartVibration(Ostim_Animation_DeviceSelector, -1, Ostim_Animation_Pattern, Ostim_Animation_Funscript, GetOStimSpeed(), evts)
+        EndIf
+        If _Ostim_Stroker
+            Int speed = GetOStimSpeed()
+            If speed < 10
+                speed = 10
+            EndIf
+            _OstimSceneStrokerHandle = StartStroke(Ostim_Animation_DeviceSelector, -1, Ostim_Stroker_Pattern, Ostim_Stroker_Funscript, speed, evts)
+        EndIf
     Else
+        _OstimSceneStrokerHandle = - 1
         _OstimSceneVibrationHandle = -1
     EndIf
     If oldHandle != -1
+        TDevices.StopHandle(oldHandle)
+    EndIf
+    If oldStrokerHandle != -1
         TDevices.StopHandle(oldHandle)
     EndIf
 EndEvent

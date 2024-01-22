@@ -150,7 +150,9 @@ impl Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Task::Scalar(speed) => write!(f, "Constant({}%)", speed),
-            Task::Pattern(speed, actuator, pattern) => write!(f, "Pattern({}, {}, {})", speed, actuator, pattern),
+            Task::Pattern(speed, actuator, pattern) => {
+                write!(f, "Pattern({}, {}, {})", speed, actuator, pattern)
+            }
             Task::Linear(speed, pattern) => write!(f, "Linear({}, {})", speed, pattern),
         }
     }
