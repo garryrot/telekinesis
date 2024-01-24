@@ -372,7 +372,7 @@ Event OnPageReset(String page)
             If TIntegration.Ostim_Stroker
                 ostim_stroker_pattern_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_OSTIM_STROKER_PATTERN", "Stroker Pattern", _PatternSelectorOptions[TIntegration.Ostim_Stroker_Pattern], ostim_stroker_pattern_flag)
+            AddMenuOptionST("MENU_OSTIM_STROKER_PATTERN", "Stroker Pattern", _PatternSelectorOptionsStroker[TIntegration.Ostim_Stroker_Pattern], ostim_stroker_pattern_flag)
         
             Int ostim_stroker_funscript_flag = OPTION_FLAG_DISABLED
             If TIntegration.Ostim_Stroker && TIntegration.Ostim_Stroker_Pattern == 0
@@ -1203,20 +1203,20 @@ State MENU_OSTIM_STROKER_FUNSCRIPT
     Event OnMenuOpenST()
         SetMenuDialogStartIndex(0)
         SetMenuDialogDefaultIndex(0)
-        SetMenuDialogOptions(_VibrateFunscriptNames)
+        SetMenuDialogOptions(_StrokeFunscriptNames)
     EndEvent
 
     Event OnMenuAcceptST(int index)
         TIntegration.Ostim_Stroker_Funscript = _VibrateFunscriptNames[index]
-        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+        SetMenuOptionValueST(_StrokeFunscriptNames[index])
     EndEvent
 
     Event OnDefaultST()
-        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+        SetMenuOptionValueST(_StrokeFunscriptNames[0])
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.funscript")
     EndEvent
 EndState
 
