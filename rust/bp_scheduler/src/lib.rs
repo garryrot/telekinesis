@@ -416,7 +416,7 @@ mod tests {
 
         // act
         let start = Instant::now();
-        player.play_linear_background(fs, Duration::from_secs(1), Speed::new(10));
+        player.play_linear_background(fs, Duration::from_secs(2), Speed::new(10));
         wait_ms(400).await;
         player.scheduler.update_task(1, Speed::new(50));
         player.await_all().await;
@@ -430,6 +430,32 @@ mod tests {
         calls[3].assert_timestamp(550, start);
         calls[4].assert_timestamp(600, start);
     }
+   
+   
+    #[tokio::test]
+    async fn test_linear_speed_factors_above_50percent_work() {
+        // arrange
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut player = PlayerTest::setup(&client.created_devices);
+
+        let mut fs = FScript::default();
+        fs.actions.push(FSPoint { pos: 0, at: 0 });
+        fs.actions.push(FSPoint { pos: 100, at: 1000 });
+        fs.actions.push(FSPoint { pos: 0, at: 2000 });
+
+        // act
+        let start = Instant::now();
+        player.play_linear_background(fs, Duration::from_secs(4), Speed::new(80));
+        player.await_all().await;
+
+        // assert
+        client.print_device_calls(start);
+        let calls = client.get_device_calls(1);
+        calls[0].assert_timestamp(0, start);
+        calls[1].assert_timestamp(1250, start);
+        calls[2].assert_timestamp(2500, start);
+    }
+
 
     /// Scalar
     #[tokio::test]

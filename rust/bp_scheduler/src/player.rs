@@ -52,7 +52,10 @@ impl PatternPlayer {
                 }
                 let waiting_time = Duration::from_millis(point.at as u64).saturating_sub(last_at);
                 let offset: Duration = last_instant.elapsed().saturating_sub(last_waiting_time);
-                let actual_waiting_time = waiting_time.saturating_mul((1.0 / current_speed.as_float()) as u32).saturating_sub(offset);
+
+                let factor = 1.0 / current_speed.as_float();
+                let t = waiting_time.as_micros() as f64;
+                let actual_waiting_time = Duration::from_micros((t * factor) as u64).saturating_sub(offset);
 
                 last_instant = Instant::now();
                 last_at = Duration::from_millis(point.at as u64);
