@@ -41,6 +41,26 @@ Event OnUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
 
+Int _SexlabSceneVibrationHandle = -1
+Int _SexlabSceneStrokerHandle = -1
+Int _OstimSceneVibrationHandle = -1
+Int _OstimSceneStrokerHandle = -1
+Int _ToysSceneVibrationHandle = -1
+Bool _InSexlabScene = false
+Bool _InToysScene = false
+
+Function Maintenance()
+    ; Resuming scenes on game load is not supported, just reset it
+    _SexlabSceneVibrationHandle = -1
+    _SexlabSceneStrokerHandle = -1
+    _OstimSceneVibrationHandle = -1
+    _OstimSceneStrokerHandle = -1
+    _ToysSceneVibrationHandle = -1
+    _InSexlabScene = false
+    _InToysScene = false
+    UnregisterForUpdate()
+EndFunction
+
 Function InitDefaultListeners()
     InitDeviousDevicesHandlers()
     InitOstimHandlers()
@@ -54,26 +74,23 @@ Function InitDefaultOnEventHandlers()
     Chainbeasts_Vibrate = true
 EndFunction
 
-Int _SexlabSceneVibrationHandle = -1
-Int _SexlabSceneStrokerHandle = -1
-Int _OstimSceneVibrationHandle = -1
-Int _OstimSceneStrokerHandle = -1
-Int _ToysSceneVibrationHandle = -1
-
 Function UpdateRousingControlledSexScene()
-    TDevices.LogDebug("UpdateRousingControlledSexScene StrokerHandle: " + _OstimSceneStrokerHandle + " SexlabStroker:" + _SexlabSceneVibrationHandle)
+    TDevices.LogDebug("UpdateRousingControlled OS-Stroker: " + _OstimSceneStrokerHandle + " OS-Vib " + _OstimSceneVibrationHandle + " SL-Stroker:" + _SexlabSceneStrokerHandle + " SLVib: " + _SexlabSceneVibrationHandle)
     If _InToysScene
         Int speed = (Toys as ToysFramework).GetRousing()
         TDevices.UpdateHandle(_ToysSceneVibrationHandle, speed)
     EndIf
-    If _InSexlabScene && _SexlabSceneVibrationHandle != -1
+
+    If _InSexlabScene
         Int speed = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
-        TDevices.UpdateHandle(_SexlabSceneVibrationHandle, speed)
+        If _SexlabSceneVibrationHandle != -1
+            TDevices.UpdateHandle(_SexlabSceneVibrationHandle, speed)
+        EndIf
+        If _SexlabSceneStrokerHandle != -1
+            TDevices.UpdateHandle(_SexlabSceneStrokerHandle, speed)
+        EndIf
     EndIf
-    If _InSexlabScene && _SexlabSceneStrokerHandle != -1
-        Int speed = (SexLabAroused as slaFrameworkScr).GetActorArousal(PlayerRef)
-        TDevices.UpdateHandle(_SexlabSceneStrokerHandle, speed)
-    EndIf
+    
     If _OstimSceneVibrationHandle != -1
         Int speed = GetOStimSpeed()
         TDevices.UpdateHandle(_OstimSceneVibrationHandle, speed)
@@ -230,7 +247,6 @@ EndEvent
 
 
 Int _DeviousDevicesVibrateHandle = -1
-
 Int Property DeviousDevices_Vibrate_DeviceSelector = 0 Auto Hidden
 Int Property DeviousDevices_Vibrate_DeviceSelector_Default = 0 AutoReadOnly Hidden
 String Property DeviousDevices_Vibrate_Event_Anal = "Anal" Auto Hidden
@@ -314,7 +330,6 @@ EndEvent
 ;           /____/\___/_/|_/_/\__,_/_.___/ 
 
 
-Bool _InSexlabScene = false
 
 String Property Sexlab_Animation_Funscript = "" Auto Hidden
 String Property Sexlab_Animation_Funscript_Default = "" Auto Hidden
@@ -438,10 +453,13 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
 	_InSexlabScene = False
     If _SexlabSceneVibrationHandle != -1
         TDevices.StopHandle(_SexlabSceneVibrationHandle)
+        _SexlabSceneVibrationHandle = -1
     EndIf
     If _SexlabSceneStrokerHandle != -1
         TDevices.StopHandle(_SexlabSceneStrokerHandle)
+        _SexlabSceneStrokerHandle = -1
     EndIf
+    UnregisterForUpdate()
 EndEvent
 
 Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
@@ -531,7 +549,6 @@ EndProperty
 
 Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
     TDevices.LogDebug("OnOStimStart")
-    UnregisterForUpdate()
     UpdateRousingControlledSexScene()
 EndEvent
 
@@ -626,7 +643,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
         TDevices.StopHandle(oldHandle)
     EndIf
     If oldStrokerHandle != -1
-        TDevices.StopHandle(oldHandle)
+        TDevices.StopHandle(oldStrokerHandle)
     EndIf
 EndEvent
 
@@ -694,7 +711,6 @@ EndFunction
 ;                     /____/                                             
 
 
-Bool _InToysScene = false
 
 Bool _Toys_Vaginal_Penetration = false
 Bool Property Toys_Vaginal_Penetration_Default = false AutoReadOnly Hidden

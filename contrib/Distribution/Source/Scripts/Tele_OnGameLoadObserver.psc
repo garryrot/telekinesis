@@ -45,5 +45,6 @@ Function LoadTelekinesis(Tele_Devices devices)
     EndIf
     
     integration.PlayerRef = Game.GetPlayer()
+    integration.Maintenance()
     devices.ConnectAndScanForDevices()
 EndFunction
