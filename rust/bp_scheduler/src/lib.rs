@@ -59,12 +59,12 @@ impl ButtplugScheduler {
 
     /// Clean up finished tasks
     pub fn clean_finished_tasks(&mut self) {
-        self.control_handles.retain(|i,handle| ! handle.cancellation_token.is_cancelled() );
+        self.control_handles.retain(|_,handle| ! handle.cancellation_token.is_cancelled() );
     } 
 
-    #[instrument(skip(self))]
     pub fn stop_task(&mut self, handle: i32) {
         if self.control_handles.contains_key(&handle) {
+            debug!("stop handle {}", handle);
             self.control_handles
                 .remove(&handle)
                 .unwrap()
@@ -75,7 +75,6 @@ impl ButtplugScheduler {
         }
     }
 
-    #[instrument(skip(self))]
     pub fn update_task(&mut self, handle: i32, speed: Speed) -> bool {
         if self.control_handles.contains_key(&handle) {
             debug!("updating handle {}", handle);
@@ -92,13 +91,13 @@ impl ButtplugScheduler {
         }
     }
 
-    #[instrument(skip(self))]
     pub fn stop_all(&mut self) {
         let queue_full_err = "Event sender full";
         self.worker_task_sender
             .send(WorkerTask::StopAll)
             .unwrap_or_else(|_| error!(queue_full_err));
         for entry in self.control_handles.drain() {
+            debug!("stop-all - stopping handle {:?}", entry.0);
             entry.1.cancellation_token.cancel();
         }
         self.control_handles.clear();
