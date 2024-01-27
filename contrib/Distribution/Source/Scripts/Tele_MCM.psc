@@ -366,7 +366,7 @@ Event OnPageReset(String page)
             AddMenuOptionST("MENU_OSTIM_STROKER_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
 
             AddHeaderOption("Actions")
-            AddMenuOptionST("MENU_OSTIM_STROKER_SPEED", "Speed", _OstimSpeedOptions[TIntegration.Ostim_Animation_Speed_Control], ostim_stroker_speed_flag)
+            AddMenuOptionST("MENU_OSTIM_STROKER_SPEED", "Speed", _OstimSpeedOptions[TIntegration.Ostim_Stroker_Speed_Control], ostim_stroker_speed_flag)
 
             Int ostim_stroker_pattern_flag = OPTION_FLAG_DISABLED
             If TIntegration.Ostim_Stroker
@@ -1207,7 +1207,7 @@ State MENU_OSTIM_STROKER_FUNSCRIPT
     EndEvent
 
     Event OnMenuAcceptST(int index)
-        TIntegration.Ostim_Stroker_Funscript = _VibrateFunscriptNames[index]
+        TIntegration.Ostim_Stroker_Funscript = _StrokeFunscriptNames[index]
         SetMenuOptionValueST(_StrokeFunscriptNames[index])
     EndEvent
 
