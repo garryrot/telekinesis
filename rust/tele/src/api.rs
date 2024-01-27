@@ -202,12 +202,14 @@ pub trait Api<T> {
                 match (self.fns().init.exec)() {
                     Ok(state) => {
                         guard.replace(state);
+                        return true;
                     }
                     Err(err) => {
                         error!("error constructing state: {:?}", err);
                     }
                 }
             }
+            return false;
         }
 
         if cmd_matches(self.destroy().name, cmd) {
