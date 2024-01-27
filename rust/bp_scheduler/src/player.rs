@@ -2,15 +2,20 @@ use funscript::FScript;
 use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
-use std::{sync::Arc, time::Duration, fmt};
+use std::{fmt, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{sleep, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, trace, instrument};
+use tracing::{error, info, instrument, trace};
 
-use crate::{cancellable_wait, actuator::Actuator, speed::Speed, worker::{WorkerTask, ButtplugClientResult}};
+use crate::{
+    actuator::Actuator,
+    cancellable_wait,
+    speed::Speed,
+    worker::{ButtplugClientResult, WorkerTask},
+};
 
 /// Pattern executor that can be passed from the schedulers main-thread to a sub-thread
 pub struct PatternPlayer {
@@ -31,11 +36,14 @@ impl PatternPlayer {
         mut self,
         duration: Duration,
         fscript: FScript,
-        speed: Speed
+        speed: Speed,
     ) -> ButtplugClientResult {
         info!("linear pattern started");
         let mut last_result = Ok(());
-        if speed.as_float() <= 0.0 || fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
+        if speed.as_float() <= 0.0
+            || fscript.actions.is_empty()
+            || fscript.actions.iter().all(|x| x.at == 0)
+        {
             return last_result;
         }
         let mut current_speed = speed;
@@ -50,10 +58,13 @@ impl PatternPlayer {
                         current_speed = update;
                     }
                 }
-                let waiting_time_us = Duration::from_millis(point.at as u64).saturating_sub(last_at).as_micros() as f64;
+                let waiting_time_us = Duration::from_millis(point.at as u64)
+                    .saturating_sub(last_at)
+                    .as_micros() as f64;
                 let offset: Duration = last_instant.elapsed().saturating_sub(last_waiting_time);
                 let factor = 1.0 / current_speed.as_float();
-                let actual_waiting_time = Duration::from_micros((waiting_time_us * factor) as u64).saturating_sub(offset);
+                let actual_waiting_time =
+                    Duration::from_micros((waiting_time_us * factor) as u64).saturating_sub(offset);
 
                 last_instant = Instant::now();
                 last_at = Duration::from_millis(point.at as u64);
@@ -64,7 +75,9 @@ impl PatternPlayer {
 
                 let token = &self.cancellation_token.clone();
                 if let Some(result) = tokio::select! {
-                    _ = token.cancelled() => { None }
+                    _ = token.cancelled() => {
+                        break;
+                    }
                     result = async {
                         let result = self.do_linear(Speed::from_fs(point).as_float(), actual_waiting_time.as_millis() as u32).await;
                         sleep(actual_waiting_time).await;
@@ -103,8 +116,7 @@ impl PatternPlayer {
         loop {
             let mut j = 1;
             while j + i < action_len - 1
-                && (fscript.actions[i + j].at - fscript.actions[i].at)
-                    < self.scalar_resolution_ms
+                && (fscript.actions[i + j].at - fscript.actions[i].at) < self.scalar_resolution_ms
             {
                 j += 1;
             }
@@ -166,8 +178,13 @@ impl PatternPlayer {
         for actuator in self.actuators.iter() {
             trace!("do_update {} {:?}", speed, actuator);
             self.worker_task_sender
-                .send(WorkerTask::Update(actuator.clone(), speed, is_pattern, self.handle))
-                .unwrap_or_else(|_| error!("queue full"));
+                .send(WorkerTask::Update(
+                    actuator.clone(),
+                    speed,
+                    is_pattern,
+                    self.handle,
+                ))
+                .unwrap_or_else(|err| error!("queue err {:?}", err));
         }
     }
 
@@ -182,7 +199,7 @@ impl PatternPlayer {
                     is_pattern,
                     self.handle,
                 ))
-                .unwrap_or_else(|_| error!("queue full"));
+                .unwrap_or_else(|err| error!("queue err {:?}", err));
         }
     }
 
@@ -197,7 +214,7 @@ impl PatternPlayer {
                     self.handle,
                     self.result_sender.clone(),
                 ))
-                .unwrap_or_else(|_| error!("queue full"));
+                .unwrap_or_else(|err| error!("queue err {:?}", err));
         }
         let mut last_result = Ok(());
         for _ in self.actuators.iter() {
@@ -218,7 +235,7 @@ impl PatternPlayer {
                     true,
                     self.result_sender.clone(),
                 ))
-                .unwrap_or_else(|_| error!("queue full"));
+                .unwrap_or_else(|err| error!("queue err {:?}", err));
         }
         self.result_receiver.recv().await.unwrap()
     }

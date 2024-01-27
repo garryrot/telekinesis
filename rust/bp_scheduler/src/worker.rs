@@ -1,8 +1,8 @@
 use buttplug::client::{LinearCommand, ButtplugClientError};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt, sync::Arc};
 
-use tokio::sync::mpsc::UnboundedReceiver;
-use tracing::{info, trace};
+use tokio::{runtime::Handle, sync::mpsc::UnboundedReceiver};
+use tracing::{error, info, trace, warn};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{access::DeviceAccess, actuator::Actuator, speed::Speed};
@@ -57,17 +57,23 @@ impl ButtplugWorker {
                         let result = device_access
                             .stop_scalar(&actuator, is_pattern, handle)
                             .await;
-                        result_sender.send(result).unwrap();
+                        if let Err(err) = result_sender.send(result) {
+                            error!("failed sending scalar result {:?}", err)
+                        }
                     }
                     WorkerTask::Move(actuator, position, duration_ms, finish, result_sender) => {
                         let cmd = LinearCommand::LinearMap(HashMap::from([(
                             actuator.index_in_device,
                             (duration_ms, position),
                         )]));
-                        let result = actuator.device.linear(&cmd).await;
-                        if finish {
-                            result_sender.send(result).unwrap();
-                        }
+                        Handle::current().spawn(async move {
+                            let result = actuator.device.linear(&cmd).await;
+                            if finish {
+                                if let Err(err) = result_sender.send(result) {
+                                    error!("failed sending linear result {:?}", err)
+                                }
+                            }
+                        });
                     }
                     WorkerTask::StopAll => {
                         device_access.clear_all();

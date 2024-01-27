@@ -39,6 +39,18 @@ pub enum TkLogLevel {
     Error = 4,
 }
 
+impl From<TkLogLevel> for Level {
+    fn from(val: TkLogLevel) -> Self {
+        match val {
+            crate::settings::TkLogLevel::Trace => Level::TRACE,
+            crate::settings::TkLogLevel::Debug => Level::DEBUG,
+            crate::settings::TkLogLevel::Info => Level::INFO,
+            crate::settings::TkLogLevel::Warn => Level::WARN,
+            crate::settings::TkLogLevel::Error => Level::ERROR,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TkSettings {
     pub version: u32,

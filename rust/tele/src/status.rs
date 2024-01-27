@@ -7,7 +7,7 @@ use bp_scheduler::actuator::{get_actuators, Actuator};
 use buttplug::client::ButtplugClientDevice;
 use crossbeam_channel::Receiver;
 use itertools::Itertools;
-use tracing::{debug, error};
+use tracing::debug;
 
 use crate::{connection::TkConnectionEvent, settings::TkSettings};
 

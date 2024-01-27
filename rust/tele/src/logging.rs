@@ -3,7 +3,10 @@ use std::{
     sync::Mutex,
 };
 
+
 use tracing::{Level, info};
+
+use crate::settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH};
 
 #[cxx::bridge]
 mod ffi {
@@ -33,15 +36,17 @@ pub fn tk_init_logging_stdout() -> bool {
 }
 
 pub fn tk_init_logging(file_path: String) -> bool {
+    let settings = TkSettings::try_read_or_default(SETTINGS_PATH, SETTINGS_FILE);
     let file = match File::create(file_path) {
         Ok(file) => file,
-        Err(_) => {
-            eprintln!("Couldn't write to log file, no logs available.");
+        Err(err) => {
+            eprintln!("Couldn't write to log file, no logs available: {:?}", err);
             return false;
         }
     };
+    let log_lvl : Level = settings.log_level.into();
     let subscriber = tracing_subscriber::fmt()
-        .with_max_level(Level::DEBUG)
+        .with_max_level(log_lvl)
         .with_ansi(false)
         .with_writer(Mutex::new(file))
         .with_thread_ids(true)
