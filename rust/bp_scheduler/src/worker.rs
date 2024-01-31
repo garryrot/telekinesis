@@ -1,5 +1,5 @@
 use buttplug::client::{LinearCommand, ButtplugClientError};
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 
 use tokio::{runtime::Handle, sync::mpsc::UnboundedReceiver};
 use tracing::{error, info, trace, warn};
@@ -43,7 +43,7 @@ impl ButtplugWorker {
         let mut device_access = DeviceAccess::default();
         loop {
             if let Some(next_action) = self.task_receiver.recv().await {
-                trace!("exec device action {:?}", next_action);
+                trace!("worker exec action {:?}", next_action);
                 match next_action {
                     WorkerTask::Start(actuator, speed, is_pattern, handle) => {
                         device_access

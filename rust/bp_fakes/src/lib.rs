@@ -78,7 +78,7 @@ impl FakeMessage {
         self
     }
 
-    pub fn assert_position(&self, position: f64) -> &Self {
+    pub fn assert_pos(&self, position: f64) -> &Self {
         match self.message.clone() {
             message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
                 cmd.vectors().iter().all(|v| {
@@ -111,7 +111,7 @@ impl FakeMessage {
         self
     }
 
-    pub fn assert_timestamp(&self, time_ms: i32, start_instant: Instant) -> &Self {
+    pub fn assert_time(&self, time_ms: i32, start_instant: Instant) -> &Self {
         debug!("self.time.elapsed: {:?}", self.time.elapsed());
         debug!("start_instant.elapsed: {:?}", start_instant.elapsed());
         let elapsed_ms = (start_instant.elapsed() - self.time.elapsed()).as_millis() as i32;
@@ -253,8 +253,6 @@ impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServ
         &mut self,
         message_sender: tokio::sync::mpsc::Sender<ButtplugCurrentSpecServerMessage>,
     ) -> BoxFuture<'static, Result<(), ButtplugConnectorError>> {
-        let devices = self.devices.clone();
-        let send = message_sender.clone();
         self.server_outbound_sender = message_sender;
         async move {
             async_manager::spawn(async move {
@@ -599,7 +597,7 @@ pub mod tests {
 
         // asert
         client.get_device_calls(1)[0]
-            .assert_position(0.9)
+            .assert_pos(0.9)
             .assert_duration(42);
     }
 

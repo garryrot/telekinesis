@@ -92,13 +92,13 @@ Function UpdateRousingControlledSexScene()
     EndIf
     
     If _OstimSceneVibrationHandle != -1
-        Int speed = GetOStimSpeed()
+        Int speed = GetOStimSpeed(Ostim_Animation_Speed_Control)
         TDevices.UpdateHandle(_OstimSceneVibrationHandle, speed)
     EndIf
     If _OstimSceneStrokerHandle != -1
-        Int speed = GetOStimSpeed()
-        If speed < 10
-            speed = 10
+        Int speed = GetOStimSpeed(Ostim_Stroker_Speed_Control)
+        If speed > 90
+            speed = 90
         EndIf
         TDevices.UpdateHandle(_OstimSceneStrokerHandle, speed)
     EndIf
@@ -111,10 +111,13 @@ Int Function StartStroke(Int deviceSelector, Float duration_sec, Int patternType
     If deviceSelector == 1
         events = evts
     EndIf
-    If patternType == 1
-        funscript = TDevices.GetRandomPattern(false)
+    If patternType > 0
+        If patternType == 1
+            funscript = TDevices.GetRandomPattern(false)
+        EndIf
+        return TDevices.LinearPattern(funscript, speed, duration_sec, events)
     EndIf
-    return TDevices.LinearPattern(funscript, speed, duration_sec, events)
+    return TDevices.Linear(speed, 250, 5000, duration_sec, events)
 EndFunction
 
 Int Function StartVibration(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int speed, String[] evts)
@@ -626,10 +629,10 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
 
     If hasVaginalStim || hasAnalStim || hasNippleStim || hasPenisStim || isPenetrated
         If _Ostim_Animation
-            _OstimSceneVibrationHandle = StartVibration(Ostim_Animation_DeviceSelector, -1, Ostim_Animation_Pattern, Ostim_Animation_Funscript, GetOStimSpeed(), evts)
+            _OstimSceneVibrationHandle = StartVibration(Ostim_Animation_DeviceSelector, -1, Ostim_Animation_Pattern, Ostim_Animation_Funscript, GetOStimSpeed(Ostim_Animation_Speed_Control), evts)
         EndIf
         If _Ostim_Stroker
-            Int speed = GetOStimSpeed()
+            Int speed = GetOStimSpeed(Ostim_Stroker_Speed_Control)
             If speed < 10
                 speed = 10
             EndIf
@@ -647,28 +650,31 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     EndIf
 EndEvent
 
-Int Function GetOStimSpeed()
-    If Ostim_Animation_Speed_Control == 1
+Int Function GetOStimSpeed(Int controlMode) ; 
+    If controlMode  == 1
         Float speed = OThread.GetSpeed(0) as Float
         If speed == 0.0
             speed = 0.5
         EndIf
         Float factor = speed / _OstimMaxSpeed as Float
+        ; TDevices.LogDebug("GetOstimSpeed(1) " + factor + " speed: " + speed + " _OstimMaxSpeed: " + _OstimMaxSpeed)
         return (100 * factor) as Int
     EndIf
 
-    If Ostim_Animation_Speed_Control == 2
+    If controlMode == 2
         Float excitement = OActor.GetExcitement(PlayerRef)
+        ; TDevices.LogDebug("GetOstimSpeed(2) " + excitement)
         return excitement as Int
     EndIf
 
-    If Ostim_Animation_Speed_Control == 3
+    If controlMode == 3
         Float speed = OThread.GetSpeed(0) as Float
         If speed == 0.0
             speed = 0.5
         EndIf
         Float speedFactor = speed / (_OstimMaxSpeed as Float)
         Float excitement = OActor.GetExcitement(PlayerRef)
+        ; TDevices.LogDebug("GetOstimSpeed(3) speed: " + speed + " speedFactor" + speedFactor + " excitement: " + excitement + " _OstimMaxSpeed: " + _OstimMaxSpeed)
         return (excitement * speedFactor) as Int
     EndIf
 

@@ -6,7 +6,7 @@ use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
 use itertools::Itertools;
 use pattern::{get_pattern_names, read_pattern};
-use std::sync::{Arc, Mutex};
+use std::{default, sync::{Arc, Mutex}};
 use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
@@ -341,7 +341,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             pattern_name,
             false,
         ) {
-            Some(fscript) => tk.linear(
+            Some(fscript) => tk.linear_pattern(
                 Task::Linear(Speed::new(speed.into()), pattern_name.into()),
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
@@ -350,6 +350,17 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
+    })
+    .def_control(ApiControl {
+        name: "linear.oscillate",
+        exec: |tk, speed, time_sec, pattern_name, body_parts| {
+            tk.linear_oscillate(
+                    Task::Linear(Speed::new(speed.into()), pattern_name.into()),
+                    get_duration_from_secs(time_sec),
+                    pattern_name,
+                    read_input_string(body_parts))
+            },
+        default: ERROR_HANDLE
     })
     .def_update(ApiUpdate {
         exec: |tk, handle, speed| tk.update(handle, Speed::new(speed.into())),

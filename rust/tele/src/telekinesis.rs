@@ -1,6 +1,7 @@
 use anyhow::Error;
 use bp_fakes::FakeDeviceConnector;
 use bp_scheduler::speed::Speed;
+use bp_scheduler::player::LinearRange;
 use bp_scheduler::ButtplugScheduler;
 use bp_scheduler::PlayerSettings;
 use buttplug::core::message::ActuatorType;
@@ -189,6 +190,7 @@ impl Telekinesis {
                         .await
                 }
                 Task::Linear(_, _) => panic!(),
+                Task::LinearOscillate(_, _) => todo!(),
             };
             let event = match result {
                 Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
@@ -200,14 +202,14 @@ impl Telekinesis {
         handle
     }
 
-    pub fn linear(
+    pub fn linear_pattern(
         &mut self,
         task: Task,
         duration: Duration,
         body_parts: Vec<String>,
         fscript: FScript,
     ) -> i32 {
-        info!("linear");
+        info!("linear pattern");
 
         self.scheduler.clean_finished_tasks();
         let task_clone = task.clone();
@@ -235,6 +237,59 @@ impl Telekinesis {
                 .expect("never full");
             let result = match task {
                 Task::Linear(speed, _) => player.play_linear(duration, fscript, speed).await,
+                _ => panic!(),
+            };
+            let event = match result {
+                Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
+                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
+            };
+            client_sender_clone.send(event.clone()).expect("never full");
+            status_sender_clone.send(event.clone()).expect("never full");
+        });
+        handle
+    }
+
+    pub fn linear_oscillate(
+        &mut self,
+        task: Task,
+        duration: Duration,
+        range: &str,
+        body_parts: Vec<String>,
+    ) -> i32 {
+        info!("linear oscillate");
+
+        self.scheduler.clean_finished_tasks();
+        let task_clone = task.clone();
+
+        let actuators = self.status.connected_actuators();
+        let player = self.scheduler.create_player(TkParams::filter_devices(
+            &actuators,
+            &body_parts,
+            &[ActuatorType::Position],
+            &self.settings.devices,
+        ));
+        let handle = player.handle;
+
+        let client_sender_clone = self.client_event_sender.clone();
+        let status_sender_clone = self.status_event_sender.clone();
+        self.runtime.spawn(async move {
+            let now = Instant::now();
+            client_sender_clone
+                .send(TkConnectionEvent::ActionStarted(
+                    task_clone.clone(),
+                    player.actuators.clone(),
+                    body_parts,
+                    player.handle,
+                ))
+                .expect("never full");
+            let result = match task {
+                Task::Linear(speed, _) => player.play_oscillate_linear(duration, speed, LinearRange { 
+                    start_pos: 0.0, 
+                    end_pos: 1.0, 
+                    min_dur: 300.0, 
+                    max_dur: 3000.0, 
+                    invert: false
+                }).await,
                 _ => panic!(),
             };
             let event = match result {

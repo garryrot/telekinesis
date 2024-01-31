@@ -127,7 +127,18 @@ Int Function LinearPattern(String pattern, Int speed, Float duration_sec = -1.0,
       Returns an Int handle to stop the  early, see StopHandle(Int) }
     If Connects()
         Int handle = Tele_Api.Tele_Control("linear.pattern", InRange(speed, 1, 100), duration_sec, pattern, events)
-        Trace("(Linear) speed='" + speed + "' duration='" + duration_sec + "' pattern=" + pattern + " events=" + events + " handle=" + handle)
+        Trace("(Linear Pattern) speed='" + speed + "' duration='" + duration_sec + "' pattern=" + pattern + " events=" + events + " handle=" + handle)
+        return handle
+    EndIf
+    return -1
+EndFunction
+
+Int Function Linear(Int speed, Int min_pos, Int max_pos, Float duration_sec = -1.0, String[] events)
+    { Move all specified devices for the given duration
+      Returns an Int handle to stop the  early, see StopHandle(Int) }
+    If Connects()
+        Int handle = Tele_Api.Tele_Control("linear.oscillate", InRange(speed, 0, 100), duration_sec, "", events)
+        Trace("(Linear) speed='" + speed + "' duration='" + duration_sec + "' pattern=" + min_pos + "," + max_pos + " events=" + events + " handle=" + handle)
         return handle
     EndIf
     return -1

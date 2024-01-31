@@ -38,7 +38,7 @@ String[] _DeviceNames
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 14
+    return 15
 EndFunction
 
 Event OnConfigInit()
@@ -64,7 +64,7 @@ Event OnVersionUpdate(int newVersion)
         TIntegration.MigrateToV12()
     EndIf
 
-    If CurrentVersion < 14
+    If CurrentVersion < 15
         ;  Older than 1.3.0
         InitLocals()
         TIntegration.InitDefaultListeners()
@@ -98,9 +98,10 @@ Function InitLocals()
     _PatternSelectorOptions[1] = "Funscript"
     _PatternSelectorOptions[2] = "Random Funscript"
 
-    _PatternSelectorOptionsStroker = new String[2]
-    _PatternSelectorOptionsStroker[0] = "Funscript"
-    _PatternSelectorOptionsStroker[1] = "Random Funscript"
+    _PatternSelectorOptionsStroker = new String[3]
+    _PatternSelectorOptionsStroker[0] = "Stroke"
+    _PatternSelectorOptionsStroker[1] = "Funscript"
+    _PatternSelectorOptionsStroker[2] = "Random Funscript"
     
     _OstimSpeedOptions = new String[4]
     _OstimSpeedOptions[0] = "Constant"
@@ -307,7 +308,7 @@ Event OnPageReset(String page)
             AddMenuOptionST("MENU_SEXLAB_STROKER_PATTERN", "Stroker Pattern", _PatternSelectorOptionsStroker[TIntegration.Sexlab_Stroker_Pattern], sexlab_stroker_pattern_flag)
         
             Int sexlab_stroker_funscript_flag = OPTION_FLAG_DISABLED
-            If TIntegration.Sexlab_Stroker && TIntegration.Sexlab_Stroker_Pattern == 0
+            If TIntegration.Sexlab_Stroker && TIntegration.Sexlab_Stroker_Pattern == 1
                 sexlab_stroker_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_SEXLAB_STROKER_FUNSCRIPT", "Stroker Funscript", TIntegration.Sexlab_Stroker_Funscript, sexlab_stroker_funscript_flag)
@@ -375,7 +376,7 @@ Event OnPageReset(String page)
             AddMenuOptionST("MENU_OSTIM_STROKER_PATTERN", "Stroker Pattern", _PatternSelectorOptionsStroker[TIntegration.Ostim_Stroker_Pattern], ostim_stroker_pattern_flag)
         
             Int ostim_stroker_funscript_flag = OPTION_FLAG_DISABLED
-            If TIntegration.Ostim_Stroker && TIntegration.Ostim_Stroker_Pattern == 0
+            If TIntegration.Ostim_Stroker && TIntegration.Ostim_Stroker_Pattern == 1
                 ostim_stroker_funscript_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_OSTIM_STROKER_FUNSCRIPT", "Stroker Funscript", TIntegration.Ostim_Stroker_Funscript, ostim_stroker_funscript_flag)

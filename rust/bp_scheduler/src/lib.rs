@@ -11,11 +11,11 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, instrument, info, debug};
+use tracing::{debug, error};
 
 mod access;
 pub mod actuator;
-mod player;
+pub mod player;
 pub mod speed;
 mod worker;
 
@@ -59,8 +59,9 @@ impl ButtplugScheduler {
 
     /// Clean up finished tasks
     pub fn clean_finished_tasks(&mut self) {
-        self.control_handles.retain(|_,handle| ! handle.cancellation_token.is_cancelled() );
-    } 
+        self.control_handles
+            .retain(|_, handle| !handle.cancellation_token.is_cancelled());
+    }
 
     pub fn stop_task(&mut self, handle: i32) {
         if self.control_handles.contains_key(&handle) {
@@ -145,6 +146,8 @@ async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> boo
 #[cfg(test)]
 mod tests {
     use crate::actuator::get_actuators;
+    use crate::player::LinearRange;
+    use crate::player::PatternPlayer;
     use crate::speed::Speed;
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
@@ -231,11 +234,19 @@ mod tests {
             }));
         }
 
+        fn get_player(&mut self) -> PatternPlayer {
+            self.scheduler
+                .create_player(get_actuators(self.all_devices.clone()))
+        }
+
         async fn play_linear(&mut self, funscript: FScript, duration: Duration, speed: Speed) {
             let player = self
                 .scheduler
                 .create_player(get_actuators(self.all_devices.clone()));
-            player.play_linear(duration, funscript, speed).await.unwrap();
+            player
+                .play_linear(duration, funscript, speed)
+                .await
+                .unwrap();
         }
 
         fn play_linear_background(&mut self, funscript: FScript, duration: Duration, speed: Speed) {
@@ -243,7 +254,10 @@ mod tests {
                 .scheduler
                 .create_player(get_actuators(self.all_devices.clone()));
             self.handles.push(Handle::current().spawn(async move {
-                player.play_linear(duration, funscript, speed).await.unwrap();
+                player
+                    .play_linear(duration, funscript, speed)
+                    .await
+                    .unwrap();
             }));
         }
 
@@ -287,6 +301,106 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_oscillate_linear_1() {
+        let (client, _) = test_oscillate(
+            Speed::new(100),
+            LinearRange{ start_pos: 0.0, end_pos: 1.0, min_dur: 20.0, max_dur: 400.0, invert: false },
+        )
+        .await;
+
+        let calls = client.get_device_calls(1);
+        calls[0].assert_duration(20);
+        calls[1].assert_duration(20);
+        calls[2].assert_duration(20);
+    }
+
+    #[tokio::test]
+    async fn test_oscillate_linear_2() {
+        let (client, _) = test_oscillate(
+            Speed::new(0),
+            LinearRange{ start_pos: 1.0, end_pos:0.0, min_dur: 10.0, max_dur: 100.0, invert: false }
+        )
+        .await;
+
+        let calls = client.get_device_calls(1);
+        calls[0].assert_duration(100).assert_pos(0.0);
+        calls[1].assert_duration(100).assert_pos(1.0);
+        calls[2].assert_duration(100).assert_pos(0.0);
+    }
+
+    #[tokio::test]
+    async fn test_oscillate_linear_3() {
+        let (client, _) = test_oscillate(
+            Speed::new(75),
+            LinearRange{ start_pos: 0.2, end_pos: 0.7, min_dur: 100.0, max_dur: 200.0, invert: false }
+        )
+        .await;
+
+        let calls = client.get_device_calls(1);
+        calls[0].assert_duration(125).assert_pos(0.7);
+        calls[1].assert_duration(125).assert_pos(0.2);
+        calls[2].assert_duration(125).assert_pos(0.7);
+    }
+
+    #[tokio::test]
+    async fn test_oscillate_linear_invert() {
+        let (client, _) = test_oscillate(
+            Speed::new(100),
+            LinearRange{ start_pos: 0.0, end_pos: 1.0, min_dur: 10.0, max_dur: 10.0, invert: true }
+        )
+        .await;
+
+        let calls = client.get_device_calls(1);
+        calls[0].assert_pos(0.0);
+        calls[1].assert_pos(1.0);
+        calls[2].assert_pos(0.0);
+    }
+
+    #[tokio::test]
+    async fn test_oscillate_update() {
+        let client: ButtplugTestClient = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut test = PlayerTest::setup(&client.created_devices);
+
+        // act
+        let start = Instant::now();
+        let player = test.get_player();
+        let join = Handle::current().spawn(async move {
+            let _ = player
+                .play_oscillate_linear(Duration::from_millis(250), Speed::new(100), LinearRange{ 
+                    start_pos: 0.0, 
+                    end_pos: 1.0, 
+                    min_dur: 10.0, 
+                    max_dur: 100.0, 
+                    invert: true })
+                .await;
+        });
+
+        test.scheduler.update_task(1, Speed::new(0));
+        let _ = join.await;
+
+        client.print_device_calls(start);
+        let calls = client.get_device_calls(1);
+        calls[0].assert_duration(100);
+        calls[1].assert_duration(100);
+        calls[2].assert_duration(100);
+    }
+
+    async fn test_oscillate(speed: Speed, range: LinearRange) -> (ButtplugTestClient, Instant) {
+        let client = get_test_client(vec![linear(1, "lin1")]).await;
+        let mut test = PlayerTest::setup(&client.created_devices);
+
+        // act
+        let start = Instant::now();
+        let player = test.get_player();
+        let _ = player
+            .play_oscillate_linear(Duration::from_millis((range.max_dur * 2.5) as u64), speed, range)
+            .await;
+
+        client.print_device_calls(start);
+        (client, start)
+    }
+
+    #[tokio::test]
     async fn test_linear_empty_pattern_finishes_and_does_not_panic() {
         let client = get_test_client(vec![linear(1, "lin1")]).await;
         let mut player = PlayerTest::setup(&client.created_devices);
@@ -323,13 +437,13 @@ mod tests {
         // assert
         client.print_device_calls(start);
         client.get_device_calls(1)[0]
-            .assert_position(0.0)
+            .assert_pos(0.0)
             .assert_duration(200)
-            .assert_timestamp(0, start);
+            .assert_time(0, start);
         client.get_device_calls(1)[1]
-            .assert_position(1.0)
+            .assert_pos(1.0)
             .assert_duration(200)
-            .assert_timestamp(200, start);
+            .assert_time(200, start);
     }
 
     #[tokio::test]
@@ -343,7 +457,11 @@ mod tests {
         // act
         let start = Instant::now();
         player
-            .play_linear(get_repeated_pattern(n), get_duration_ms(&fscript), Speed::max())
+            .play_linear(
+                get_repeated_pattern(n),
+                get_duration_ms(&fscript),
+                Speed::max(),
+            )
             .await;
 
         // assert
@@ -370,10 +488,10 @@ mod tests {
         client.print_device_calls(start);
 
         let calls = client.get_device_calls(1);
-        calls[0].assert_position(1.0).assert_timestamp(0, start);
-        calls[1].assert_position(0.0).assert_timestamp(200, start);
-        calls[2].assert_position(1.0).assert_timestamp(400, start);
-        calls[3].assert_position(0.0).assert_timestamp(600, start);
+        calls[0].assert_pos(1.0).assert_time(0, start);
+        calls[1].assert_pos(0.0).assert_time(200, start);
+        calls[2].assert_pos(1.0).assert_time(400, start);
+        calls[3].assert_pos(0.0).assert_time(600, start);
     }
 
     #[tokio::test]
@@ -394,7 +512,7 @@ mod tests {
         // assert
         client.print_device_calls(start);
         client.get_device_calls(1)[0]
-            .assert_position(0.0)
+            .assert_pos(0.0)
             .assert_duration(400);
         assert!(
             start.elapsed().as_millis() < 425,
@@ -423,14 +541,13 @@ mod tests {
         // assert
         client.print_device_calls(start);
         let calls = client.get_device_calls(1);
-        calls[0].assert_timestamp(0, start);
-        calls[1].assert_timestamp(250, start);
-        calls[2].assert_timestamp(500, start);
-        calls[3].assert_timestamp(550, start);
-        calls[4].assert_timestamp(600, start);
+        calls[0].assert_time(0, start);
+        calls[1].assert_time(250, start);
+        calls[2].assert_time(500, start);
+        calls[3].assert_time(550, start);
+        calls[4].assert_time(600, start);
     }
-   
-   
+
     #[tokio::test]
     async fn test_linear_speed_factors_above_50percent_work() {
         // arrange
@@ -450,11 +567,10 @@ mod tests {
         // assert
         client.print_device_calls(start);
         let calls = client.get_device_calls(1);
-        calls[0].assert_timestamp(0, start);
-        calls[1].assert_timestamp(1250, start);
-        calls[2].assert_timestamp(2500, start);
+        calls[0].assert_time(0, start);
+        calls[1].assert_time(1250, start);
+        calls[2].assert_time(2500, start);
     }
-
 
     /// Scalar
     #[tokio::test]
@@ -545,7 +661,7 @@ mod tests {
         calls[1].assert_strenth(0.5);
         calls[2].assert_strenth(0.7);
         calls[3].assert_strenth(1.0);
-        calls[4].assert_strenth(0.0).assert_timestamp(125, start);
+        calls[4].assert_strenth(0.0).assert_time(125, start);
         assert_eq!(calls.len(), 5)
     }
 
@@ -594,8 +710,8 @@ mod tests {
         // assert
         client.print_device_calls(start);
         let calls = client.get_device_calls(1);
-        calls[0].assert_strenth(0.42).assert_timestamp(0, start);
-        calls[1].assert_strenth(0.42).assert_timestamp(100, start);
+        calls[0].assert_strenth(0.42).assert_time(0, start);
+        calls[1].assert_strenth(0.42).assert_time(100, start);
     }
 
     #[tokio::test]
@@ -650,16 +766,16 @@ mod tests {
         client.print_device_calls(start);
         client.get_device_calls(1)[0]
             .assert_strenth(1.0)
-            .assert_timestamp(0, start);
+            .assert_time(0, start);
         client.get_device_calls(1)[1]
             .assert_strenth(0.5)
-            .assert_timestamp(100, start);
+            .assert_time(100, start);
         client.get_device_calls(1)[2]
             .assert_strenth(0.1)
-            .assert_timestamp(200, start);
+            .assert_time(200, start);
         client.get_device_calls(1)[3]
             .assert_strenth(0.0)
-            .assert_timestamp(300, start);
+            .assert_time(300, start);
     }
 
     #[tokio::test]
@@ -854,7 +970,7 @@ mod tests {
 
     fn check_timing(device_calls: Vec<FakeMessage>, n: usize, start: Instant) {
         for i in 0..n - 1 {
-            device_calls[i].assert_timestamp((i * 100) as i32, start);
+            device_calls[i].assert_time((i * 100) as i32, start);
         }
     }
 

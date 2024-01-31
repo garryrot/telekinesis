@@ -1,14 +1,16 @@
+use anyhow::{anyhow, Context};
 use funscript::FScript;
-use tokio::runtime::Handle;
+use tokio::{io::split, runtime::Handle};
 use tokio::task::JoinHandle;
 
-use std::{fmt, sync::Arc, time::Duration};
+use std::num::ParseIntError;
+use std::{any, fmt, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{sleep, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, instrument, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 use crate::{
     actuator::Actuator,
@@ -29,7 +31,77 @@ pub struct PatternPlayer {
     pub worker_task_sender: UnboundedSender<WorkerTask>,
 }
 
+pub struct LinearRange {
+    pub start_pos: f64,
+    pub end_pos: f64,
+    pub min_dur: f64,
+    pub max_dur: f64,
+    pub invert: bool
+}
+
+impl Default for LinearRange {
+    fn default() -> Self {
+        Self {
+            start_pos: 0.0, 
+            end_pos: 100.0,
+            min_dur: 250.0,
+            max_dur: 4000.0,
+            invert: false
+        }
+    }
+}
+
+impl LinearRange {
+    pub fn start_pos(&self) -> f64 {
+        match self.invert {
+            true => self.end_pos,
+            false => self.start_pos
+        }
+    }
+    pub fn end_pos(&self) -> f64 {
+        match self.invert {
+            true => self.start_pos,
+            false => self.end_pos
+        }
+    }
+}
+
 impl PatternPlayer {
+    pub async fn play_oscillate_linear(
+        mut self,
+        duration: Duration,
+        speed: Speed,
+        range: LinearRange
+    ) -> ButtplugClientResult {
+        let waiter = self.stop_after(duration);
+
+        let get_t = |speed: Speed| {  
+            let factor = (100 - speed.value) as f64 / 100.0;
+            (range.min_dur + (range.max_dur - range.min_dur) * factor) as u32
+        };
+
+        let mut current_speed = speed;
+        while !self.cancelled() {
+
+            self.try_update(&mut current_speed);
+            let mut wait_ms = get_t(current_speed);
+            self.do_linear(range.end_pos(), wait_ms).await.unwrap();
+            sleep(Duration::from_millis(wait_ms as u64)).await;
+
+            if self.cancelled() {
+                break;
+            }
+
+            self.try_update(&mut current_speed);
+            wait_ms = get_t(current_speed);
+            self.do_linear(range.start_pos(), wait_ms).await.unwrap();
+            sleep(Duration::from_millis(wait_ms as u64)).await;
+        }
+
+        waiter.abort();
+        Ok(())
+    }
+
     /// Executes the linear 'fscript' for 'duration' and consumes the player
     #[instrument(skip(fscript))]
     pub async fn play_linear(
@@ -70,16 +142,19 @@ impl PatternPlayer {
                 last_at = Duration::from_millis(point.at as u64);
                 last_waiting_time = actual_waiting_time;
                 if actual_waiting_time == Duration::ZERO {
+                    debug!("duration is zero, skipping");
                     continue;
                 }
 
                 let token = &self.cancellation_token.clone();
                 if let Some(result) = tokio::select! {
                     _ = token.cancelled() => {
+                        debug!("linear pattern cancelled");
                         break;
                     }
                     result = async {
                         let result = self.do_linear(Speed::from_fs(point).as_float(), actual_waiting_time.as_millis() as u32).await;
+                        debug!("sleeping for {:?}...", actual_waiting_time);
                         sleep(actual_waiting_time).await;
                         result
                     } => {
@@ -136,6 +211,7 @@ impl PatternPlayer {
                 Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
             {
                 if !(cancellable_wait(waiting_time, &self.cancellation_token).await) {
+                    debug!("scalar pattern cancelled");
                     break;
                 }
             }
@@ -246,6 +322,16 @@ impl PatternPlayer {
             sleep(duration).await;
             cancellation_clone.cancel();
         })
+    }
+
+    fn try_update(&mut self, speed: &mut Speed) {
+        if let Ok(update) = self.update_receiver.try_recv() {
+            *speed = update;
+        }
+    }
+
+    fn cancelled(&self) -> bool {
+        self.cancellation_token.is_cancelled()
     }
 }
 

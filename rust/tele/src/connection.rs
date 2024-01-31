@@ -34,6 +34,7 @@ pub enum Task {
     Scalar(Speed),
     Pattern(Speed, ActuatorType, String),
     Linear(Speed, String),
+    LinearOscillate(Speed, String)
 }
 
 #[derive(Clone, Debug)]
@@ -154,6 +155,7 @@ impl Display for Task {
                 write!(f, "Pattern({}, {}, {})", speed, actuator, pattern)
             }
             Task::Linear(speed, pattern) => write!(f, "Linear({}, {})", speed, pattern),
+            Task::LinearOscillate(speed, pattern) => write!(f, "Oscillate({}, {})", speed, pattern),
         }
     }
 }
