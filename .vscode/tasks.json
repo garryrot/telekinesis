@@ -2,34 +2,34 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "Build Papyrus (Debug)",
 			"type": "pyro",
 			"projectFile": "Debug.ppj",
 			"gamePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Skyrim Special Edition\\",
 			"problemMatcher": [
 				"$PapyrusCompiler"
 			],
-			"label": "Compile Papyrus (Debug)",
 			"group": {
 				"kind": "build"
 			}
 		},
 		{
+			"label": "Build Papyrus (Release)",
 			"type": "pyro",
 			"projectFile": "Release.ppj",
 			"gamePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Skyrim Special Edition\\",
 			"problemMatcher": [
 				"$PapyrusCompiler"
 			],
-			"label": "Compile Papyrus (Release)",
 			"group": {
 				"kind": "build"
 			}
 		},
 		{
+			"label": "Install Mod (Release)",
 			"type": "shell",
-			"label": "Deploy Papyrus Scripts (To Skyrim dir)",
 			"command": "./deploy-scripts-and-run.ps1",
-			"dependsOn": "Compile Papyrus (Release)",
+			"dependsOn": "Build Papyrus (Release)",
 			"presentation": {
 				"reveal": "always",
 				"panel": "new"
