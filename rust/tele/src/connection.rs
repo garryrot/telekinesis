@@ -15,7 +15,7 @@ use buttplug::{
 use crossbeam_channel::Sender;
 use futures::StreamExt;
 use tokio::runtime::Handle;
-use tracing::{error, info, span, Level};
+use tracing::{debug, error, info, span, Level};
 
 use crate::settings::TkConnectionType;
 
@@ -58,12 +58,15 @@ pub async fn handle_connection(
     let sender_interla_clone = event_sender_internal.clone();
     let mut buttplug_events = client.event_stream();
     let sender_clone = event_sender.clone();
-    Handle::current().spawn(async move {
-        let _ = span!(Level::INFO, "connection control").entered();
+    Handle::current().spawn(async move {   
+        // let span = span!(Level::INFO, "tk_conn_events");
+        // let _enter = span.enter();
+        debug!("starting...");
+
         loop {
             let next_cmd = command_receiver.recv().await;
             if let Some(cmd) = next_cmd {
-                info!("Executing command {:?}", cmd);
+                debug!("Executing command {:?}", cmd);
                 match cmd {
                     TkCommand::Scan => {
                         if let Err(err) = client.start_scanning().await {
@@ -94,14 +97,14 @@ pub async fn handle_connection(
                         client
                             .disconnect()
                             .await
-                            .unwrap_or_else(|_| error!("Failed to disconnect."));
+                            .unwrap_or_else(|_| error!("failed to disconnect"));
                         break;
                     }
                     TkCommand::StopAll => {
                         client
                             .stop_all_devices()
                             .await
-                            .unwrap_or_else(|_| error!("Failed to stop all devices."));
+                            .unwrap_or_else(|_| error!("failed to stop all devices"));
                     }
                 }
             } else {
@@ -111,7 +114,9 @@ pub async fn handle_connection(
         info!("stream closed");
     });
 
-    let _ = span!(Level::INFO, "device control").entered();
+    // let span = span!(Level::INFO, "tk_device_events");
+    // let _enter = span.enter();
+
     while let Some(event) = buttplug_events.next().await {
         match event.clone() {
             ButtplugClientEvent::DeviceAdded(device) => {
@@ -144,7 +149,7 @@ pub async fn handle_connection(
 fn try_send_event(sender: &Sender<TkConnectionEvent>, evt: TkConnectionEvent) {
     sender
         .try_send(evt)
-        .unwrap_or_else(|_| error!("Event sender full"));
+        .unwrap_or_else(|_| error!("event sender full"));
 }
 
 impl Display for Task {

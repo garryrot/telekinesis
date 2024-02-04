@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Error;
 use cxx::{CxxString, CxxVector};
-use tracing::error;
+use tracing::{debug, error};
 
 macro_rules! declare_api_cmd {
     ($t:ident) => {
@@ -320,24 +320,24 @@ pub trait Api<T> {
         F: FnOnce(&mut T) -> R,
     {
         let tele = &self.state();
-
         if let Ok(mut guard) = tele.try_lock() {
             match guard.take() {
                 Some(mut tk) => {
+                    debug!("calling...");
                     let result = func(&mut tk);
                     guard.replace(tk);
                     return result;
                 }
-                None => error!("Dispatch on 'None'"),
+                None => error!("dispatch on 'None'"),
             }
         } else {
-            error!("Failed locking mutex");
+            error!("failed locking mutex");
         }
         default
     }
 
     fn fail_dispatch<D>(&self, default: D) -> D {
-        error!("Cmd not found");
+        error!("cmd not found");
         default
     }
 }
