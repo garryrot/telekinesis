@@ -126,6 +126,7 @@ impl Status {
             .filter(|x| x.0.device.index() != device.index())
             .chain(new_actuators)
             .collect();
+        debug!("device status updated: {:?}", self.actuators)
     }
 }
 

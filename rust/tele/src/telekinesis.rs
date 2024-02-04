@@ -1,7 +1,7 @@
 use anyhow::Error;
 use bp_fakes::FakeDeviceConnector;
+use bp_scheduler::settings::LinearRange;
 use bp_scheduler::speed::Speed;
-use bp_scheduler::player::LinearRange;
 use bp_scheduler::ButtplugScheduler;
 use bp_scheduler::PlayerSettings;
 use buttplug::core::message::ActuatorType;
@@ -83,9 +83,8 @@ impl Telekinesis {
             status_event_sender: event_sender_internal.clone(),
             status: Status::new(event_receiver_internal, &settings),
         };
-        info!(?telekinesis, "connecting...");
+        info!(?telekinesis, "connecting...");    
         telekinesis.runtime.spawn(async move {
-            debug!("starting connection handling thread");
             let client = with_connector(connect_action().await).await;
             handle_connection(
                 event_sender_client,
@@ -162,12 +161,15 @@ impl Telekinesis {
 
         let task_clone = task.clone();
         let actuators = self.status.connected_actuators();
-        let player = self.scheduler.create_player(TkParams::filter_devices(
+
+        let devices = TkParams::filter_devices(
             &actuators,
             &body_parts,
             actuator_types,
             &self.settings.devices,
-        ));
+        );
+        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
+        let player = self.scheduler.create_player_with_settings(devices, settings);
 
         let handle = player.handle;
         let client_sender_clone = self.client_event_sender.clone();
@@ -215,12 +217,15 @@ impl Telekinesis {
         let task_clone = task.clone();
 
         let actuators = self.status.connected_actuators();
-        let player = self.scheduler.create_player(TkParams::filter_devices(
+
+        let devices = TkParams::filter_devices(
             &actuators,
             &body_parts,
             &[ActuatorType::Position],
             &self.settings.devices,
-        ));
+        );
+        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
+        let player = self.scheduler.create_player_with_settings(devices, settings);
         let handle = player.handle;
 
         let client_sender_clone = self.client_event_sender.clone();
@@ -262,12 +267,15 @@ impl Telekinesis {
         let task_clone = task.clone();
 
         let actuators = self.status.connected_actuators();
-        let player = self.scheduler.create_player(TkParams::filter_devices(
+
+        let devices = TkParams::filter_devices(
             &actuators,
             &body_parts,
             &[ActuatorType::Position],
             &self.settings.devices,
-        ));
+        );
+        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
+        let player = self.scheduler.create_player_with_settings(devices, settings);
         let handle = player.handle;
 
         let client_sender_clone = self.client_event_sender.clone();
@@ -284,10 +292,10 @@ impl Telekinesis {
                 .expect("never full");
             let result = match task {
                 Task::Linear(speed, _) => player.play_oscillate_linear(duration, speed, LinearRange { 
-                    start_pos: 0.0, 
-                    end_pos: 1.0, 
-                    min_dur: 300.0, 
-                    max_dur: 3000.0, 
+                    min_pos: 0.0, 
+                    max_pos: 1.0, 
+                    min_ms: 50, 
+                    max_ms: 10_000,  // TODO what do with this
                     invert: false
                 }).await,
                 _ => panic!(),
@@ -335,28 +343,6 @@ impl Telekinesis {
         }
     }
 
-    #[instrument(skip(self))]
-    pub fn settings_set_enabled(&mut self, actuator_id: &str, enabled: bool) {
-        debug!("settings={:?}", self.settings);
-        let mut settings = self.settings.clone();
-        settings.set_enabled(actuator_id, enabled);
-        self.settings = settings;
-    }
-
-    #[instrument(skip(self))]
-    pub fn settings_set_events(&mut self, actuator_id: &str, events: &[String]) {
-        debug!("settings={:?}", self.settings);
-        let settings = self.settings.clone();
-        self.settings = settings.set_events(actuator_id, events);
-    }
-
-    pub fn settings_get_events(&self, actuator_id: &str) -> Vec<String> {
-        self.settings.get_events(actuator_id)
-    }
-
-    pub fn settings_get_enabled(&self, actuator_id: &str) -> bool {
-        self.settings.is_enabled(actuator_id)
-    }
 }
 
 pub fn in_process_connector(
@@ -484,7 +470,7 @@ mod tests {
                 .unwrap();
         tk.await_connect(count);
         for actuator_id in tk.status.get_known_actuator_ids() {
-            tk.settings_set_enabled(&actuator_id, true);
+            tk.settings.set_enabled(&actuator_id, true);
         }
         tk.vibrate(
             Task::Scalar(Speed::new(100)),
@@ -533,7 +519,7 @@ mod tests {
             ],
             None,
         );
-        tk.settings_set_enabled("vib2 (Vibrate)", false);
+        tk.settings.set_enabled("vib2 (Vibrate)", false);
 
         // act
         tk.vibrate(
@@ -648,8 +634,8 @@ mod tests {
     fn settings_are_trimmed_and_lowercased() {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
-        tk.settings_set_enabled("vib1 (Vibrate)", true);
-        tk.settings_set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
+        tk.settings.set_enabled("vib1 (Vibrate)", true);
+        tk.settings.set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
         tk.vibrate(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -719,12 +705,12 @@ mod tests {
             None,
         );
 
-        tk.settings_set_events("vib2", one_event);
-        tk.settings_set_events("vib3", two_events);
+        tk.settings.set_events("vib2", one_event);
+        tk.settings.set_events("vib3", two_events);
 
-        assert_eq!(tk.settings_get_events("vib1"), empty);
-        assert_eq!(tk.settings_get_events("vib2"), one_event);
-        assert_eq!(tk.settings_get_events("vib3"), two_events);
+        assert_eq!(tk.settings.get_events("vib1"), empty);
+        assert_eq!(tk.settings.get_events("vib2"), one_event);
+        assert_eq!(tk.settings.get_events("vib3"), two_events);
     }
 
     #[test]
@@ -736,8 +722,8 @@ mod tests {
             ],
             None,
         );
-        tk.settings_set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
-        tk.settings_set_events("vib2 (Vibrate)", &[String::from("bogus")]);
+        tk.settings.set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
+        tk.settings.set_events("vib2 (Vibrate)", &[String::from("bogus")]);
 
         tk.vibrate(
             Task::Scalar(Speed::max()),
@@ -757,8 +743,8 @@ mod tests {
     fn event_is_trimmed_and_ignores_casing() {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
-        tk.settings_set_enabled("vib1 (Vibrate)", true);
-        tk.settings_set_events("vib1 (Vibrate)", &[String::from("some event")]);
+        tk.settings.set_enabled("vib1 (Vibrate)", true);
+        tk.settings.set_events("vib1 (Vibrate)", &[String::from("some event")]);
         tk.vibrate(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -855,7 +841,7 @@ mod tests {
         tk.await_connect(count);
 
         for actuator in tk.status.actuators() {
-            tk.settings_set_enabled(actuator.identifier(), true);
+            tk.settings.set_enabled(actuator.identifier(), true);
         }
         (tk, call_registry)
     }

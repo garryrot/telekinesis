@@ -4,8 +4,11 @@ use std::{
     path::PathBuf,
 };
 
+use bp_scheduler::{actuator::Actuator, settings::{ActuatorSettings, LinearRange, ScalarSettings}};
+use buttplug::core::message::ActuatorType;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tracing::{error, event, info, Level};
+use tracing::{debug, error, event, info, instrument, Level};
 
 use crate::input::sanitize_name_list;
 
@@ -66,14 +69,33 @@ pub struct TkDeviceSettings {
     pub actuator_id: String,
     pub enabled: bool,
     pub events: Vec<String>,
+    #[serde(default = "ActuatorSettings::default")]
+    pub actuator_settings: ActuatorSettings,
 }
 
 impl TkDeviceSettings {
-    pub fn from_name(actuator_id: &str) -> TkDeviceSettings {
+    pub fn from_identifier(actuator_id: &str) -> TkDeviceSettings {
         TkDeviceSettings {
             actuator_id: actuator_id.into(),
             enabled: false,
             events: vec![],
+            actuator_settings: ActuatorSettings::None,
+        }
+    }
+    pub fn from_actuator(actuator: &Actuator) -> TkDeviceSettings {
+        TkDeviceSettings {
+            actuator_id: actuator.identifier().into(),
+            enabled: false,
+            events: vec![],
+            actuator_settings: match actuator.actuator {
+                ActuatorType::Vibrate
+                | ActuatorType::Rotate
+                | ActuatorType::Oscillate
+                | ActuatorType::Constrict
+                | ActuatorType::Inflate => ActuatorSettings::Scalar(ScalarSettings::default()),
+                ActuatorType::Position => ActuatorSettings::Linear(LinearRange::default()),
+                _ => ActuatorSettings::None,
+            },
         }
     }
 }
@@ -123,77 +145,102 @@ impl TkSettings {
         self.devices.iter().filter(|d| d.enabled).cloned().collect()
     }
 
-    pub fn add(&mut self, actuator_id: &str) {
-        if self.devices.iter().any(|d| d.actuator_id == actuator_id) {
-            return;
-        }
-        self.devices.push(TkDeviceSettings::from_name(actuator_id));
-    }
-
-    pub fn set_events(mut self, actuator_id: &str, events: &[String]) -> Self {
-        self.assure_exists(actuator_id);
-        let evts: Vec<String> = sanitize_name_list(events);
-        self.devices = self
-            .devices
-            .iter()
-            .map(|d| {
-                let mut device = d.clone();
-                if d.actuator_id == actuator_id {
-                    device.events = evts.clone();
-                }
+    pub fn get_or_create(&mut self, actuator_id: &str) -> TkDeviceSettings {
+        let device = self.get_device(actuator_id);
+        match device {
+            Some(setting) => setting,
+            None => {
+                let device = TkDeviceSettings::from_identifier(actuator_id);
+                self.update_device(device.clone());
                 device
-            })
-            .collect();
-        self
-    }
-
-    pub fn get_events(&self, actuator_id: &str) -> Vec<String> {
-        match self
-            .devices
-            .iter()
-            .filter(|d| d.actuator_id == actuator_id)
-            .map(|d| d.events.clone())
-            .next()
-        {
-            Some(evt) => evt,
-            None => vec![],
+            },
         }
     }
 
+    pub fn get_or_create_linear(&mut self, actuator_id: &str) -> (TkDeviceSettings, LinearRange) {
+        let mut device = self.get_or_create(actuator_id);
+        if let ActuatorSettings::Linear(ref linear) = device.actuator_settings {
+            return (device.clone(), linear.clone());
+        }
+        let default = LinearRange::default();
+        device.actuator_settings = ActuatorSettings::Linear(default.clone());
+        self.update_device(device.clone());
+        (device, default)
+    }
+
+    pub fn get_or_create_scalar(&mut self, actuator_id: &str) -> (TkDeviceSettings, ScalarSettings) {
+        let mut device = self.get_or_create(actuator_id);
+        if let ActuatorSettings::Scalar(ref scalar) = device.actuator_settings {
+            return (device.clone(), scalar.clone());
+        }
+        let default = ScalarSettings::default();
+        device.actuator_settings = ActuatorSettings::Scalar(default.clone());
+        self.update_device(device.clone());
+        (device, default)
+    }
+
+    pub fn access_linear<F, R>(&mut self, actuator_id: &str, accessor: F) -> R
+        where F: FnOnce(&mut LinearRange) -> R
+    {
+        let (mut settings, mut linear) = self.get_or_create_linear(actuator_id);
+        let result = accessor(&mut linear);
+        settings.actuator_settings = ActuatorSettings::Linear(linear);
+        self.update_device(settings);
+        result
+    }
+
+    pub fn access_scalar<F, R>(&mut self, actuator_id: &str, accessor: F) -> R
+        where F: FnOnce(&mut ScalarSettings) -> R
+    {
+        let (mut settings, mut scalar) = self.get_or_create_scalar(actuator_id);
+        let result = accessor(&mut scalar);
+        settings.actuator_settings = ActuatorSettings::Scalar(scalar);
+        self.update_device(settings);
+
+        result
+    }
+   
+    pub fn update_device(&mut self, setting: TkDeviceSettings)
+    {
+        let insert_pos = self.devices.iter().find_position(|x| x.actuator_id == setting.actuator_id);
+        if let Some((pos, _)) = insert_pos {
+            self.devices[ pos ] = setting;
+        } else {
+            self.devices.push(setting);
+        }
+    }
+
+    pub fn get_device(&self, actuator_id: &str) -> Option<TkDeviceSettings> {
+         self.devices
+                .iter()
+                .find(|d| d.actuator_id == actuator_id)
+                .cloned()
+    }
+
+    #[instrument]
     pub fn set_enabled(&mut self, actuator_id: &str, enabled: bool) {
-        self.assure_exists(actuator_id);
+        debug!("set_enabled");
 
-        self.devices = self
-            .devices
-            .iter()
-            .map(|d| {
-                let mut device = d.clone();
-                if d.actuator_id == actuator_id {
-                    device.enabled = enabled;
-                }
-                device
-            })
-            .collect();
+        let mut device =  self.get_or_create(actuator_id);
+        device.enabled = enabled;
+        self.update_device(device)
     }
 
-    pub fn assure_exists(&mut self, actuator_id: &str) {
-        if self
-            .devices
-            .iter()
-            .filter(|d| d.actuator_id == actuator_id)
-            .count()
-            == 0
-        {
-            self.add(actuator_id);
-        }
+    #[instrument]
+    pub fn set_events(&mut self, actuator_id: &str, events: &[String]) {
+        debug!("set_events");
+
+        let mut device = self.get_or_create(actuator_id);
+        device.events = sanitize_name_list(events);
+        self.update_device(device);
     }
 
-    pub fn is_enabled(&self, actuator_id: &str) -> bool {
-        self.devices
-            .iter()
-            .filter(|d| d.actuator_id == actuator_id && d.enabled)
-            .count()
-            >= 1
+    pub fn get_events(&mut self, actuator_id: &str) -> Vec<String> {
+        self.get_or_create(actuator_id).events
+    }
+
+    pub fn get_enabled(&mut self, actuator_id: &str) -> bool {
+        self.get_or_create(actuator_id).enabled
     }
 }
 
@@ -209,21 +256,24 @@ mod tests {
         let mut setting = TkSettings::default();
 
         // Act
-        setting.devices.push(TkDeviceSettings::from_name("value"));
+        setting.devices.push(TkDeviceSettings::from_identifier("value"));
 
         let serialized = serde_json::to_string_pretty(&setting).unwrap();
         let deserialized: TkSettings = serde_json::from_str(&serialized).unwrap();
         println!("{}", serialized);
-        assert_eq!(deserialized.devices[0].actuator_id, setting.devices[0].actuator_id);
+        assert_eq!(
+            deserialized.devices[0].actuator_id,
+            setting.devices[0].actuator_id
+        );
     }
 
     #[test]
     fn file_existing_returns_parsed_content() {
         // Arrange
         let mut setting = TkSettings::default();
-        setting.devices.push(TkDeviceSettings::from_name("a"));
-        setting.devices.push(TkDeviceSettings::from_name("b"));
-        setting.devices.push(TkDeviceSettings::from_name("c"));
+        setting.devices.push(TkDeviceSettings::from_identifier("a"));
+        setting.devices.push(TkDeviceSettings::from_identifier("b"));
+        setting.devices.push(TkDeviceSettings::from_identifier("c"));
 
         let file = "test_config.json";
         let (path, _tmp_dir) = create_temp_file(file, &serde_json::to_string(&setting).unwrap());
@@ -256,16 +306,16 @@ mod tests {
     #[test]
     fn adds_every_device_only_once() {
         let mut settings = TkSettings::default();
-        settings.add("a");
-        settings.add("a");
+        settings.get_or_create("a");
+        settings.get_or_create("a");
         assert_eq!(settings.devices.len(), 1);
     }
 
     #[test]
     fn enable_and_disable_devices() {
         let mut settings = TkSettings::default();
-        settings.add("a");
-        settings.add("b");
+        settings.get_or_create("a");
+        settings.get_or_create("b");
         settings.set_enabled("a", true);
         let enabled_devices = settings.get_enabled_devices();
         assert_eq!(enabled_devices.len(), 1);
@@ -278,8 +328,8 @@ mod tests {
     #[test]
     fn enable_multiple_devices() {
         let mut settings = TkSettings::default();
-        settings.add("a");
-        settings.add("b");
+        settings.get_or_create("a");
+        settings.get_or_create("b");
         settings.set_enabled("a", true);
         settings.set_enabled("b", true);
         assert_eq!(settings.get_enabled_devices().len(), 2);
@@ -295,22 +345,22 @@ mod tests {
     #[test]
     fn is_enabled_false() {
         let mut settings = TkSettings::default();
-        settings.add("a");
-        assert!(!settings.is_enabled("a"));
+        settings.get_or_create("a");
+        assert!(!settings.get_enabled("a"));
     }
 
     #[test]
     fn is_enabled_true() {
         let mut settings = TkSettings::default();
-        settings.add("a");
+        settings.get_or_create("a");
         settings.set_enabled("a", true);
-        assert!(settings.is_enabled("a"));
+        assert!(settings.get_enabled("a"));
     }
 
     #[test]
     fn write_to_temp_file() {
         let mut settings = TkSettings::default();
-        settings.add("foobar");
+        settings.get_or_create("foobar");
 
         // act
         let target_file = "some_target_file.json";

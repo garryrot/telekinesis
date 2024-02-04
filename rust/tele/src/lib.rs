@@ -1,19 +1,22 @@
 use api::*;
-use bp_scheduler::speed::Speed;
+use bp_scheduler::{
+    settings::{ActuatorSettings, LinearRange},
+    speed::Speed,
+};
 use buttplug::core::message::ActuatorType;
 use connection::{Task, TkConnectionEvent};
 use ffi::SKSEModEvent;
 use input::get_duration_from_secs;
 use itertools::Itertools;
 use pattern::{get_pattern_names, read_pattern};
-use std::{default, sync::{Arc, Mutex}};
-use tracing::instrument;
+use std::sync::{Arc, Mutex};
+use tracing::{debug, instrument};
 
 use cxx::{CxxString, CxxVector};
 use telekinesis::{Telekinesis, ERROR_HANDLE};
 
 use crate::{
-    input::{parse_list_string, read_input_string},
+    input::{parse_csv, read_input_string},
     settings::{TkConnectionType, TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
 
@@ -355,12 +358,13 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "linear.oscillate",
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
             tk.linear_oscillate(
-                    Task::Linear(Speed::new(speed.into()), pattern_name.into()),
-                    get_duration_from_secs(time_sec),
-                    pattern_name,
-                    read_input_string(body_parts))
-            },
-        default: ERROR_HANDLE
+                Task::Linear(Speed::new(speed.into()), pattern_name.into()),
+                get_duration_from_secs(time_sec),
+                pattern_name,
+                read_input_string(body_parts),
+            )
+        },
+        default: ERROR_HANDLE,
     })
     .def_update(ApiUpdate {
         exec: |tk, handle, speed| tk.update(handle, Speed::new(speed.into())),
@@ -405,31 +409,150 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_cmd1(ApiCmd1 {
         name: "device.settings.enable",
         exec: |tk, actuator_id| {
-            tk.settings_set_enabled(actuator_id, true);
+            tk.settings.set_enabled(actuator_id, true);
             true
         },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.settings.disable",
         exec: |tk, actuator_id| {
-            tk.settings_set_enabled(actuator_id, false);
+            tk.settings.set_enabled(actuator_id, false);
             true
         },
     })
     .def_qry_bool_1(ApiQryBool1 {
         name: "device.settings.enabled",
-        exec: |tk, actuator_id| tk.settings_get_enabled(actuator_id),
+        exec: |tk, actuator_id| tk.settings.get_enabled(actuator_id),
     })
     .def_cmd2(ApiCmd2 {
         name: "device.settings.events",
         exec: |tk, actuator_id, events| {
-            tk.settings_set_events(actuator_id, &parse_list_string(events));
+            tk.settings.set_events(actuator_id, &parse_csv(events));
             true
         },
     })
     .def_qry_lst_1(ApiQryList1 {
         name: "device.settings.events",
-        exec: |tk, actuator_id| tk.settings_get_events(actuator_id),
+        exec: |tk, actuator_id| tk.settings.get_events(actuator_id),
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.scalar.min_speed",
+        default: "",
+        exec: |tk, actuator_id| {
+            tk.settings
+                .access_scalar(actuator_id, |x| x.min_speed.to_string())
+        },
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.scalar.min_speed",
+        exec: |tk, actuator_id, percent| {
+            tk.settings.access_scalar(actuator_id, |x| {
+                x.min_speed = percent.parse().unwrap_or(0);
+            });
+            true
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.scalar.max_speed",
+        default: "",
+        exec: |tk, actuator_id| {
+            tk.settings
+                .access_scalar(actuator_id, |x| x.max_speed.to_string())
+        },
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.scalar.max_speed",
+        exec: |tk, actuator_id, percent| {
+            tk.settings.access_scalar(actuator_id, |x| {
+                x.max_speed = percent.parse().unwrap_or(100);
+            });
+            true
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.linear.min_ms",
+        default: "",
+        exec: |tk, actuator_id| {
+            tk.settings
+                .access_linear(actuator_id, |x| x.min_ms.to_string())
+        },
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.linear.min_ms",
+        exec: |tk, actuator_id, percent| {
+            tk.settings.access_linear(actuator_id, |x| {
+                x.min_ms = percent.parse().unwrap_or(0);
+            });
+            true
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.linear.max_ms",
+        default: "",
+        exec: |tk, actuator_id| {
+            tk.settings
+                .access_linear(actuator_id, |x| x.max_ms.to_string())
+        },
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.linear.max_ms",
+        exec: |tk, actuator_id, percent| {
+            tk.settings.access_linear(actuator_id, |x|
+                x.max_ms = percent.parse().unwrap_or(100)
+            );
+            true
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.linear.min_pos",
+        default: "",
+        exec: |tk, actuator_id| {
+            tk.settings
+                .access_linear(actuator_id, |x| x.min_pos.to_string())
+        },
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.linear.min_pos",
+        exec: |tk, actuator_id, percent| {
+            tk.settings
+                .access_linear(actuator_id, |x| x.min_pos = percent.parse().unwrap_or(0.0));
+            true
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.linear.max_pos",
+        default: "",
+        exec: |tk, actuator_id| {
+            tk.settings
+                .access_linear(actuator_id, |x| x.max_pos.to_string())
+        },
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.linear.max_pos",
+        exec: |tk, actuator_id, percent| {
+            tk.settings.access_linear(actuator_id, |x|
+                x.max_pos = percent.parse().unwrap_or(LinearRange::default().max_pos)
+            );
+            true
+        },
+    })
+    .def_qry_bool_1(ApiQryBool1 {
+        name: "device.linear.invert",
+        exec: |tk, actuator_id| tk.settings.access_linear(actuator_id, |x| x.invert),
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.linear.invert",
+        exec: |tk, actuator_id, invert| {
+            tk.settings
+                .access_linear(actuator_id, |x| x.invert = invert == "false");
+            true
+        },
+    })
+    // connection
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.connection.status",
+        default: "Not Connected",
+        exec: |tk, actuator_id| tk.status.get_actuator_status(actuator_id).to_string(),
     })
     .def_qry_str1(ApiQryStr1 {
         name: "device.connection.status",

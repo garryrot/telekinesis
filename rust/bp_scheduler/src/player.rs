@@ -1,10 +1,8 @@
-use anyhow::{anyhow, Context};
 use funscript::FScript;
-use tokio::{io::split, runtime::Handle};
+use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
-use std::num::ParseIntError;
-use std::{any, fmt, sync::Arc, time::Duration};
+use std::{fmt, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{sleep, Instant},
@@ -13,10 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, instrument, trace};
 
 use crate::{
-    actuator::Actuator,
-    cancellable_wait,
-    speed::Speed,
-    worker::{ButtplugClientResult, WorkerTask},
+    actuator::Actuator, cancellable_wait, settings::{ActuatorSettings, LinearRange}, speed::Speed, worker::{ButtplugClientResult, WorkerTask}
 };
 
 /// Pattern executor that can be passed from the schedulers main-thread to a sub-thread
@@ -24,6 +19,7 @@ pub struct PatternPlayer {
     pub handle: i32,
     pub scalar_resolution_ms: i32,
     pub actuators: Vec<Arc<Actuator>>,
+    pub settings: Vec<ActuatorSettings>,
     pub result_sender: UnboundedSender<ButtplugClientResult>,
     pub result_receiver: UnboundedReceiver<ButtplugClientResult>,
     pub update_receiver: UnboundedReceiver<Speed>,
@@ -31,73 +27,25 @@ pub struct PatternPlayer {
     pub worker_task_sender: UnboundedSender<WorkerTask>,
 }
 
-pub struct LinearRange {
-    pub start_pos: f64,
-    pub end_pos: f64,
-    pub min_dur: f64,
-    pub max_dur: f64,
-    pub invert: bool
-}
-
-impl Default for LinearRange {
-    fn default() -> Self {
-        Self {
-            start_pos: 0.0, 
-            end_pos: 100.0,
-            min_dur: 250.0,
-            max_dur: 4000.0,
-            invert: false
-        }
-    }
-}
-
-impl LinearRange {
-    pub fn start_pos(&self) -> f64 {
-        match self.invert {
-            true => self.end_pos,
-            false => self.start_pos
-        }
-    }
-    pub fn end_pos(&self) -> f64 {
-        match self.invert {
-            true => self.start_pos,
-            false => self.end_pos
-        }
-    }
-}
-
 impl PatternPlayer {
     pub async fn play_oscillate_linear(
         mut self,
         duration: Duration,
         speed: Speed,
-        range: LinearRange
+        settings: LinearRange
     ) -> ButtplugClientResult {
+        debug!(?settings, "oscillation started");
         let waiter = self.stop_after(duration);
-
-        let get_t = |speed: Speed| {  
-            let factor = (100 - speed.value) as f64 / 100.0;
-            (range.min_dur + (range.max_dur - range.min_dur) * factor) as u32
-        };
-
         let mut current_speed = speed;
         while !self.cancelled() {
-
             self.try_update(&mut current_speed);
-            let mut wait_ms = get_t(current_speed);
-            self.do_linear(range.end_pos(), wait_ms).await.unwrap();
-            sleep(Duration::from_millis(wait_ms as u64)).await;
-
+            self.do_stroke(true, current_speed, &settings).await.unwrap();
             if self.cancelled() {
                 break;
             }
-
             self.try_update(&mut current_speed);
-            wait_ms = get_t(current_speed);
-            self.do_linear(range.start_pos(), wait_ms).await.unwrap();
-            sleep(Duration::from_millis(wait_ms as u64)).await;
+            self.do_stroke(false, current_speed, &settings).await.unwrap();
         }
-
         waiter.abort();
         Ok(())
     }
@@ -153,10 +101,9 @@ impl PatternPlayer {
                         break;
                     }
                     result = async {
-                        let result = self.do_linear(Speed::from_fs(point).as_float(), actual_waiting_time.as_millis() as u32).await;
-                        debug!("sleeping for {:?}...", actual_waiting_time);
-                        sleep(actual_waiting_time).await;
-                        result
+                        let pos = Speed::from_fs(point).as_float();
+                        debug!(?actual_waiting_time, ?pos, "moving");
+                        self.do_linear(pos, actual_waiting_time.as_millis() as u32).await
                     } => {
                         Some(result)
                     }
@@ -201,15 +148,17 @@ impl PatternPlayer {
                 current_speed = update;
             }
 
+            let speed = Speed::from_fs(current).multiply(&current_speed);
             if !started {
-                self.do_scalar(Speed::from_fs(current).multiply(&current_speed), true);
+                self.do_scalar(speed, true);
                 started = true;
             } else {
-                self.do_update(Speed::from_fs(current).multiply(&current_speed), true);
+                self.do_update(speed, true);
             }
             if let Some(waiting_time) =
                 Duration::from_millis(next.at as u64).checked_sub(loop_started.elapsed())
             {
+                debug!(?speed, ?waiting_time, "vibrating");
                 if !(cancellable_wait(waiting_time, &self.cancellation_token).await) {
                     debug!("scalar pattern cancelled");
                     break;
@@ -251,12 +200,12 @@ impl PatternPlayer {
     }
 
     fn do_update(&self, speed: Speed, is_pattern: bool) {
-        for actuator in self.actuators.iter() {
+        for (i, actuator) in self.actuators.iter().enumerate() {
             trace!("do_update {} {:?}", speed, actuator);
             self.worker_task_sender
                 .send(WorkerTask::Update(
                     actuator.clone(),
-                    speed,
+                    apply_scalar_settings(speed, &self.settings[ i ]),
                     is_pattern,
                     self.handle,
                 ))
@@ -266,12 +215,12 @@ impl PatternPlayer {
 
     #[instrument(skip(self))]
     fn do_scalar(&self, speed: Speed, is_pattern: bool) {
-        for actuator in self.actuators.iter() {
+        for (i, actuator) in self.actuators.iter().enumerate() {
             trace!("do_scalar");
             self.worker_task_sender
                 .send(WorkerTask::Start(
                     actuator.clone(),
-                    speed,
+                    apply_scalar_settings(speed, &self.settings[ i ]),
                     is_pattern,
                     self.handle,
                 ))
@@ -303,6 +252,7 @@ impl PatternPlayer {
     async fn do_linear(&mut self, pos: f64, duration_ms: u32) -> ButtplugClientResult {
         for actuator in &self.actuators {
             trace!("do_linear");
+            // TODO: Limit by max speed?
             self.worker_task_sender
                 .send(WorkerTask::Move(
                     actuator.clone(),
@@ -313,6 +263,30 @@ impl PatternPlayer {
                 ))
                 .unwrap_or_else(|err| error!("queue err {:?}", err));
         }
+        sleep(Duration::from_millis(duration_ms as u64)).await;
+        self.result_receiver.recv().await.unwrap()
+    }
+
+    #[instrument(skip(self))]
+    async fn do_stroke(&mut self, start: bool, speed: Speed, settings: &LinearRange) -> ButtplugClientResult {
+        let mut wait_ms = 0;
+        for (i, actuator) in self.actuators.iter().enumerate() {
+            let actual_settings = settings.merge(&self.settings[ i ].linear_or_max());
+            wait_ms = actual_settings.get_duration_ms(speed);
+            let target_pos = actual_settings.get_pos(start);
+            debug!(?wait_ms, ?target_pos, ?settings, "stroke");
+            self.worker_task_sender
+                .send(WorkerTask::Move(
+                    actuator.clone(),
+                    target_pos,
+                    wait_ms,
+                    true,
+                    self.result_sender.clone(),
+                ))
+                .unwrap_or_else(|err| error!("queue err {:?}", err));
+        }
+        // breaks with multiple devices that have different settings
+        sleep(Duration::from_millis(wait_ms as u64)).await;
         self.result_receiver.recv().await.unwrap()
     }
 
@@ -332,6 +306,52 @@ impl PatternPlayer {
 
     fn cancelled(&self) -> bool {
         self.cancellation_token.is_cancelled()
+    }
+}
+
+impl LinearRange {
+    fn merge(&self, settings: &LinearRange) -> LinearRange {   
+        LinearRange {
+            min_ms: if self.min_ms < settings.min_ms { settings.min_ms } else { self.min_ms },
+            max_ms: if self.max_ms > settings.max_ms { settings.max_ms } else { self.max_ms },
+            min_pos: if self.min_pos < settings.min_pos { settings.min_pos } else { self.min_pos },
+            max_pos: if self.max_pos > settings.max_pos { settings.max_pos } else { self.max_pos },
+            invert: if settings.invert { ! self.invert } else { self.invert },
+        }
+    }
+    pub fn get_pos(&self, move_up: bool) -> f64 {
+        let mut move_up = move_up;
+        if self.invert {
+            move_up = !move_up;
+        }
+        match move_up {
+            true => self.max_pos,
+            false => self.min_pos
+        }
+    }
+    pub fn get_duration_ms(&self, speed: Speed) -> u32 {
+        let factor = (100 - speed.value) as f64 / 100.0;
+        let ms = self.min_ms as f64 + (self.max_ms - self.min_ms) as f64 * factor;
+        ms as u32
+    }
+}
+
+fn apply_scalar_settings(speed: Speed, settings: &ActuatorSettings) -> Speed {
+    if speed.value == 0 {
+        return speed;
+    }
+    match settings {
+        ActuatorSettings::Scalar(settings) => {
+            trace!("applying {settings:?}");
+            if speed.value < settings.min_speed as u16 {
+                Speed::new(settings.min_speed)
+            } else if speed.value > settings.max_speed as u16 {
+                Speed::new(settings.max_speed)
+            } else {
+                speed
+            }
+        },
+        _ => speed,
     }
 }
 

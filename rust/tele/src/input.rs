@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use bp_scheduler::actuator::Actuator;
+use bp_scheduler::{actuator::Actuator, settings::ActuatorSettings};
 use buttplug::core::message::ActuatorType;
 use cxx::{CxxString, CxxVector};
 use tracing::debug;
@@ -13,7 +13,7 @@ pub fn sanitize_name_list(list: &[String]) -> Vec<String> {
         .collect()
 }
 
-pub fn parse_list_string(input: &str) -> Vec<String> {
+pub fn parse_csv(input: &str) -> Vec<String> {
     let mut list = vec![];
     for part in input.split(',') {
         if !part.is_empty() {
@@ -48,9 +48,9 @@ impl TkParams {
         input_body_parts: &[String],
         actuator_types: &[ActuatorType],
         device_settings: &[TkDeviceSettings]
-    ) -> Vec<Arc<Actuator>> {
+        ) -> Vec<Arc<Actuator>> {
         let body_parts = sanitize_name_list(input_body_parts);
-        let selected = device_settings.iter().filter( |setting| { 
+        let selected_settings = device_settings.iter().filter( |setting| { 
             if ! setting.enabled {
                 return false;
             }
@@ -58,16 +58,21 @@ impl TkParams {
                 return true;
             }
             setting.events.iter().any( |y| body_parts.contains(y) )
-        }).map( |x| x.actuator_id.to_owned() ).collect::<Vec<String>>();
+        }).cloned().collect::<Vec<TkDeviceSettings>>();
+
+        let selected = selected_settings.iter().map(|x| x.actuator_id.clone()).collect::<Vec<String>>();
         
         let used = actuators
                 .iter()
                 .filter( |x| actuator_types.iter().any(|y| y == &x.actuator) )
                 .filter( |x| selected.contains( & x.identifier().to_owned() ) )
                 .cloned()
-                .collect();
+                .collect::<Vec<Arc<Actuator>>>();
+
+        let actuator_settings = used.iter().map(|x| device_settings.iter().find( |y| y.actuator_id == x.identifier() ) );
+
         debug!("connected: {:?}", actuators.iter().map( |x| x.identifier() ).collect::<Vec<&str>>());
-        debug!("used: {:?}", used );
+        debug!(?used);
         used
     }
 

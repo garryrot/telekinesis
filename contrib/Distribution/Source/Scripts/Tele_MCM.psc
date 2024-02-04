@@ -18,7 +18,7 @@ Tele_Devices Property TDevices Hidden
         Endif
         return _TDevices
     EndFunction
-EndProperty 
+EndProperty
 
 String[] _ConnectionMenuOptions
 String[] _DeviceSelectorOptions ; 0 = All, 1 = Match Tags
@@ -31,14 +31,22 @@ Int[] _DeviceEventOids
 Int[] _TestVibratePatternOid
 Int[] _TestStrokePatternOid
 
+Int[] _StrokerMinPosOid
+Int[] _StrokerMaxPosOid
+Int[] _StrokerMinMsOid
+Int[] _StrokerMaxMsOid
+Int[] _StrokerInvertOid
+Int[] _VibratorMinSpeedOid
+Int[] _VibratorMaxSpeedOid
+
 String[] _StrokeFunscriptNames
 String[] _VibrateFunscriptNames
 
-String[] _DeviceNames
+String[] _ActuatorIds
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 15
+    return 16
 EndFunction
 
 Event OnConfigInit()
@@ -64,7 +72,7 @@ Event OnVersionUpdate(int newVersion)
         TIntegration.MigrateToV12()
     EndIf
 
-    If CurrentVersion < 15
+    If CurrentVersion < 16
         ;  Older than 1.3.0
         InitLocals()
         TIntegration.InitDefaultListeners()
@@ -111,12 +119,18 @@ Function InitLocals()
     
     _UseDeviceOids = new Int[20] ; Reserve mcm space for 5 fields per device
     _DeviceEventOids = new Int[20]
-    
-    _DeviceNames = new String[1]
+    _StrokerMinPosOid = new Int[20]
+    _StrokerMaxPosOid = new Int[20]
+    _StrokerMinMsOid = new Int[20]
+    _StrokerMaxMsOid = new Int[20]
+    _StrokerInvertOid = new Int[20]
+    _VibratorMinSpeedOid = new Int[20]
+    _VibratorMaxSpeedOid = new Int[20]
+    _ActuatorIds = new String[20]
     _DebugSpellsAdded = false
 
-    _StrokeFunscriptNames = new String[127]
-    _VibrateFunscriptNames = new String[127]
+    _StrokeFunscriptNames = new String[1]
+    _VibrateFunscriptNames = new String[1]
     _TestVibratePatternOid = new Int[127]
     _TestStrokePatternOid = new Int[127]
 EndFunction
@@ -157,48 +171,89 @@ Event OnPageReset(String page)
         AddEmptyOption()
     EndIf
     If page == "Devices"
-        SetCursorFillMode(TOP_TO_BOTTOM)
+        SetCursorFillMode(LEFT_TO_RIGHT)
         If ! TDevices.Connects()
             AddHeaderOption("Connection Disabled...")
             return
         EndIf
   
         AddHeaderOption("Discovery")
+        AddEmptyOption()
+
         AddToggleOptionST("ACTION_SCAN_FOR_DEVICES", "Scan for devices", TDevices.ScanningForDevices)
-        _DeviceNames = Tele_Api.Qry_Lst("devices")
-        Int len = _DeviceNames.Length
+        AddEmptyOption()
+
+        _ActuatorIds = Tele_Api.Qry_Lst("devices")
+        Int len = _ActuatorIds.Length
         If len > 20
             TDevices.LogError("Too many devices, ignoring some in MCM")
             len = 20
         EndIf
-
         Int i = 0
         While (i < len) 
-            String actuatorId = _DeviceNames[i]
+            String actuatorId = _ActuatorIds[i]
             
             If actuatorId != ""
                 String status = Tele_Api.Qry_Str_1("device.connection.status", actuatorId)
-                AddHeaderOption(actuatorId)
-                AddTextOption(Key(i, "State"), status, OPTION_FLAG_DISABLED)
-                AddTextOption(Key(i, "Motor"), Tele_Api.Qry_Str_1("device.actuator", actuatorId) + " " + Tele_Api.Qry_Str_1("device.actuator.index", actuatorId), OPTION_FLAG_DISABLED)
-                _DeviceEventOids[i] = AddInputOption(Key(i, "Body Parts"), Join(Tele_Api.Qry_Lst_1("device.settings.events", actuatorId), ","))
-
-                Int flags = OPTION_FLAG_DISABLED
-                If status == "Connected"
-                    flags = OPTION_FLAG_NONE
-                EndIf
-
                 bool connects = false
                 If TDevices.Connects()
                     connects = Tele_Api.Qry_Bool_1("device.settings.enabled", actuatorId)
                 EndIf
-                _UseDeviceOids[i] = AddToggleOption(Key(i, "Enabled"), connects, flags)
+                String actuatorType = Tele_Api.Qry_Str_1("device.actuator", actuatorId)
+                Bool isStroker = actuatorType == "Position"
+                String actuatorIndex = Tele_Api.Qry_Str_1("device.actuator.index", actuatorId)
+                String[] events = Tele_Api.Qry_Lst_1("device.settings.events", actuatorId)
+
+                AddHeaderOption(actuatorId)
+                AddEmptyOption()
+
+                Int enabled_flag = OPTION_FLAG_DISABLED
+                If status == "Connected"
+                    enabled_flag = OPTION_FLAG_NONE
+                EndIf
+
+                _UseDeviceOids[i] = AddToggleOption("Enabled", connects, enabled_flag)
+                If isStroker
+                    Int minMs = Tele_Api.Qry_Str_1("device.linear.min_ms", actuatorId) as Int
+                    _StrokerMinMsOid[i] = AddSliderOption("Min Stroke (ms)", minMs)
+                Else
+                    Int minSpeed = Tele_Api.Qry_Str_1("device.scalar.min_speed", actuatorId) as Int
+                    _VibratorMinSpeedOid[i] = AddSliderOption("Min Speed %", minSpeed)
+                EndIf
+
+                AddTextOption("State", status, OPTION_FLAG_DISABLED)
+                If isStroker
+                    Int maxMs = Tele_Api.Qry_Str_1("device.linear.max_ms", actuatorId) as Int
+                    _StrokerMaxMsOid[i] = AddSliderOption("Max Stroke (ms)", maxMs)
+                Else
+                    Int maxSpeed = Tele_Api.Qry_Str_1("device.scalar.max_speed", actuatorId) as Int
+                    _VibratorMaxSpeedOid[i] = AddSliderOption("Max Speed %", maxSpeed)
+                EndIf
+
+                AddTextOption("Motor", actuatorType + " " + actuatorIndex, OPTION_FLAG_DISABLED)
+                If isStroker
+                    Float minPos = Tele_Api.Qry_Str_1("device.linear.min_pos", actuatorId) as Float
+                    _StrokerMinPosOid[i] = AddSliderOption("Min Pos", minPos, "{2}")
+                Else
+                    AddEmptyOption()
+                    _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
+                    AddEmptyOption()
+                EndIf
+
+                If isStroker
+                    _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
+                    Float maxPos = Tele_Api.Qry_Str_1("device.linear.max_pos", actuatorId) as Float
+                    _StrokerMaxPosOid[i] = AddSliderOption("Max Pos", maxPos, "{2}")
+                    AddEmptyOption()
+                    String invertPos = Tele_Api.Qry_Bool_1("device.linear.invert", actuatorId)
+                    _StrokerInvertOid[i] = AddToggleOption("Invert Pos", invertPos)
+                EndIf
             EndIf
 
             i += 1
         EndWhile
 
-        If _DeviceNames.Length == 0
+        If _ActuatorIds.Length == 0
             AddHeaderOption("No devices discovered yet...")
         EndIf
     EndIf
@@ -2075,9 +2130,9 @@ EndState
 
 Event OnOptionSelect(int oid)
     Int i = 0
-    While (i < 31 && i < _DeviceNames.Length)
+    While (i < 31 && i < _ActuatorIds.Length)
         If (oid == _UseDeviceOids[i])
-            String device = _DeviceNames[i]
+            String device = _ActuatorIds[i]
             Bool isUsed = ! Tele_Api.Qry_Bool_1("device.settings.enabled", device)
             SetToggleOptionValue(oid, isUsed)
             If isUsed
@@ -2111,12 +2166,92 @@ Event OnOptionSelect(int oid)
     Tele_Api.Cmd("settings.store")
 EndEvent
 
-Event OnOptionInputAccept(int oid, string value)
+Event OnOptionSliderOpen(Int oid)
     Int i = 0
-    While (i < 31 && i < _DeviceNames.Length)
+    While (i < _StrokerMinPosOid.Length)
+        If (oid == _VibratorMinSpeedOid[i])
+            Int minSpeed = Tele_Api.Qry_Str_1("device.linear.min_speed", _ActuatorIds[i]) as Int
+            SetSliderDialogStartValue(minSpeed)
+            SetSliderDialogDefaultValue(0)
+            SetSliderDialogRange(0, 100)
+            SetSliderDialogInterval(1) 
+        EndIf
+        If (oid == _VibratorMaxSpeedOid[i])
+            Int maxSpeed = Tele_Api.Qry_Str_1("device.linear.max_speed", _ActuatorIds[i]) as Int
+            SetSliderDialogStartValue(maxSpeed)
+            SetSliderDialogDefaultValue(100)
+            SetSliderDialogRange(0, 100)
+            SetSliderDialogInterval(1) 
+        EndIf
+        If (oid == _StrokerMinPosOid[i])
+            Float minPos = Tele_Api.Qry_Str_1("device.linear.min_pos", _ActuatorIds[i]) as Float
+            SetSliderDialogStartValue(minPos)
+            SetSliderDialogDefaultValue(0)
+            SetSliderDialogRange(0.0, 1.0)
+            SetSliderDialogInterval(0.01) 
+        EndIf
+        If (oid == _StrokerMaxPosOid[i])
+            Float maxPos = Tele_Api.Qry_Str_1("device.linear.max_pos", _ActuatorIds[i]) as Float
+            SetSliderDialogStartValue(maxPos)
+            SetSliderDialogDefaultValue(1)
+            SetSliderDialogRange(0.0, 1.0)
+            SetSliderDialogInterval(0.01)
+        EndIf
+        If (oid == _StrokerMinMsOid[i])
+            Float minMs = Tele_Api.Qry_Str_1("device.linear.min_ms", _ActuatorIds[i]) as Float
+            SetSliderDialogStartValue(minMs)
+            SetSliderDialogDefaultValue(250)
+            SetSliderDialogRange(50, 10000)
+            SetSliderDialogInterval(10)
+        EndIf
+        If (oid == _StrokerMaxMsOid[i])
+            Float maxMs = Tele_Api.Qry_Str_1("device.linear.max_ms", _ActuatorIds[i]) as Float
+            SetSliderDialogStartValue(maxMs)
+            SetSliderDialogDefaultValue(3000)
+            SetSliderDialogRange(50, 10000)
+            SetSliderDialogInterval(10)
+        EndIf
+        i += 1
+    EndWhile
+EndEvent
+
+Event OnOptionSliderAccept(Int oid, Float value)
+    Int i = 0
+    While (i < _StrokerMinPosOid.Length)
+        If (oid == _VibratorMinSpeedOid[i])
+            SetSliderOptionValue(oid, value, "{0}")
+            Tele_Api.Cmd_2("device.scalar.min_speed", _ActuatorIds[i], value as Int)
+        EndIf
+        If (oid == _VibratorMaxSpeedOid[i])
+            SetSliderOptionValue(oid, value, "{0}")
+            Tele_Api.Cmd_2("device.scalar.max_speed", _ActuatorIds[i], value as Int)
+        EndIf
+        If (oid == _StrokerMinPosOid[i])
+            SetSliderOptionValue(oid, value, "{2}")
+            Tele_Api.Cmd_2("device.linear.min_pos", _ActuatorIds[i], value)
+        EndIf
+        If (oid == _StrokerMaxPosOid[i])
+            SetSliderOptionValue(oid, value, "{2}")
+            Tele_Api.Cmd_2("device.linear.max_pos", _ActuatorIds[i], value)
+        EndIf
+        If (oid == _StrokerMinMsOid[i])
+            SetSliderOptionValue(oid, value, "{0}")
+            Tele_Api.Cmd_2("device.linear.min_ms", _ActuatorIds[i], value as Int)
+        EndIf
+        If (oid == _StrokerMaxMsOid[i])
+            SetSliderOptionValue(oid, value, "{0}")
+            Tele_Api.Cmd_2("device.linear.max_ms", _ActuatorIds[i], value as Int)
+        EndIf
+        i += 1
+    EndWhile
+    Tele_Api.Cmd("settings.store")
+EndEvent
+
+Event OnOptionInputAccept(Int oid, String value)
+    Int i = 0
+    While (i < 31 && i < _ActuatorIds.Length)
         If (oid == _DeviceEventOids[i])
-            String name = _DeviceNames[i]
-            Tele_Api.Cmd_2("device.settings.events", name, value)
+            Tele_Api.Cmd_2("device.settings.events", _ActuatorIds[i], value)
             SetInputOptionValue(oid, value)
         EndIf
         i += 1
@@ -2124,9 +2259,9 @@ Event OnOptionInputAccept(int oid, string value)
     Tele_Api.Cmd("settings.store")
 EndEvent
 
-Event OnOptionHighlight(int oid)
+Event OnOptionHighlight(Int oid)
     Int i = 0
-    While (i < 31 && i < _DeviceNames.Length)
+    While (i < 31 && i < _ActuatorIds.Length)
         If (oid == _DeviceEventOids[i])  
             String infoText = "A comma-separated list of body parts associated with this device.\n"
             infoText += "By default, the terms 'Nipple', 'Vaginal', 'Anal', 'Penetration' are used to describe these, but any is possible.\n"
@@ -2136,10 +2271,6 @@ Event OnOptionHighlight(int oid)
         i += 1
     EndWhile
 EndEvent
-
-String Function Key( String index, String name )
-    return "[" + index + "] " + name
-EndFunction
 
 String Function Join(String[] segments, String separator)
     String joined = ""

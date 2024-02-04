@@ -1,6 +1,7 @@
 use actuator::Actuator;
 use buttplug::client::ButtplugClientError;
 use player::PatternPlayer;
+use settings::ActuatorSettings;
 use speed::Speed;
 use std::collections::HashMap;
 use worker::{ButtplugWorker, WorkerTask};
@@ -17,6 +18,7 @@ mod access;
 pub mod actuator;
 pub mod player;
 pub mod speed;
+pub mod settings;
 mod worker;
 
 #[derive(Debug)]
@@ -105,6 +107,11 @@ impl ButtplugScheduler {
     }
 
     pub fn create_player(&mut self, actuators: Vec<Arc<Actuator>>) -> PatternPlayer {
+        let empty_settings = actuators.iter().map(|_| ActuatorSettings::None).collect::<Vec<ActuatorSettings>>();
+        self.create_player_with_settings(actuators, empty_settings)
+    }
+
+    pub fn create_player_with_settings(&mut self, actuators: Vec<Arc<Actuator>>, settings: Vec<ActuatorSettings>) -> PatternPlayer {
         let (update_sender, update_receiver) = unbounded_channel::<Speed>();
 
         let cancellation_token = CancellationToken::new();
@@ -121,6 +128,7 @@ impl ButtplugScheduler {
             unbounded_channel::<Result<(), ButtplugClientError>>();
         PatternPlayer {
             actuators,
+            settings,
             result_sender,
             result_receiver,
             update_receiver,
@@ -146,8 +154,9 @@ async fn cancellable_wait(duration: Duration, cancel: &CancellationToken) -> boo
 #[cfg(test)]
 mod tests {
     use crate::actuator::get_actuators;
-    use crate::player::LinearRange;
     use crate::player::PatternPlayer;
+    use crate::settings::ActuatorSettings;
+    use crate::settings::LinearRange;
     use crate::speed::Speed;
     use bp_fakes::get_test_client;
     use bp_fakes::FakeMessage;
@@ -239,6 +248,10 @@ mod tests {
                 .create_player(get_actuators(self.all_devices.clone()))
         }
 
+        fn get_player_with_settings(&mut self, settings: Vec<ActuatorSettings>) -> PatternPlayer {
+            self.scheduler.create_player_with_settings(get_actuators(self.all_devices.clone()), settings)
+        }
+
         async fn play_linear(&mut self, funscript: FScript, duration: Duration, speed: Speed) {
             let player = self
                 .scheduler
@@ -304,21 +317,21 @@ mod tests {
     async fn test_oscillate_linear_1() {
         let (client, _) = test_oscillate(
             Speed::new(100),
-            LinearRange{ start_pos: 0.0, end_pos: 1.0, min_dur: 20.0, max_dur: 400.0, invert: false },
+            LinearRange{ min_pos: 0.0, max_pos: 1.0, min_ms: 50, max_ms: 400, invert: false },
         )
         .await;
 
         let calls = client.get_device_calls(1);
-        calls[0].assert_duration(20);
-        calls[1].assert_duration(20);
-        calls[2].assert_duration(20);
+        calls[0].assert_duration(50);
+        calls[1].assert_duration(50);
+        calls[2].assert_duration(50);
     }
 
     #[tokio::test]
     async fn test_oscillate_linear_2() {
         let (client, _) = test_oscillate(
             Speed::new(0),
-            LinearRange{ start_pos: 1.0, end_pos:0.0, min_dur: 10.0, max_dur: 100.0, invert: false }
+            LinearRange{ min_pos: 1.0, max_pos: 0.0, min_ms: 10, max_ms: 100, invert: false }
         )
         .await;
 
@@ -332,7 +345,7 @@ mod tests {
     async fn test_oscillate_linear_3() {
         let (client, _) = test_oscillate(
             Speed::new(75),
-            LinearRange{ start_pos: 0.2, end_pos: 0.7, min_dur: 100.0, max_dur: 200.0, invert: false }
+            LinearRange{ min_pos: 0.2, max_pos: 0.7, min_ms: 100, max_ms: 200, invert: false }
         )
         .await;
 
@@ -346,7 +359,7 @@ mod tests {
     async fn test_oscillate_linear_invert() {
         let (client, _) = test_oscillate(
             Speed::new(100),
-            LinearRange{ start_pos: 0.0, end_pos: 1.0, min_dur: 10.0, max_dur: 10.0, invert: true }
+            LinearRange{ min_pos: 0.0, max_pos: 1.0, min_ms: 50, max_ms: 50, invert: true }
         )
         .await;
 
@@ -366,11 +379,11 @@ mod tests {
         let player = test.get_player();
         let join = Handle::current().spawn(async move {
             let _ = player
-                .play_oscillate_linear(Duration::from_millis(250), Speed::new(100), LinearRange{ 
-                    start_pos: 0.0, 
-                    end_pos: 1.0, 
-                    min_dur: 10.0, 
-                    max_dur: 100.0, 
+                .play_oscillate_linear(Duration::from_millis(250), Speed::new(100), LinearRange { 
+                    min_pos: 0.0, 
+                    max_pos: 1.0, 
+                    min_ms: 10, 
+                    max_ms: 100, 
                     invert: true })
                 .await;
         });
@@ -391,9 +404,10 @@ mod tests {
 
         // act
         let start = Instant::now();
-        let player = test.get_player();
+        let duration_ms = range.max_ms as f64 * 2.5;
+        let player = test.get_player_with_settings(vec![ ActuatorSettings::Linear(range)]);
         let _ = player
-            .play_oscillate_linear(Duration::from_millis((range.max_dur * 2.5) as u64), speed, range)
+            .play_oscillate_linear(Duration::from_millis(duration_ms as u64), speed, LinearRange::max())
             .await;
 
         client.print_device_calls(start);
@@ -737,15 +751,6 @@ mod tests {
         calls[0].assert_strenth(0.1);
         calls[1].assert_strenth(0.07);
         calls[2].assert_strenth(0.0);
-    }
-
-    fn enable_log() {
-        tracing::subscriber::set_global_default(
-            tracing_subscriber::fmt()
-                .with_max_level(Level::TRACE)
-                .finish(),
-        )
-        .unwrap();
     }
 
     #[tokio::test]
