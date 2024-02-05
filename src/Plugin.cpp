@@ -60,9 +60,11 @@ void Tele_Event_Thread() {
             auto strArg = (std::string)evts[i].str_arg;
             auto numArg = (float)evts[i].num_arg;
 
-            SKSE::ModCallbackEvent modEvent{eventName, strArg, numArg, TeleMainQuest};
-            auto modCallbackEventSource = SKSE::GetModCallbackEventSource();
-            modCallbackEventSource->SendEvent(&modEvent);
+            SKSE::GetTaskInterface()->AddTask([eventName, strArg, numArg] {
+                SKSE::ModCallbackEvent modEvent{ eventName, strArg, numArg, TeleMainQuest };
+                auto modCallbackEventSource = SKSE::GetModCallbackEventSource();
+                modCallbackEventSource->SendEvent(&modEvent);
+            });
         }
         if (evts.size() == 0) {
             tk_log_info("evt dispatch not ready, sleeping...");
