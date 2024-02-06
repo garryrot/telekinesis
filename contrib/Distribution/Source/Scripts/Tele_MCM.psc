@@ -38,6 +38,7 @@ Int[] _StrokerMaxMsOid
 Int[] _StrokerInvertOid
 Int[] _VibratorMinSpeedOid
 Int[] _VibratorMaxSpeedOid
+Int[] _VibratorFactorOid
 
 String[] _StrokeFunscriptNames
 String[] _VibrateFunscriptNames
@@ -126,6 +127,7 @@ Function InitLocals()
     _StrokerInvertOid = new Int[20]
     _VibratorMinSpeedOid = new Int[20]
     _VibratorMaxSpeedOid = new Int[20]
+    _VibratorFactorOid = new Int[20]
     _ActuatorIds = new String[20]
     _DebugSpellsAdded = false
 
@@ -215,37 +217,38 @@ Event OnPageReset(String page)
                 _UseDeviceOids[i] = AddToggleOption("Enabled", connects, enabled_flag)
                 If isStroker
                     Int minMs = Tele_Api.Qry_Str_1("device.linear.min_ms", actuatorId) as Int
-                    _StrokerMinMsOid[i] = AddSliderOption("Min Stroke (ms)", minMs)
+                    _StrokerMinMsOid[i] = AddSliderOption("Fastest Stroke", minMs, "{0} ms")
                 Else
                     Int minSpeed = Tele_Api.Qry_Str_1("device.scalar.min_speed", actuatorId) as Int
-                    _VibratorMinSpeedOid[i] = AddSliderOption("Min Speed %", minSpeed)
+                    _VibratorMinSpeedOid[i] = AddSliderOption("Min Speed", minSpeed, "{0} %")
                 EndIf
 
                 AddTextOption("State", status, OPTION_FLAG_DISABLED)
                 If isStroker
                     Int maxMs = Tele_Api.Qry_Str_1("device.linear.max_ms", actuatorId) as Int
-                    _StrokerMaxMsOid[i] = AddSliderOption("Max Stroke (ms)", maxMs)
+                    _StrokerMaxMsOid[i] = AddSliderOption("Slowest Stroke", maxMs, "{0} ms")
                 Else
                     Int maxSpeed = Tele_Api.Qry_Str_1("device.scalar.max_speed", actuatorId) as Int
-                    _VibratorMaxSpeedOid[i] = AddSliderOption("Max Speed %", maxSpeed)
+                    _VibratorMaxSpeedOid[i] = AddSliderOption("Max Speed", maxSpeed, "{0} %")
                 EndIf
 
                 AddTextOption("Motor", actuatorType + " " + actuatorIndex, OPTION_FLAG_DISABLED)
                 If isStroker
                     Float minPos = Tele_Api.Qry_Str_1("device.linear.min_pos", actuatorId) as Float
-                    _StrokerMinPosOid[i] = AddSliderOption("Min Pos", minPos, "{2}")
+                    _StrokerMinPosOid[i] = AddSliderOption("Full In", minPos, "{2}")
                 Else
-                    AddEmptyOption()
+                    Float factor = Tele_Api.Qry_Str_1("device.scalar.factor", actuatorId) as Float
+                    _VibratorFactorOid[i] = AddSliderOption("Downscale Factor", factor, "{2}")
                     _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
-                    AddEmptyOption()
+                    AddEmptyOption();
                 EndIf
 
                 If isStroker
                     _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
                     Float maxPos = Tele_Api.Qry_Str_1("device.linear.max_pos", actuatorId) as Float
-                    _StrokerMaxPosOid[i] = AddSliderOption("Max Pos", maxPos, "{2}")
+                    _StrokerMaxPosOid[i] = AddSliderOption("Full Out", maxPos, "{2}")
                     AddEmptyOption()
-                    String invertPos = Tele_Api.Qry_Bool_1("device.linear.invert", actuatorId)
+                    Bool invertPos = Tele_Api.Qry_Bool_1("device.linear.invert", actuatorId)
                     _StrokerInvertOid[i] = AddToggleOption("Invert Pos", invertPos)
                 EndIf
             EndIf
@@ -348,7 +351,7 @@ Event OnPageReset(String page)
             AddHeaderOption("Actions")
             If TIntegration.SexLabAroused != None
                 Int sexlab_stroker_rousing_flag = OPTION_FLAG_DISABLED
-                If TIntegration.Sexlab_Stroker
+                If TIntegration.Sexlab_Stroker && TIntegration.Sexlab_Stroker_Pattern == 0
                     sexlab_stroker_rousing_flag = OPTION_FLAG_NONE
                 EndIf    
                 AddToggleOptionST("OPTION_SEXLAB_STROKER_ROUSING", "Arousal = Stroker Speed", TIntegration.Sexlab_Stroker_Rousing, sexlab_stroker_rousing_flag)
@@ -416,7 +419,7 @@ Event OnPageReset(String page)
             AddHeaderOption("")
             AddToggleOptionST("OPTION_OSTIM_STROKER", "Enable Strokers", TIntegration.Ostim_Stroker)
             Int ostim_stroker_speed_flag = OPTION_FLAG_DISABLED
-            If TIntegration.Ostim_Stroker
+            If TIntegration.Ostim_Stroker && TIntegration.Ostim_Stroker_Pattern == 0
                 ostim_stroker_speed_flag = OPTION_FLAG_NONE
             EndIf
             AddMenuOptionST("MENU_OSTIM_STROKER_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
@@ -2130,15 +2133,26 @@ EndState
 
 Event OnOptionSelect(int oid)
     Int i = 0
+    String device = ""
     While (i < 31 && i < _ActuatorIds.Length)
         If (oid == _UseDeviceOids[i])
-            String device = _ActuatorIds[i]
+            device = _ActuatorIds[i]
             Bool isUsed = ! Tele_Api.Qry_Bool_1("device.settings.enabled", device)
             SetToggleOptionValue(oid, isUsed)
             If isUsed
                 Tele_Api.Cmd_1("device.settings.enable", device)
             Else
                 Tele_Api.Cmd_1("device.settings.disable", device)
+            EndIf
+        EndIf
+        If (oid == _StrokerInvertOid[i])
+            device = _ActuatorIds[i]
+            Bool isInverted = ! Tele_Api.Qry_Bool_1("device.linear.invert", device)
+            SetToggleOptionValue(oid, isInverted)
+            If isInverted
+                Tele_Api.Cmd_1("device.linear.invert.enable", device)
+            Else
+                Tele_Api.Cmd_1("device.linear.invert.disable", device)
             EndIf
         EndIf
         i += 1
@@ -2170,18 +2184,25 @@ Event OnOptionSliderOpen(Int oid)
     Int i = 0
     While (i < _StrokerMinPosOid.Length)
         If (oid == _VibratorMinSpeedOid[i])
-            Int minSpeed = Tele_Api.Qry_Str_1("device.linear.min_speed", _ActuatorIds[i]) as Int
+            Int minSpeed = Tele_Api.Qry_Str_1("device.scalar.min_speed", _ActuatorIds[i]) as Int
             SetSliderDialogStartValue(minSpeed)
             SetSliderDialogDefaultValue(0)
             SetSliderDialogRange(0, 100)
             SetSliderDialogInterval(1) 
         EndIf
         If (oid == _VibratorMaxSpeedOid[i])
-            Int maxSpeed = Tele_Api.Qry_Str_1("device.linear.max_speed", _ActuatorIds[i]) as Int
+            Int maxSpeed = Tele_Api.Qry_Str_1("device.scalar.max_speed", _ActuatorIds[i]) as Int
             SetSliderDialogStartValue(maxSpeed)
             SetSliderDialogDefaultValue(100)
             SetSliderDialogRange(0, 100)
             SetSliderDialogInterval(1) 
+        EndIf
+        If (oid == _VibratorFactorOid[i])
+            Float factor = Tele_Api.Qry_Str_1("device.scalar.factor", _ActuatorIds[i]) as Float
+            SetSliderDialogStartValue(factor)
+            SetSliderDialogDefaultValue(1.0)
+            SetSliderDialogRange(0, 1.0)
+            SetSliderDialogInterval(0.01) 
         EndIf
         If (oid == _StrokerMinPosOid[i])
             Float minPos = Tele_Api.Qry_Str_1("device.linear.min_pos", _ActuatorIds[i]) as Float
@@ -2219,12 +2240,16 @@ Event OnOptionSliderAccept(Int oid, Float value)
     Int i = 0
     While (i < _StrokerMinPosOid.Length)
         If (oid == _VibratorMinSpeedOid[i])
-            SetSliderOptionValue(oid, value, "{0}")
+            SetSliderOptionValue(oid, value, "{0}%")
             Tele_Api.Cmd_2("device.scalar.min_speed", _ActuatorIds[i], value as Int)
         EndIf
         If (oid == _VibratorMaxSpeedOid[i])
-            SetSliderOptionValue(oid, value, "{0}")
+            SetSliderOptionValue(oid, value, "{0}%")
             Tele_Api.Cmd_2("device.scalar.max_speed", _ActuatorIds[i], value as Int)
+        EndIf
+        If (oid == _VibratorFactorOid[i])
+            SetSliderOptionValue(oid, value, "{2}")
+            Tele_Api.Cmd_2("device.scalar.factor", _ActuatorIds[i], value)
         EndIf
         If (oid == _StrokerMinPosOid[i])
             SetSliderOptionValue(oid, value, "{2}")
@@ -2235,11 +2260,11 @@ Event OnOptionSliderAccept(Int oid, Float value)
             Tele_Api.Cmd_2("device.linear.max_pos", _ActuatorIds[i], value)
         EndIf
         If (oid == _StrokerMinMsOid[i])
-            SetSliderOptionValue(oid, value, "{0}")
+            SetSliderOptionValue(oid, value, "{0} ms")
             Tele_Api.Cmd_2("device.linear.min_ms", _ActuatorIds[i], value as Int)
         EndIf
         If (oid == _StrokerMaxMsOid[i])
-            SetSliderOptionValue(oid, value, "{0}")
+            SetSliderOptionValue(oid, value, "{0} ms")
             Tele_Api.Cmd_2("device.linear.max_ms", _ActuatorIds[i], value as Int)
         EndIf
         i += 1
@@ -2266,6 +2291,45 @@ Event OnOptionHighlight(Int oid)
             String infoText = "A comma-separated list of body parts associated with this device.\n"
             infoText += "By default, the terms 'Nipple', 'Vaginal', 'Anal', 'Penetration' are used to describe these, but any is possible.\n"
             infoText += "Example: Vaginal,Anal,Nipple\n"
+            SetInfoText(infoText)
+        EndIf
+        If (oid == _StrokerMinPosOid[i]) 
+            String infoText = "The hardware position that is considered a full penetration\n"
+            infoText += "In funscripts, 0.0 is considered the lowest possible hardware position i.e. a full penetration\n"
+            infoText += "Set it to a higher value to have less penetration, 0.1 = 10% less, 0.2 = 20% less..."
+            SetInfoText(infoText)
+        EndIf
+        If (oid == _StrokerMaxPosOid[i])
+            String infoText = "The hardware position that is considered the least penetration\n"
+            infoText += "In funscripts, 1.0 is considered the highest possible hardware position i.e. the least penetration\n"
+            infoText += "Set it to a lower value to have a lower min position, 0.8 = 20% lower, 0.7 = 30% lower..."
+            SetInfoText(infoText)
+        EndIf
+        If (oid == _StrokerMinMsOid[i])
+            String infoText = "The duration of the fastest possible stroke in milliseconds\n"
+            infoText += "This setting is ignored in funscripts."
+            SetInfoText(infoText)
+        EndIf
+        If (oid == _StrokerMaxMsOid[i])
+            String infoText = "The duration of the slowest possible stroke in milliseconds\n"
+            infoText += "This setting is ignored in funscripts."
+            SetInfoText(infoText)
+        EndIf
+        If (oid == _StrokerInvertOid[i])
+            String infoText = "Invert the position of all position points for this device\n"
+            infoText += "Position 1.0 will become 0.0, position 0.2 will become 0.8 and so on...\n"
+            infoText += "Enable this, in case you have a device that does not work with the default direction"
+            SetInfoText(infoText)
+        EndIf
+        If (oid == _VibratorMinSpeedOid[i])
+            String infoText = "Minimum vibration strength in percent\n"
+            infoText += "Default: 0. Increase this, if your device does not work well with low speed\n"
+            infoText += "This setting is ignored for 0% i.e. commands that stop the device."
+            SetInfoText(infoText)
+        EndIf
+        If (oid == _VibratorMaxSpeedOid[i])
+            String infoText = "Maximum vibration strength in percent\n"
+            infoText += "Default 100. Decrease this, if your device is too strong"
             SetInfoText(infoText)
         EndIf
         i += 1

@@ -249,10 +249,13 @@ impl PatternPlayer {
     }
 
     #[instrument(skip(self))]
-    async fn do_linear(&mut self, pos: f64, duration_ms: u32) -> ButtplugClientResult {
-        for actuator in &self.actuators {
+    async fn do_linear(&mut self, mut pos: f64, duration_ms: u32) -> ButtplugClientResult {
+        for (i, actuator) in self.actuators.iter().enumerate() {
+            let settings = &self.settings[ i ].linear_or_max();
+            if settings.invert {
+                pos = 1.0 - pos;
+            }
             trace!("do_linear");
-            // TODO: Limit by max speed?
             self.worker_task_sender
                 .send(WorkerTask::Move(
                     actuator.clone(),
@@ -320,13 +323,9 @@ impl LinearRange {
         }
     }
     pub fn get_pos(&self, move_up: bool) -> f64 {
-        let mut move_up = move_up;
-        if self.invert {
-            move_up = !move_up;
-        }
         match move_up {
-            true => self.max_pos,
-            false => self.min_pos
+            true => if self.invert { 1.0 - self.max_pos } else { self.max_pos },
+            false => if self.invert { 1.0 - self.min_pos } else { self.min_pos }
         }
     }
     pub fn get_duration_ms(&self, speed: Speed) -> u32 {
@@ -343,6 +342,7 @@ fn apply_scalar_settings(speed: Speed, settings: &ActuatorSettings) -> Speed {
     match settings {
         ActuatorSettings::Scalar(settings) => {
             trace!("applying {settings:?}");
+            let speed = Speed::from_float(speed.as_float() * settings.factor);
             if speed.value < settings.min_speed as u16 {
                 Speed::new(settings.min_speed)
             } else if speed.value > settings.max_speed as u16 {

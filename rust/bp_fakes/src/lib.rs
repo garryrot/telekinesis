@@ -26,6 +26,7 @@ use std::time::Duration;
 use std::vec;
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, error};
+use assert_float_eq::*;
 
 use std::time::Instant;
 
@@ -83,7 +84,7 @@ impl FakeMessage {
             message::ButtplugSpecV3ClientMessage::LinearCmd(cmd) => {
                 cmd.vectors().iter().all(|v| {
                     let actual: f64 = v.position();
-                    assert_eq!(position, actual);
+                    assert_float_relative_eq!(position, actual, 0.001);
                     true
                 });
             }

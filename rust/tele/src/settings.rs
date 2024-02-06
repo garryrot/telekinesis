@@ -103,8 +103,8 @@ impl TkDeviceSettings {
 impl TkSettings {
     pub fn default() -> Self {
         TkSettings {
-            version: 1,
-            log_level: TkLogLevel::Trace,
+            version: 2,
+            log_level: TkLogLevel::Debug,
             connection: TkConnectionType::InProcess,
             devices: vec![],
             pattern_path: String::from(DEFAULT_PATTERN_PATH),
@@ -159,6 +159,9 @@ impl TkSettings {
 
     pub fn get_or_create_linear(&mut self, actuator_id: &str) -> (TkDeviceSettings, LinearRange) {
         let mut device = self.get_or_create(actuator_id);
+        if let ActuatorSettings::Scalar(ref scalar) = device.actuator_settings {
+            error!("actuator {:?} is scalar but assumed linear... dropping all {:?}", actuator_id, scalar)
+        }
         if let ActuatorSettings::Linear(ref linear) = device.actuator_settings {
             return (device.clone(), linear.clone());
         }
@@ -170,6 +173,9 @@ impl TkSettings {
 
     pub fn get_or_create_scalar(&mut self, actuator_id: &str) -> (TkDeviceSettings, ScalarSettings) {
         let mut device = self.get_or_create(actuator_id);
+        if let ActuatorSettings::Linear(ref linear) = device.actuator_settings {
+            error!("actuator {:?} is linear but assumed scalar... dropping all {:?}", actuator_id, linear)
+        }
         if let ActuatorSettings::Scalar(ref scalar) = device.actuator_settings {
             return (device.clone(), scalar.clone());
         }

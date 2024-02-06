@@ -359,14 +359,14 @@ mod tests {
     async fn test_oscillate_linear_invert() {
         let (client, _) = test_oscillate(
             Speed::new(100),
-            LinearRange{ min_pos: 0.0, max_pos: 1.0, min_ms: 50, max_ms: 50, invert: true }
+            LinearRange{ min_pos: 0.2, max_pos: 0.7, min_ms: 50, max_ms: 50, invert: true }
         )
         .await;
 
         let calls = client.get_device_calls(1);
-        calls[0].assert_pos(0.0);
-        calls[1].assert_pos(1.0);
-        calls[2].assert_pos(0.0);
+        calls[0].assert_pos(0.3);
+        calls[1].assert_pos(0.8);
+        calls[2].assert_pos(0.3);
     }
 
     #[tokio::test]

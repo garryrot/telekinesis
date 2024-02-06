@@ -93,14 +93,16 @@ Function UpdateRousingControlledSexScene()
     
     If _OstimSceneVibrationHandle != -1
         Int speed = GetOStimSpeed(Ostim_Animation_Speed_Control)
+        If (speed == 0)
+            speed = 1
+        EndIf
         TDevices.UpdateHandle(_OstimSceneVibrationHandle, speed)
     EndIf
     If _OstimSceneStrokerHandle != -1
-        Int speed = GetOStimSpeed(Ostim_Stroker_Speed_Control)
-        If speed > 90
-            speed = 90
+        If Ostim_Stroker_Pattern == 0
+            Int speed = GetOStimSpeed(Ostim_Stroker_Speed_Control)
+            TDevices.UpdateHandle(_OstimSceneStrokerHandle, speed)
         EndIf
-        TDevices.UpdateHandle(_OstimSceneStrokerHandle, speed)
     EndIf
     RegisterForSingleUpdate(2)
 EndFunction
@@ -115,7 +117,7 @@ Int Function StartStroke(Int deviceSelector, Float duration_sec, Int patternType
         If patternType == 1
             funscript = TDevices.GetRandomPattern(false)
         EndIf
-        return TDevices.LinearPattern(funscript, speed, duration_sec, events)
+        return TDevices.LinearPattern(funscript, 100, duration_sec, events)
     EndIf
     return TDevices.Linear(speed, 250, 5000, duration_sec, events)
 EndFunction
@@ -164,7 +166,6 @@ Function ResetIntegrationSettings()
     Ostim_Stroker_DeviceSelector = Ostim_Stroker_DeviceSelector_Default
     Ostim_Stroker_Funscript = Ostim_Stroker_Funscript_Default
     Ostim_Stroker_Speed_Control = Ostim_Stroker_Speed_Control_Default
-    Ostim_Stroker_Pattern = Ostim_Stroker_Pattern_Default
     Ostim_Stroker_Pattern = Ostim_Stroker_Pattern_Default
     Ostim_Stroker_Funscript = Ostim_Stroker_Funscript_Default
     Ostim_Animation_Funscript = Ostim_Animation_Funscript_Default
@@ -633,9 +634,6 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
         EndIf
         If _Ostim_Stroker
             Int speed = GetOStimSpeed(Ostim_Stroker_Speed_Control)
-            If speed < 10
-                speed = 10
-            EndIf
             _OstimSceneStrokerHandle = StartStroke(Ostim_Animation_DeviceSelector, -1, Ostim_Stroker_Pattern, Ostim_Stroker_Funscript, speed, evts)
         EndIf
     Else
@@ -650,7 +648,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     EndIf
 EndEvent
 
-Int Function GetOStimSpeed(Int controlMode) ; 
+Int Function GetOStimSpeed(Int controlMode)
     If controlMode  == 1
         Float speed = OThread.GetSpeed(0) as Float
         If speed == 0.0

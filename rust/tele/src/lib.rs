@@ -470,6 +470,23 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         },
     })
     .def_qry_str1(ApiQryStr1 {
+        name: "device.scalar.factor",
+        default: "",
+        exec: |tk, actuator_id| {
+            tk.settings
+                .access_scalar(actuator_id, |x| x.factor.to_string())
+        },
+    })
+    .def_cmd2(ApiCmd2 {
+        name: "device.scalar.factor",
+        exec: |tk, actuator_id, factor| {
+            tk.settings.access_scalar(actuator_id, |x| {
+                x.factor = factor.parse().unwrap_or(1.0);
+            });
+            true
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
         name: "device.linear.min_ms",
         default: "",
         exec: |tk, actuator_id| {
@@ -540,11 +557,19 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.invert",
         exec: |tk, actuator_id| tk.settings.access_linear(actuator_id, |x| x.invert),
     })
-    .def_cmd2(ApiCmd2 {
-        name: "device.linear.invert",
-        exec: |tk, actuator_id, invert| {
+    .def_cmd1(ApiCmd1 {
+        name: "device.linear.invert.enable",
+        exec: |tk, actuator_id| {
             tk.settings
-                .access_linear(actuator_id, |x| x.invert = invert == "false");
+                .access_linear(actuator_id, |x| x.invert = true);
+            true
+        },
+    })
+    .def_cmd1(ApiCmd1 {
+        name: "device.linear.invert.disable",
+        exec: |tk, actuator_id | {
+            tk.settings
+                .access_linear(actuator_id, |x| x.invert = false);
             true
         },
     })

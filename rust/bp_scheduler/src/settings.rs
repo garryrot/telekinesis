@@ -11,7 +11,8 @@ pub enum ScalarScaling {
 pub struct ScalarSettings {
     pub min_speed: i64,
     pub max_speed: i64,
-    pub scaling: ScalarScaling
+    pub factor: f64,
+    pub swell: ScalarScaling
 }
 
 impl Default for ScalarSettings {
@@ -19,7 +20,8 @@ impl Default for ScalarSettings {
         Self {
             min_speed: 0,
             max_speed: 100,
-            scaling: ScalarScaling::Linear
+            factor: 1.0,
+            swell: ScalarScaling::Linear
         }
     }
 }

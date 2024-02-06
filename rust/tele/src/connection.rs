@@ -15,7 +15,7 @@ use buttplug::{
 use crossbeam_channel::Sender;
 use futures::StreamExt;
 use tokio::runtime::Handle;
-use tracing::{debug, error, info, span, Level};
+use tracing::{debug, error, info};
 
 use crate::settings::TkConnectionType;
 
