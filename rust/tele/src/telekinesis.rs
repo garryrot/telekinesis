@@ -241,7 +241,7 @@ impl Telekinesis {
                 ))
                 .expect("never full");
             let result = match task {
-                Task::Linear(speed, _) => player.play_linear(duration, fscript, speed).await,
+                Task::Linear(speed, _) => player.play_linear(duration, fscript).await,
                 _ => panic!(),
             };
             let event = match result {

@@ -56,59 +56,31 @@ impl PatternPlayer {
         mut self,
         duration: Duration,
         fscript: FScript,
-        speed: Speed,
     ) -> ButtplugClientResult {
         info!("linear pattern started");
         let mut last_result = Ok(());
-        if speed.as_float() <= 0.0
-            || fscript.actions.is_empty()
-            || fscript.actions.iter().all(|x| x.at == 0)
-        {
+        if fscript.actions.is_empty() || fscript.actions.iter().all(|x| x.at == 0) {
             return last_result;
         }
-        let mut current_speed = speed;
         let waiter = self.stop_after(duration);
         while !self.cancellation_token.is_cancelled() {
-            let mut last_instant = Instant::now();
-            let mut last_at = Duration::ZERO;
-            let mut last_waiting_time = Duration::ZERO;
+            let started = Instant::now();
             for point in fscript.actions.iter() {
-                if let Ok(update) = self.update_receiver.try_recv() {
-                    if update.as_float() > 0.0 {
-                        current_speed = update;
+                let point_as_float = Speed::from_fs(point).as_float();
+                if let Some(waiting_time) =
+                    Duration::from_millis(point.at as u64).checked_sub(started.elapsed())
+                {
+                    let token = &self.cancellation_token.clone();
+                    if let Some(result) = tokio::select! {
+                        _ = token.cancelled() => { None }
+                        result = async {
+                            self.do_linear(point_as_float, waiting_time.as_millis() as u32).await
+                        } => {
+                            Some(result)
+                        }
+                    } {
+                        last_result = result;
                     }
-                }
-                let waiting_time_us = Duration::from_millis(point.at as u64)
-                    .saturating_sub(last_at)
-                    .as_micros() as f64;
-                let offset: Duration = last_instant.elapsed().saturating_sub(last_waiting_time);
-                let factor = 1.0 / current_speed.as_float();
-                let actual_waiting_time =
-                    Duration::from_micros((waiting_time_us * factor) as u64).saturating_sub(offset);
-
-                last_instant = Instant::now();
-                last_at = Duration::from_millis(point.at as u64);
-                last_waiting_time = actual_waiting_time;
-                if actual_waiting_time == Duration::ZERO {
-                    debug!("duration is zero, skipping");
-                    continue;
-                }
-
-                let token = &self.cancellation_token.clone();
-                if let Some(result) = tokio::select! {
-                    _ = token.cancelled() => {
-                        debug!("linear pattern cancelled");
-                        break;
-                    }
-                    result = async {
-                        let pos = Speed::from_fs(point).as_float();
-                        debug!(?actual_waiting_time, ?pos, "moving");
-                        self.do_linear(pos, actual_waiting_time.as_millis() as u32).await
-                    } => {
-                        Some(result)
-                    }
-                } {
-                    last_result = result;
                 }
             }
         }
@@ -255,7 +227,7 @@ impl PatternPlayer {
             if settings.invert {
                 pos = 1.0 - pos;
             }
-            trace!("do_linear");
+            debug!(?duration_ms, ?pos, ?settings, "linear");
             self.worker_task_sender
                 .send(WorkerTask::Move(
                     actuator.clone(),
