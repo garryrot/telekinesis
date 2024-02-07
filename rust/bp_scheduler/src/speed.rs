@@ -26,7 +26,7 @@ impl Speed {
         }
     }
     pub fn from_float(factor: f64) -> Speed {
-        Speed::new((factor * 100.0) as i64)
+        Speed::new((factor * 100.0) as i64)    
     }
     pub fn multiply(&self, other: &Speed) -> Speed {
         let this = self.as_float();

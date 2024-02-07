@@ -514,9 +514,8 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_cmd2(ApiCmd2 {
         name: "device.linear.max_ms",
         exec: |tk, actuator_id, percent| {
-            tk.settings.access_linear(actuator_id, |x|
-                x.max_ms = percent.parse().unwrap_or(100)
-            );
+            tk.settings
+                .access_linear(actuator_id, |x| x.max_ms = percent.parse().unwrap_or(100));
             true
         },
     })
@@ -547,9 +546,9 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_cmd2(ApiCmd2 {
         name: "device.linear.max_pos",
         exec: |tk, actuator_id, percent| {
-            tk.settings.access_linear(actuator_id, |x|
+            tk.settings.access_linear(actuator_id, |x| {
                 x.max_pos = percent.parse().unwrap_or(LinearRange::default().max_pos)
-            );
+            });
             true
         },
     })
@@ -560,16 +559,14 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_cmd1(ApiCmd1 {
         name: "device.linear.invert.enable",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_linear(actuator_id, |x| x.invert = true);
+            tk.settings.access_linear(actuator_id, |x| x.invert = true);
             true
         },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.linear.invert.disable",
-        exec: |tk, actuator_id | {
-            tk.settings
-                .access_linear(actuator_id, |x| x.invert = false);
+        exec: |tk, actuator_id| {
+            tk.settings.access_linear(actuator_id, |x| x.invert = false);
             true
         },
     })

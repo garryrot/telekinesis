@@ -261,18 +261,6 @@ mod tests {
                 .unwrap();
         }
 
-        fn play_linear_background(&mut self, funscript: FScript, duration: Duration) {
-            let player = self
-                .scheduler
-                .create_player(get_actuators(self.all_devices.clone()));
-            self.handles.push(Handle::current().spawn(async move {
-                player
-                    .play_linear(duration, funscript)
-                    .await
-                    .unwrap();
-            }));
-        }
-
         async fn await_last(&mut self) {
             let _ = self.handles.pop().unwrap().await;
         }
@@ -316,7 +304,7 @@ mod tests {
     async fn test_oscillate_linear_1() {
         let (client, _) = test_oscillate(
             Speed::new(100),
-            LinearRange{ min_pos: 0.0, max_pos: 1.0, min_ms: 50, max_ms: 400, invert: false },
+            LinearRange{ min_pos: 0.0, max_pos: 1.0, min_ms: 50, max_ms: 400, invert: false, scaling: crate::settings::LinearSpeedScaling::Linear },
         )
         .await;
 
@@ -330,7 +318,7 @@ mod tests {
     async fn test_oscillate_linear_2() {
         let (client, _) = test_oscillate(
             Speed::new(0),
-            LinearRange{ min_pos: 1.0, max_pos: 0.0, min_ms: 10, max_ms: 100, invert: false }
+            LinearRange{ min_pos: 1.0, max_pos: 0.0, min_ms: 10, max_ms: 100, invert: false, scaling: crate::settings::LinearSpeedScaling::Linear }
         )
         .await;
 
@@ -344,7 +332,7 @@ mod tests {
     async fn test_oscillate_linear_3() {
         let (client, _) = test_oscillate(
             Speed::new(75),
-            LinearRange{ min_pos: 0.2, max_pos: 0.7, min_ms: 100, max_ms: 200, invert: false }
+            LinearRange{ min_pos: 0.2, max_pos: 0.7, min_ms: 100, max_ms: 200, invert: false, scaling: crate::settings::LinearSpeedScaling::Linear }
         )
         .await;
 
@@ -358,7 +346,7 @@ mod tests {
     async fn test_oscillate_linear_invert() {
         let (client, _) = test_oscillate(
             Speed::new(100),
-            LinearRange{ min_pos: 0.2, max_pos: 0.7, min_ms: 50, max_ms: 50, invert: true }
+            LinearRange{ min_pos: 0.2, max_pos: 0.7, min_ms: 50, max_ms: 50, invert: true, scaling: crate::settings::LinearSpeedScaling::Linear }
         )
         .await;
 
@@ -378,12 +366,17 @@ mod tests {
         let player = test.get_player();
         let join = Handle::current().spawn(async move {
             let _ = player
-                .play_oscillate_linear(Duration::from_millis(250), Speed::new(100), LinearRange { 
-                    min_pos: 0.0, 
-                    max_pos: 1.0, 
-                    min_ms: 10, 
-                    max_ms: 100, 
-                    invert: true })
+                .play_oscillate_linear(
+                    Duration::from_millis(250), 
+                    Speed::new(100), 
+                    LinearRange {
+                        min_pos: 0.0, 
+                        max_pos: 1.0, 
+                        min_ms: 10, 
+                        max_ms: 100, 
+                        invert: true, 
+                        scaling: crate::settings::LinearSpeedScaling::Linear
+                    })
                 .await;
         });
 

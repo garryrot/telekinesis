@@ -59,7 +59,7 @@ void Tele_Event_Thread() {
             auto eventName = (std::string)evts[i].event_name;
             auto strArg = (std::string)evts[i].str_arg;
             auto numArg = (float)evts[i].num_arg;
-
+            
             SKSE::GetTaskInterface()->AddTask([eventName, strArg, numArg] {
                 SKSE::ModCallbackEvent modEvent{ eventName, strArg, numArg, TeleMainQuest };
                 auto modCallbackEventSource = SKSE::GetModCallbackEventSource();

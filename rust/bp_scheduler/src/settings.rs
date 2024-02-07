@@ -1,27 +1,30 @@
 use serde::{Deserialize, Serialize};
 
+use crate::speed::Speed;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ScalarScaling {
-    Linear,           // f(x) = x
-    Quadratic,        // f(x) = x^2 
-    QuadraticFraction // f(x) = x^(1/2)
+    // Note: currently unused
+    Linear,            // f(x) = x
+    Quadratic,         // f(x) = x^2
+    QuadraticFraction, // f(x) = x^(1/2)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ScalarSettings {
+pub struct ScalarRange {
     pub min_speed: i64,
     pub max_speed: i64,
     pub factor: f64,
-    pub swell: ScalarScaling
+    pub scaling: ScalarScaling,
 }
 
-impl Default for ScalarSettings {
+impl Default for ScalarRange {
     fn default() -> Self {
         Self {
             min_speed: 0,
             max_speed: 100,
             factor: 1.0,
-            swell: ScalarScaling::Linear
+            scaling: ScalarScaling::Linear,
         }
     }
 }
@@ -30,7 +33,7 @@ impl Default for ScalarSettings {
 pub enum ActuatorSettings {
     #[default]
     None,
-    Scalar(ScalarSettings),
+    Scalar(ScalarRange),
     Linear(LinearRange),
 }
 
@@ -44,12 +47,32 @@ impl ActuatorSettings {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum LinearSpeedScaling {
+    Linear,         // f(x) = x
+    Parabolic(i32), // f(x) = 1 - (1 - x)^n
+}
+
+impl LinearSpeedScaling {
+    pub fn apply(&self, speed: Speed) -> Speed {
+        match self {
+            LinearSpeedScaling::Linear => speed,
+            LinearSpeedScaling::Parabolic(n) => {
+                let mut x = speed.as_float();
+                x = 1.0 - (1.0 - x).powi(*n);
+                Speed::from_float(x)
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinearRange {
     pub min_ms: i64,
     pub max_ms: i64,
     pub min_pos: f64,
     pub max_pos: f64,
     pub invert: bool,
+    pub scaling: LinearSpeedScaling,
 }
 
 impl LinearRange {
@@ -60,6 +83,7 @@ impl LinearRange {
             min_pos: 0.0,
             max_pos: 1.0,
             invert: false,
+            scaling: LinearSpeedScaling::Linear,
         }
     }
 }
@@ -71,6 +95,7 @@ impl Default for LinearRange {
             min_pos: 0.0,
             max_pos: 1.0,
             invert: false,
+            scaling: LinearSpeedScaling::Linear,
         }
     }
 }

@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, instrument, trace};
 
 use crate::{
-    actuator::Actuator, cancellable_wait, settings::{ActuatorSettings, LinearRange}, speed::Speed, worker::{ButtplugClientResult, WorkerTask}
+    actuator::Actuator, cancellable_wait, settings::{ActuatorSettings, LinearRange, LinearSpeedScaling}, speed::Speed, worker::{ButtplugClientResult, WorkerTask}
 };
 
 /// Pattern executor that can be passed from the schedulers main-thread to a sub-thread
@@ -39,12 +39,12 @@ impl PatternPlayer {
         let mut current_speed = speed;
         while !self.cancelled() {
             self.try_update(&mut current_speed);
-            self.do_stroke(true, current_speed, &settings).await.unwrap();
+            self.do_oscillate(true, current_speed, &settings).await.unwrap();
             if self.cancelled() {
                 break;
             }
             self.try_update(&mut current_speed);
-            self.do_stroke(false, current_speed, &settings).await.unwrap();
+            self.do_oscillate(false, current_speed, &settings).await.unwrap();
         }
         waiter.abort();
         Ok(())
@@ -220,13 +220,10 @@ impl PatternPlayer {
         last_result
     }
 
-    #[instrument(skip(self))]
     async fn do_linear(&mut self, mut pos: f64, duration_ms: u32) -> ButtplugClientResult {
         for (i, actuator) in self.actuators.iter().enumerate() {
             let settings = &self.settings[ i ].linear_or_max();
-            if settings.invert {
-                pos = 1.0 - pos;
-            }
+            pos = settings.apply_pos(pos);
             debug!(?duration_ms, ?pos, ?settings, "linear");
             self.worker_task_sender
                 .send(WorkerTask::Move(
@@ -242,14 +239,14 @@ impl PatternPlayer {
         self.result_receiver.recv().await.unwrap()
     }
 
-    #[instrument(skip(self))]
-    async fn do_stroke(&mut self, start: bool, speed: Speed, settings: &LinearRange) -> ButtplugClientResult {
+    async fn do_oscillate(&mut self, start: bool, mut speed: Speed, settings: &LinearRange) -> ButtplugClientResult {
         let mut wait_ms = 0;
         for (i, actuator) in self.actuators.iter().enumerate() {
             let actual_settings = settings.merge(&self.settings[ i ].linear_or_max());
+            speed = actual_settings.scaling.apply(speed);
             wait_ms = actual_settings.get_duration_ms(speed);
             let target_pos = actual_settings.get_pos(start);
-            debug!(?wait_ms, ?target_pos, ?settings, "stroke");
+            debug!(?wait_ms, ?target_pos, ?actual_settings, "stroke");
             self.worker_task_sender
                 .send(WorkerTask::Move(
                     actuator.clone(),
@@ -292,6 +289,13 @@ impl LinearRange {
             min_pos: if self.min_pos < settings.min_pos { settings.min_pos } else { self.min_pos },
             max_pos: if self.max_pos > settings.max_pos { settings.max_pos } else { self.max_pos },
             invert: if settings.invert { ! self.invert } else { self.invert },
+            scaling: match settings.scaling {
+                LinearSpeedScaling::Linear => match self.scaling {
+                    LinearSpeedScaling::Linear => LinearSpeedScaling::Linear,
+                    LinearSpeedScaling::Parabolic(n) => LinearSpeedScaling::Parabolic(n),
+                },
+                LinearSpeedScaling::Parabolic(n) =>  LinearSpeedScaling::Parabolic(n),
+            },
         }
     }
     pub fn get_pos(&self, move_up: bool) -> f64 {
@@ -299,6 +303,9 @@ impl LinearRange {
             true => if self.invert { 1.0 - self.max_pos } else { self.max_pos },
             false => if self.invert { 1.0 - self.min_pos } else { self.min_pos }
         }
+    }
+    pub fn apply_pos(&self, pos: f64) -> f64 {
+        if self.invert { 1.0 - pos } else { pos }
     }
     pub fn get_duration_ms(&self, speed: Speed) -> u32 {
         let factor = (100 - speed.value) as f64 / 100.0;

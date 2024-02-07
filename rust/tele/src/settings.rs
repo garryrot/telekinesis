@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use bp_scheduler::{actuator::Actuator, settings::{ActuatorSettings, LinearRange, ScalarSettings}};
+use bp_scheduler::{actuator::Actuator, settings::{ActuatorSettings, LinearRange, LinearSpeedScaling, ScalarRange}};
 use buttplug::core::message::ActuatorType;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -92,7 +92,7 @@ impl TkDeviceSettings {
                 | ActuatorType::Rotate
                 | ActuatorType::Oscillate
                 | ActuatorType::Constrict
-                | ActuatorType::Inflate => ActuatorSettings::Scalar(ScalarSettings::default()),
+                | ActuatorType::Inflate => ActuatorSettings::Scalar(ScalarRange::default()),
                 ActuatorType::Position => ActuatorSettings::Linear(LinearRange::default()),
                 _ => ActuatorSettings::None,
             },
@@ -165,13 +165,13 @@ impl TkSettings {
         if let ActuatorSettings::Linear(ref linear) = device.actuator_settings {
             return (device.clone(), linear.clone());
         }
-        let default = LinearRange::default();
+        let default = LinearRange { scaling: LinearSpeedScaling::Parabolic(2), ..Default::default() };
         device.actuator_settings = ActuatorSettings::Linear(default.clone());
         self.update_device(device.clone());
         (device, default)
     }
 
-    pub fn get_or_create_scalar(&mut self, actuator_id: &str) -> (TkDeviceSettings, ScalarSettings) {
+    pub fn get_or_create_scalar(&mut self, actuator_id: &str) -> (TkDeviceSettings, ScalarRange) {
         let mut device = self.get_or_create(actuator_id);
         if let ActuatorSettings::Linear(ref linear) = device.actuator_settings {
             error!("actuator {:?} is linear but assumed scalar... dropping all {:?}", actuator_id, linear)
@@ -179,7 +179,7 @@ impl TkSettings {
         if let ActuatorSettings::Scalar(ref scalar) = device.actuator_settings {
             return (device.clone(), scalar.clone());
         }
-        let default = ScalarSettings::default();
+        let default = ScalarRange::default();
         device.actuator_settings = ActuatorSettings::Scalar(default.clone());
         self.update_device(device.clone());
         (device, default)
@@ -196,7 +196,7 @@ impl TkSettings {
     }
 
     pub fn access_scalar<F, R>(&mut self, actuator_id: &str, accessor: F) -> R
-        where F: FnOnce(&mut ScalarSettings) -> R
+        where F: FnOnce(&mut ScalarRange) -> R
     {
         let (mut settings, mut scalar) = self.get_or_create_scalar(actuator_id);
         let result = accessor(&mut scalar);
