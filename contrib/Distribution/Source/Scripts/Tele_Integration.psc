@@ -75,7 +75,7 @@ Function InitDefaultOnEventHandlers()
 EndFunction
 
 Function UpdateRousingControlledSexScene()
-    TDevices.LogDebug("UpdateRousingControlled OS-Stroker: " + _OstimSceneStrokerHandle + " OS-Vib " + _OstimSceneVibrationHandle + " SL-Stroker:" + _SexlabSceneStrokerHandle + " SLVib: " + _SexlabSceneVibrationHandle)
+    ; TDevices.LogDebug("UpdateRousingControlled OS-Stroker: " + _OstimSceneStrokerHandle + " OS-Vib " + _OstimSceneVibrationHandle + " SL-Stroker:" + _SexlabSceneStrokerHandle + " SLVib: " + _SexlabSceneVibrationHandle)
     If _InToysScene
         Int speed = (Toys as ToysFramework).GetRousing()
         TDevices.UpdateHandle(_ToysSceneVibrationHandle, speed)
@@ -108,7 +108,7 @@ Function UpdateRousingControlledSexScene()
 EndFunction
 
 Int Function StartStroke(Int deviceSelector, Float duration_sec, Int patternType, String funscript, Int speed, String[] evts)
-    TDevices.LogDebug("StartStroke")
+    ; TDevices.LogDebug("StartStroke")
     String[] events = new String[1]
     If deviceSelector == 1
         events = evts
@@ -287,7 +287,7 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     If PlayerRef.GetLeveledActorBase().GetName() != actorName
         return ; Not the player
     EndIf
-    TDevices.LogDebug("OnVibrateEffectStart"+ eventName + "," + actorName + "," + vibrationStrength + "," + sender)
+    ; TDevices.LogDebug("OnVibrateEffectStart"+ eventName + "," + actorName + "," + vibrationStrength + "," + sender)
 
     ; Reverse DD multi device calculation to get the actual strength
     String[] events = new String[3]
@@ -322,7 +322,7 @@ Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form
     If PlayerRef.GetLeveledActorBase().GetName() != actorName
         return ; Not the player
     EndIf
-    TDevices.LogDebug("OnVibrateEffectStop" + eventName + "," + actorName + "," + argNum + "," + sender)
+    ; TDevices.LogDebug("OnVibrateEffectStop" + eventName + "," + actorName + "," + argNum + "," + sender)
     TDevices.StopHandle(_DeviousDevicesVibrateHandle)
 EndEvent
 
@@ -428,7 +428,7 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
     If !Sexlab_Animation && !Sexlab_Stroker
         return
     EndIf
-    TDevices.LogDebug("OnSexlabAnimationStart")
+    ; TDevices.LogDebug("OnSexlabAnimationStart")
     sslThreadController controller = (Sexlab as SexLabFramework).GetController(threadID)
     sslBaseAnimation animation = controller.Animation
 
@@ -453,7 +453,7 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
 	If !hasPlayer
 		return
 	EndIf
-    TDevices.LogDebug("OnSexlabAnimationEnd")
+    ; TDevices.LogDebug("OnSexlabAnimationEnd")
 	_InSexlabScene = False
     If _SexlabSceneVibrationHandle != -1
         TDevices.StopHandle(_SexlabSceneVibrationHandle)
@@ -552,12 +552,12 @@ Bool Property Ostim_Stroker Hidden
 EndProperty
 
 Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
-    TDevices.LogDebug("OnOStimStart")
+    ; TDevices.LogDebug("OnOStimStart")
     UpdateRousingControlledSexScene()
 EndEvent
 
 Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
-    TDevices.LogDebug("OnOstimEnd")
+    ; TDevices.LogDebug("OnOstimEnd")
     If _OstimSceneVibrationHandle != -1
         TDevices.StopHandle(_OstimSceneVibrationHandle)
         _OstimSceneVibrationHandle = -1
@@ -570,7 +570,6 @@ Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
 EndEvent
 
 Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form sender)
-    TDevices.LogDebug("OnOStimSceneChanged")
     If OThread.GetScene(0) != sceneID
         return
     EndIf
@@ -578,6 +577,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
         return
     EndIf
 
+    TDevices.LogDebug("OnOStimSceneChanged " + sceneID  + " | " + OMetadata.GetAllActionsTags(sceneID))
     Int playerActorIndex = -1
     Int playerTargetIndex = -1
 
@@ -600,14 +600,15 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
             playerTargetIndex = actorIndex
         EndIf
     EndWhile
-    
+
+    Bool isSexual = OMetadata.FindAnyActionCSV(sceneID, "sexual") > -1
     Bool hasVaginalStim = OstimPlayerHasVaginalStimulation(sceneID, playerTargetIndex, playerActorIndex)
     Bool hasAnalStim = OstimPlayerHasAnalStimulation(sceneID, playerTargetIndex, playerActorIndex)
     Bool hasNippleStim = OstimPlayerHasNippleStimulation(sceneID, playerTargetIndex, playerActorIndex)
     Bool isPenetrated = OstimPlayerIsPenetrated(sceneID, playerTargetIndex, playerActorIndex)
-    Bool hasPenisStim = OstimPlayerHasPenisStimulation(sceneID, playerTargetIndex, playerActorIndex)
+    Bool hasPenisStim = OstimSceneHasPenisStimulation(sceneID, playerTargetIndex, playerActorIndex)
     
-    String[] evts = new String[5]
+    String[] evts = new String[6]
     If hasVaginalStim
         evts[0] = Ostim_Animation_Event_Vaginal
     EndIf
@@ -623,12 +624,15 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     If isPenetrated
         evts[4] = Ostim_Animation_Event_Penetration
     EndIf
+    If isSexual
+        evts[5] = "Sexual"
+    EndIf
     _OstimMaxSpeed = OMetadata.GetMaxSpeed(sceneID)
 
     Int oldHandle = _OstimSceneVibrationHandle
     Int oldStrokerHandle = _OstimSceneStrokerHandle
 
-    If hasVaginalStim || hasAnalStim || hasNippleStim || hasPenisStim || isPenetrated
+    If isSexual || hasVaginalStim || hasAnalStim || hasNippleStim || hasPenisStim || isPenetrated
         If _Ostim_Animation
             _OstimSceneVibrationHandle = StartVibration(Ostim_Animation_DeviceSelector, -1, Ostim_Animation_Pattern, Ostim_Animation_Funscript, GetOStimSpeed(Ostim_Animation_Speed_Control), evts)
         EndIf
@@ -695,9 +699,11 @@ Bool Function OstimPlayerHasNippleStimulation(String sceneID, Int playerTarget, 
     return passiveAction != -1
 EndFunction
 
-Bool Function OstimPlayerHasPenisStimulation(String sceneID, Int playerTarget, Int playerActor)
-    Int passivePenisStim = OMetadata.FindAnyActionForTargetCSV(sceneID, playerTarget, "deepthroat,lickingpenis,grindingpenis,thighjob,handjob")
-    Int activePenisStim = OMetadata.FindAnyActionForActorCSV( sceneID, playerActor, "analsex,malemasturbation,vaginalsex" )
+Bool Function OstimSceneHasPenisStimulation(String sceneID, Int playerTarget, Int playerActor)
+    ; Int passivePenisStim = OMetadata.FindAnyActionForActorCSV( sceneID, playerTarget, "deepthroat,lickingpenis,grindingpenis,thighjob,handjob")
+    ; Int activePenisStim = OMetadata.FindAnyActionForActorCSV( sceneID, playerActor, "analsex,malemasturbation,vaginalsex" )
+    Int passivePenisStim = OMetadata.FindAnyActionCSV( sceneID, "deepthroat,lickingpenis,grindingpenis,thighjob,handjob")
+    Int activePenisStim = OMetadata.FindAnyActionCSV( sceneID, "analsex,malemasturbation,vaginalsex" )
     return passivePenisStim != -1 || activePenisStim != -1
 EndFunction
 
