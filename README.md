@@ -99,8 +99,21 @@ This mod is free software and can be used under the terms of the [Apache License
 
 ### 1.3.0
 
-- Support linear devices (Strokers)
+- Add support for linear devices (Strokers)
+  * Stroking mode controls speed based on animation speed 
+  * Funscript plays a funscript on constant speed
+  * Add new funscripts for Strokers (they are not very interesting, you are invited to add your own)
 
+- Support device/actuator specific speed/range settings
+  * Control min/max speed/strength/range (depending on device type)
+  * Support inverting strokers
+  * Specificy scaling factor for vibrators
+
+#### Bugfixes
+
+- Fix issue in event handling that caused frezees
+
+- Logging level in Telekinesis.json is now actually used
 
 
 [Older Entries...](CHANGELOG.md)
