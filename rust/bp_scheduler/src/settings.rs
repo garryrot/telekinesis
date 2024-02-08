@@ -90,7 +90,7 @@ impl LinearRange {
 impl Default for LinearRange {
     fn default() -> Self {
         Self {
-            min_ms: 250,
+            min_ms: 300,
             max_ms: 3000,
             min_pos: 0.0,
             max_pos: 1.0,

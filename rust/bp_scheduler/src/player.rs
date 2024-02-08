@@ -80,6 +80,8 @@ impl PatternPlayer {
                         }
                     } {
                         last_result = result;
+                    } else {
+                        break;
                     }
                 }
             }
@@ -339,7 +341,6 @@ impl fmt::Debug for PatternPlayer {
         f.debug_struct("PatternPlayer")
             .field("actuators", &self.actuators)
             .field("handle", &self.handle)
-            .field("resolution", &self.scalar_resolution_ms)
             .finish()
     }
 }
