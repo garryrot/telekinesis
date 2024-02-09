@@ -5,7 +5,7 @@ edition = "2021"
 description = "Fake buttplug server for testing device access"
 
 [dependencies]
-buttplug = "7.1.2"
+buttplug = "7.1.13"
 tokio = { version = "1.23.0", features = ["full", "sync"] }
 tokio-util = "0.7.8"
 serde = "1.0.164"

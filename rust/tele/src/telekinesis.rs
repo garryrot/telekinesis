@@ -291,7 +291,7 @@ impl Telekinesis {
                 ))
                 .expect("never full");
             let result = match task {
-                Task::Linear(speed, _) => player.play_oscillate_linear(duration, speed, LinearRange::max()).await,
+                Task::LinearOscillate(speed, _) => player.play_oscillate_linear(duration, speed, LinearRange::max()).await,
                 _ => panic!(),
             };
             let event = match result {

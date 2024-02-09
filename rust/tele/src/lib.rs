@@ -358,7 +358,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "linear.oscillate",
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
             tk.linear_oscillate(
-                Task::Linear(Speed::new(speed.into()), pattern_name.into()),
+                Task::LinearOscillate(Speed::new(speed.into()), pattern_name.into()),
                 get_duration_from_secs(time_sec),
                 pattern_name,
                 read_input_string(body_parts),

@@ -160,7 +160,7 @@ impl Display for Task {
                 write!(f, "Pattern({}, {}, {})", speed, actuator, pattern)
             }
             Task::Linear(speed, pattern) => write!(f, "Linear({}, {})", speed, pattern),
-            Task::LinearOscillate(speed, pattern) => write!(f, "Oscillate({}, {})", speed, pattern),
+            Task::LinearOscillate(speed, _) => write!(f, "Stroke({})", speed),
         }
     }
 }
