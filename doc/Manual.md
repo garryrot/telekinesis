@@ -14,7 +14,7 @@ The entry page gives you an overview of the connection status. There is no reaso
 
 Whenever you change any of the settings it is important to `Reconnect`, otherwise it will have no effect
 
-<img src="scr1.png" width="800"/>
+<img src="scr1.jpg" width="800"/>
 
 ## 2. Device Setup
 
@@ -32,78 +32,8 @@ Whenever a new device is discovered for the first time, it has to be activated m
 
 This setting has no effect on its own, but can be used by certain mod features to filter for devices (an example being the devious devices integration)
 
+### Step 3: Correspond Body Parts (Optional)
 
-## 3. Features & Mod Integration
-
-Telekinesis interacts with various different mods. The settings for most features are separated in three sections
-
-- **Enable** enables or disables the feature alltogether
-- **Devices** controls *which* devices are used
-- **Actions** controls *how* the devices are used (strength, movement pattern, etc.)
-
-### 3.1 Devious Devices
-
-The Devious Devices Integration syncs IRL devices with vibration events on player-worn vibrators. If the setting is enabled,
-vibrators will start  on `VibrateEffectStart` and stop on each `VibrateEffectStop` event that is fired on the player character.
-
-<img src="scr3.png" width="800"/>
-
-#### Device Filters
-
-This sections is used to select which devices to vibrate. 
-
-- **All** Will use all devices that have the capability to vibrate (Default)
-- **Match Events** will select devices based on device events/tags (`Anal`,`Vaginal`, `...`)
-
-In case of devious devices, match events will correlate to the devices worn by the player. Because only vibrations make sense in this context, only vibrators can be selected.
-
-**Example: Setting up body specific vibrators**
-
-Lets assume a `VibrateEffectStart` occurs on the player character, based on the following settings, these scnarios can happen:
-
-- In the first case `All` filter was selected. This will select all devices that can vibrate, even if they have no tags associated.
-- In the second case the in-game character wears a vibrating nipple piercing and one Vibrator is tagged with `Nipple`
-- In the third case the in-game charecter wears a vibrating anal plug and a vibrating nipple piercing, this will result in both devices being vibrated.
-
-
-| **Device Filter**   | In-Game Devices       |       IRL Plug (Events=Anal,Vaginal) | IRL Nipple Vibrator (Events=Nipple) | IRL Device 3 (Events="")     |
-|-------------------------|---------------------  |--------------------------------------|----------------------              |--------------------------------|
-| All          |             *                    | Vibrates                             | Vibrates                           |         Vibrates
-| Match Events | Vibrating Plug                   | Vibrates                             |       -                            |           -
-| Match Events | Vibrating Plug, Nipple Piercing  | Vibrates                             | Vibrates                           |           -
-
-
-#### Actions
-
-The option **Vibrate Pattern** controls how those selected devices are utiziled:
-
-- **Linear**: A regular vibration with a constant strenght. The strength may by determined by various factors, for devious devices the in-game vibration strength (1 very weak - 5 very strong) is used.
-- **Funscript**: Plays a specific funscript (select in **Vibrate Funscript**)
-- **Random Funscript**: Uses a randomly selected funscript
-
-### 3.2 Sexlab
-
-Move devices during sexlab animations that involve the player character
-
-- Supports `Sexlab Aroused` if you enable **Arousal = Vibration**. This means that the strength of the device is coupled to the players current rousing (0 = 0%, 100 = 100% vibration strength)
-- **Match Events** will use the tags of the Sexlab Animation to match devices
-- Currently only supports vibrators (strokers might come at some point on the future)
-
-<img src="scr4.png" width="800"/>
-
-### 3.3. Toys & Love
-
-Offers the Sexlab and DD functionality but just for **Toys & Love**. Also offers additional actions for **Toys & Love** specific events like **Fondling**, **Denial** or **Penetration**.
-
-Extra Actions will overlay other vibration patterns, so when you select `Pause on Denial`, it will stop all other devices for a few seconds, until the other movements continue.
-
-<img src="scr8.png" width="800"/> 
-
-### 3.4 Skyrim Chain Beasts
-
-A very experimental integration that will not work unless you recompile SCB_VibeEffect.psc (version 0.7.0).
-
-<img src="scr6.png" width="800"/>
 
 ## 4. Patterns
 
