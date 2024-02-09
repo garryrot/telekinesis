@@ -577,7 +577,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
         return
     EndIf
 
-    TDevices.LogDebug("OnOStimSceneChanged " + sceneID  + " | " + OMetadata.GetAllActionsTags(sceneID))
+    ; TDevices.LogDebug("OnOStimSceneChanged " + sceneID  + " | " + OMetadata.GetAllActionsTags(sceneID))
     Int playerActorIndex = -1
     Int playerTargetIndex = -1
 
