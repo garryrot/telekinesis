@@ -11,6 +11,10 @@ Naturally, these two devices types differ and so stroker funscripts will not be 
 
 <img src="funscripts.jpg" width="800"/>
 
+## Testing Funscripts
+
+Clicking any of those funscripts in the MCM will execute them for ANY connected device for 30s. This is not customizable.
+
 ## Customize Funscripts
 
 Funscript is an open json-based format for storing stroker or vibration patterns.

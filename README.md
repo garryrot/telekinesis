@@ -130,6 +130,8 @@ This mod is free software and can be used under the terms of the [Apache License
 
 #### Bugfixes
 
+- Hopefully fixed the MCM not loading issue
+
 - Fix issue in event handling that caused frezees
 
 - Logging level in Telekinesis.json is now actually used

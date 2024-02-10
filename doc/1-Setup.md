@@ -31,22 +31,28 @@ Every time a device connects or disconnects, a Notification in the top left will
 
 Whenever a new device is discovered for the first time, it has to be activated manually for usage. This is a safety measure to prevent this mod from arbitrarily moving connected bluetooth devices, simply because they are within range. 
 
-This must be done individually for every device and is remembered independendly of your savegame (setting are stored in `SKSE/Data/Telekinesis.json`)
+This must be done individually for every device in the MCM and is remembered independendly of your savegame 
+
+Device Setting are stored in `SKSE/Data/Telekinesis.json`, but can be changd exclusively through the MCM. You do not need to edit this file manually.
 
 <img src="scr2.jpg" width="700"/>
 
 ### Step 2: Fine-Tuning Devices
 
-Since `v1.3.0` you can customize the strength and behavior on a device-basis, to customize how these things are used according to your liking. Especially for strokers, this is highly recommended before playing, to assure that you don't hurt yourself!
+Since `v1.3.0` you can customize the strength and behavior on a device-basis according to your personal preferences.
 
-These settings are global and will be applied to every single interaction with that device. Depending on the physical form of the device, different settings will be available.
+Especially for strokers, this is highly recommended before playing!
 
-##### Scalar Devices (Vibrators, Oscillators, etc):
+These settings are global and will usually be applied to every interaction with that device. Settings are actuator-specific, so if your device has multiple Actuators (=moving parts or motors), each motor will have individual settings. 
+
+Depending on the type of motor, each actuator settings will have a specific  available.
+
+##### Scalar Actuators (Vibrators, Oscillators, etc):
 
 - **Min/Max Speed** `[]`: Limits the lowest and highest possible strength for any scalar device. This excludes setting Speed to 0, which means Stop and is always possible.
 - **Downscale Factor** `[]`: This is a factor applied to the strength. A downscale factor of `0.5` will turn a Speed of 100% that is sent to this device to 50%.
 
-##### Position Devices (a.k.a Linear Devices, Strokers)
+##### Positional Actuators (a.k.a  Strokers)
 
 - **Fastest Stroke** `[]`: The time in milli-seconds the device will take when moving from position `0.0` to `1.0` at 100% Speed
 - **Slowest Stroke** `[]`: The time in milli-seconds the device will take when moving from position `0.0` to `1.0` at 0% Speed
