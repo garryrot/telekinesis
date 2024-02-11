@@ -11,8 +11,8 @@ Spell Property Tele_Stop Auto
 
 Int Property MajorVersion = 1 AutoReadOnly Hidden
 Int Property MinorVersion = 3 AutoReadOnly Hidden
-Int Property PatchVersion = 0 AutoReadOnly Hidden
-String Property Revision = "" AutoReadOnly Hidden
+Int Property PatchVersion = 1 AutoReadOnly Hidden
+String Property Revision = "Alpha" AutoReadOnly Hidden
 
 String Property Version Hidden
     String Function Get()
@@ -133,12 +133,12 @@ Int Function LinearPattern(String pattern, Int speed, Float duration_sec = -1.0,
     return -1
 EndFunction
 
-Int Function Linear(Int speed, Int min_pos, Int max_pos, Float duration_sec = -1.0, String[] events)
+Int Function Linear(Int speed, Float duration_sec = -1.0, String[] events)
     { Move all specified devices for the given duration
       Returns an Int handle to stop the  early, see StopHandle(Int) }
     If Connects()
         Int handle = Tele_Api.Tele_Control("linear.oscillate", InRange(speed, 0, 100), duration_sec, "", events)
-        Trace("(Linear) speed='" + speed + "' duration='" + duration_sec + "' pattern=" + min_pos + "," + max_pos + " events=" + events + " handle=" + handle)
+        Trace("(Linear) speed='" + speed + "' duration='" + duration_sec + "' events=" + events + " handle=" + handle)
         return handle
     EndIf
     return -1
@@ -165,6 +165,16 @@ Int Function VibrateEvents(Int speed, Float duration_sec = -1.0, String[] events
     If Connects()
         Int handle = Tele_Api.Tele_Control("vibrate", InRange(speed, 0, 100), duration_sec, "", events)
         Trace("(Vibrate) speed='" + speed + " duration=" + duration_sec + " events=" + events + " handle=" + handle)
+        return handle
+    EndIf
+    return -1
+EndFunction
+
+Int Function Scalar(String actuator, Int speed, Float duration_sec = -1.0, String[] events)
+    { actuators: "constrict" | "inflate" | "oscillate" | "vibrate" }
+    If Connects()
+        Int handle = Tele_Api.Tele_Control("scalar", InRange(speed, 0, 100), duration_sec, actuator, events)
+        Trace("(" + actuator + ") speed='" + speed + " duration=" + duration_sec + " events=" + events + " handle=" + handle)
         return handle
     EndIf
     return -1

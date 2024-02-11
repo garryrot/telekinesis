@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use bp_scheduler::{actuator::Actuator, settings::ActuatorSettings};
 use buttplug::core::message::ActuatorType;
 use cxx::{CxxString, CxxVector};
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::settings::TkDeviceSettings;
 
@@ -38,6 +38,20 @@ pub fn read_input_string(list: &CxxVector<CxxString>) -> Vec<String> {
         .filter(|d| !d.is_empty())
         .map(|d| d.to_string_lossy().into_owned())
         .collect()
+}
+
+pub fn read_scalar_actuator(actuator: &str) -> ActuatorType {
+    let lower = actuator.to_ascii_lowercase();
+    match lower.as_str() {
+        "constrict" => ActuatorType::Constrict,
+        "inflate" => ActuatorType::Inflate,
+        "oscillate" => ActuatorType::Oscillate,
+        "vibrate" => ActuatorType::Vibrate,
+        _ => {
+            error!("unknown actuator {:?}", lower);
+            ActuatorType::Vibrate
+        }
+    }
 }
 
 pub struct TkParams {}

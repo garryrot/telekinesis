@@ -321,6 +321,7 @@ Event OnPageReset(String page)
             Else
                 AddTextOption("Arousal = Vibration Strength", "Requires SLA", OPTION_FLAG_DISABLED)
             EndIf
+            AddEmptyOption()
 
             Int sexlab_animation_pattern_flag = OPTION_FLAG_DISABLED
             If TIntegration.Sexlab_Animation
@@ -345,13 +346,17 @@ Event OnPageReset(String page)
             If TIntegration.Sexlab_Stroker
                 sexlab_stroker_selector_flag = OPTION_FLAG_NONE
             EndIf
-
+            AddToggleOptionST("OPTION_SEXLAB_OSCILLATORS", "Enable Oscillators", TIntegration.Sexlab_Oscillator)
+            If TIntegration.Sexlab_Oscillator
+                sexlab_stroker_selector_flag = OPTION_FLAG_NONE
+            EndIf
+      
             AddMenuOptionST("MENU_SEXLAB_STROKER_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Sexlab_Stroker_DeviceSelector], sexlab_stroker_selector_flag)
       
             AddHeaderOption("Actions")
             If TIntegration.SexLabAroused != None
                 Int sexlab_stroker_rousing_flag = OPTION_FLAG_DISABLED
-                If TIntegration.Sexlab_Stroker && TIntegration.Sexlab_Stroker_Pattern == 0
+                If (TIntegration.Sexlab_Stroker && TIntegration.Sexlab_Stroker_Pattern == 0) || TIntegration.Sexlab_Oscillator
                     sexlab_stroker_rousing_flag = OPTION_FLAG_NONE
                 EndIf    
                 AddToggleOptionST("OPTION_SEXLAB_STROKER_ROUSING", "Arousal = Stroker Speed", TIntegration.Sexlab_Stroker_Rousing, sexlab_stroker_rousing_flag)
@@ -422,7 +427,11 @@ Event OnPageReset(String page)
             If TIntegration.Ostim_Stroker && TIntegration.Ostim_Stroker_Pattern == 0
                 ostim_stroker_speed_flag = OPTION_FLAG_NONE
             EndIf
-            AddMenuOptionST("MENU_OSTIM_STROKER_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector], ostim_animation_selector_flag)
+            AddToggleOptionST("OPTION_OSTIM_OSCILLATOR", "Enable Oscillators", TIntegration.Ostim_Oscillator)
+            If TIntegration.Ostim_Oscillator
+                ostim_stroker_speed_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_OSTIM_STROKER_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.Ostim_Animation_DeviceSelector], ostim_stroker_speed_flag)
 
             AddHeaderOption("Actions")
             AddMenuOptionST("MENU_OSTIM_STROKER_SPEED", "Speed", _OstimSpeedOptions[TIntegration.Ostim_Stroker_Speed_Control], ostim_stroker_speed_flag)
@@ -1045,9 +1054,32 @@ State OPTION_SEXLAB_STROKER
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Move devices during sexlab player animation")
+        SetInfoText("Move linear/positional devices during sexlab player animation")
     EndEvent
 EndState
+
+State OPTION_SEXLAB_OSCILLATORS
+    Event OnSelectST()
+        TIntegration.Sexlab_Oscillator = !TIntegration.Sexlab_Oscillator
+        SetToggleOptionValueST(TIntegration.Sexlab_Oscillator)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TIntegration.Sexlab_Oscillator = TIntegration.Sexlab_Oscillator_Default
+        SetToggleOptionValueST(TIntegration.Sexlab_Oscillator)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String info = "Oscillates devices during sexlab player animation\n"
+        info += "NOTE: Oscillators are specific strokers that do not accept positional input\n"
+        info += "and instead operate with a scalar speed value (like vibrators). These do not support\n"
+        info += "playing funscripts and are always controlled by rousing or speed."
+        SetInfoText(info)
+    EndEvent
+EndState
+
 
 State MENU_SEXLAB_STROKER_DEVICE_SELECTOR
     Event OnMenuOpenST()
@@ -1438,7 +1470,29 @@ State OPTION_OSTIM_STROKER
     EndEvent
 
     Event OnHighlightST()
-        SetInfoText("Move devices during OStim player animation")
+        SetInfoText("Move linear/positional devices during sexlab player animation")
+    EndEvent
+EndState
+
+State OPTION_OSTIM_OSCILLATOR
+    Event OnSelectST()
+        TIntegration.Ostim_Oscillator = !TIntegration.Ostim_Oscillator
+        SetToggleOptionValueST(TIntegration.Ostim_Oscillator)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TIntegration.Ostim_Oscillator = TIntegration.Ostim_Oscillator_Default
+        SetToggleOptionValueST(TIntegration.Ostim_Oscillator)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String info = "Oscillates devices during ostim player animation.\n"
+        info += "NOTE: Oscillators are specific strokers that do not accept positional input\n"
+        info += "and instead operate with a scalar speed value (like vibrators). These do not support\n"
+        info += "playing funscripts and are always controlled by rousing or speed."
+        SetInfoText(info)
     EndEvent
 EndState
 

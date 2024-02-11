@@ -148,7 +148,7 @@ impl Telekinesis {
         true
     }
 
-    pub fn vibrate(
+    pub fn scalar(
         &mut self,
         task: Task,
         duration: Duration,
@@ -156,7 +156,7 @@ impl Telekinesis {
         fscript: Option<FScript>,
         actuator_types: &[ActuatorType],
     ) -> i32 {
-        info!("vibrate");
+        info!("scalar");
         self.scheduler.clean_finished_tasks();
 
         let task_clone = task.clone();
@@ -413,7 +413,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
-        let handle = tk.vibrate(
+        let handle = tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::MAX,
             vec![],
@@ -437,7 +437,7 @@ mod tests {
 
         // act
         thread::sleep(Duration::from_secs(1));
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::from_secs(1),
             vec![],
@@ -466,7 +466,7 @@ mod tests {
         for actuator_id in tk.status.get_known_actuator_ids() {
             tk.settings.set_enabled(&actuator_id, true);
         }
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::new(100)),
             Duration::from_millis(1),
             vec![],
@@ -489,7 +489,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from("does not exist")],
@@ -516,7 +516,7 @@ mod tests {
         tk.settings.set_enabled("vib2 (Vibrate)", false);
 
         // act
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![],
@@ -566,7 +566,7 @@ mod tests {
             .set_enabled(known_actuator_ids.first().unwrap(), true);
 
         let fscript = read_pattern(&pattern_path, pattern_name, vibration_pattern).unwrap();
-        let handle = tk.vibrate(
+        let handle = tk.scalar(
             Task::Pattern(Speed::max(), ActuatorType::Vibrate, pattern_name.into()),
             duration,
             vec![],
@@ -596,7 +596,7 @@ mod tests {
         for actuator in tk.status.actuators() {
             tk.settings.set_enabled(actuator.device.name(), true);
         }
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::MAX,
             vec![],
@@ -630,7 +630,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
         tk.settings.set_enabled("vib1 (Vibrate)", true);
         tk.settings.set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from("some event")],
@@ -719,7 +719,7 @@ mod tests {
         tk.settings.set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
         tk.settings.set_events("vib2 (Vibrate)", &[String::from("bogus")]);
 
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from("selected_event")],
@@ -739,7 +739,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
         tk.settings.set_enabled("vib1 (Vibrate)", true);
         tk.settings.set_events("vib1 (Vibrate)", &[String::from("some event")]);
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from(" SoMe EvEnT    ")],
@@ -779,7 +779,7 @@ mod tests {
             TkConnectionType::Test,
         )
         .unwrap();
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::new(22)),
             Duration::from_millis(1),
             vec![],
@@ -797,14 +797,14 @@ mod tests {
             TkConnectionType::Test,
         )
         .unwrap();
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::new(10)),
             Duration::from_millis(100),
             vec![],
             None,
             &[ActuatorType::Vibrate],
         );
-        tk.vibrate(
+        tk.scalar(
             Task::Scalar(Speed::new(20)),
             Duration::from_millis(200),
             vec![],

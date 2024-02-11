@@ -6,7 +6,7 @@ use bp_scheduler::{
 use buttplug::core::message::ActuatorType;
 use connection::{Task, TkConnectionEvent};
 use ffi::SKSEModEvent;
-use input::get_duration_from_secs;
+use input::{get_duration_from_secs, read_scalar_actuator};
 use itertools::Itertools;
 use pattern::{get_pattern_names, read_pattern};
 use std::sync::{Arc, Mutex};
@@ -305,12 +305,25 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_control(ApiControl {
         name: "vibrate",
         exec: |tk, speed, time_sec, _, events| {
-            tk.vibrate(
+            tk.scalar(
                 Task::Scalar(Speed::new(speed.into())),
                 get_duration_from_secs(time_sec),
                 read_input_string(events),
                 None,
                 &[ActuatorType::Vibrate],
+            )
+        },
+        default: ERROR_HANDLE,
+    })
+    .def_control(ApiControl {
+        name: "scalar",
+        exec: |tk, speed, time_sec, actuator_type, events| {
+            tk.scalar(
+                Task::Scalar(Speed::new(speed.into())),
+                get_duration_from_secs(time_sec),
+                read_input_string(events),
+                None,
+                &[read_scalar_actuator(actuator_type)],
             )
         },
         default: ERROR_HANDLE,
@@ -322,7 +335,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             pattern_name,
             true,
         ) {
-            Some(fscript) => tk.vibrate(
+            Some(fscript) => tk.scalar(
                 Task::Pattern(
                     Speed::new(speed.into()),
                     ActuatorType::Vibrate,
