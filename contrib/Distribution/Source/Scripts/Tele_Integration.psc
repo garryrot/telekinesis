@@ -29,11 +29,11 @@ Quest Property Toys Auto Hidden
 ; Type SlaFrameworkScr
 Quest Property SexLabAroused Auto Hidden
 
-; Type OSexIntegrationMain
-Quest Property OStim Auto Hidden
+; Using the type OSexIntegrationMain breaks the script loading
+Bool Property HasOStim Auto Hidden
 
 Event OnInit()
-    InitDefaultOnEventHandlers()
+    InitDefaultOnEventHandlers() ; TODO unneeded?
     InitDefaultListeners()
 EndEvent
 
@@ -644,8 +644,10 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     While i > 0
         i -= 1
         Int actorIndex = sceneActors[i]
-        If (OStim as OSexIntegrationMain).GetActor(actorIndex) == PlayerRef
-            playerActorIndex = actorIndex
+        If (HasOStim)
+            If (OThread.GetActor(0, actorIndex) == PlayerRef)
+                playerActorIndex = actorIndex
+            EndIf
         EndIf
     EndWhile
 
@@ -654,8 +656,10 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     While j > 0
         j -= 1
         Int actorIndex = sceneTargets[j]
-        If (OStim as OSexIntegrationMain).GetActor(actorIndex) == PlayerRef
-            playerTargetIndex = actorIndex
+        If (HasOStim)
+            If (OThread.GetActor(0, actorIndex) == PlayerRef)
+                playerTargetIndex = actorIndex
+            EndIf
         EndIf
     EndWhile
 
@@ -665,8 +669,7 @@ Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form s
     Bool hasNippleStim = OstimPlayerHasNippleStimulation(sceneID, playerTargetIndex, playerActorIndex)
     Bool isPenetrated = OstimPlayerIsPenetrated(sceneID, playerTargetIndex, playerActorIndex)
     Bool hasPenisStim = OstimSceneHasPenisStimulation(sceneID, playerTargetIndex, playerActorIndex)
-    
-    String[] evts = new String[6]
+       String[] evts = new String[6]
     If hasVaginalStim
         evts[0] = Ostim_Animation_Event_Vaginal
     EndIf
@@ -1124,3 +1127,4 @@ EndEvent
 ; Depracted
 
 Tele_Devices Property TeleDevices Auto
+Quest Property OStim Auto Hidden

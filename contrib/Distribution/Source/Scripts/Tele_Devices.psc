@@ -12,7 +12,7 @@ Spell Property Tele_Stop Auto
 Int Property MajorVersion = 1 AutoReadOnly Hidden
 Int Property MinorVersion = 3 AutoReadOnly Hidden
 Int Property PatchVersion = 1 AutoReadOnly Hidden
-String Property Revision = "Alpha" AutoReadOnly Hidden
+String Property Revision = "" AutoReadOnly Hidden
 
 String Property Version Hidden
     String Function Get()

@@ -39,9 +39,9 @@ Function LoadTelekinesis(Tele_Devices devices)
     EndIf
        
     If Game.GetModByName("OStim.esp") != 255
-        integration.OStim = OUtils.GetOStim() as Quest
+        integration.HasOStim = True
     Else
-        integration.OStim = None
+        integration.HasOStim = False
     EndIf
     
     integration.PlayerRef = Game.GetPlayer()
