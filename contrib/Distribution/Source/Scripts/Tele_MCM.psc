@@ -382,7 +382,7 @@ Event OnPageReset(String page)
     
     If page == " OStim"
         SetCursorFillMode(TOP_TO_BOTTOM)
-        If TIntegration.OStim != None
+        If TIntegration.HasOStim
             AddHeaderOption("Ostim Animations")
             AddToggleOptionST("OPTION_OSTIM_ANIMATION", "Enable Vibrators", TIntegration.Ostim_Animation)
             Int ostim_animation_selector_flag = OPTION_FLAG_DISABLED

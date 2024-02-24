@@ -114,6 +114,10 @@ This mod is free software and can be used under the terms of the [Apache License
 
 ## Changelog
 
+### 1.3.2
+
+- Fix OStim MCM
+
 ### 1.3.0
 
 - Increased Buttplug.io to 7.1.13, supporting lots of new devices

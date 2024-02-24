@@ -108,6 +108,7 @@ impl DeviceAccess {
             actuator.index_in_device,
             (speed.as_float(), actuator.actuator),
         )]));
+
         if let Err(err) = actuator.device.scalar(&cmd).await {
             error!("failed to set scalar speed {:?}", err);
             return Err(err);
