@@ -178,7 +178,18 @@ Event OnPageReset(String page)
             AddHeaderOption("Connection Disabled...")
             return
         EndIf
-  
+
+        ; OIDs that aren't overwritte for each entry need to be reset
+        ; to prevent random OID with "outdated" entries
+        _StrokerMinPosOid = new Int[20]
+        _StrokerMaxPosOid = new Int[20]
+        _StrokerMinMsOid = new Int[20]
+        _StrokerMaxMsOid = new Int[20]
+        _StrokerInvertOid = new Int[20]
+        _VibratorMinSpeedOid = new Int[20]
+        _VibratorMaxSpeedOid = new Int[20]
+        _VibratorFactorOid = new Int[20]
+
         AddHeaderOption("Discovery")
         AddEmptyOption()
 
@@ -194,7 +205,7 @@ Event OnPageReset(String page)
         Int i = 0
         While (i < len) 
             String actuatorId = _ActuatorIds[i]
-            
+
             If actuatorId != ""
                 String status = Tele_Api.Qry_Str_1("device.connection.status", actuatorId)
                 bool connects = false
@@ -240,7 +251,7 @@ Event OnPageReset(String page)
                     Float factor = Tele_Api.Qry_Str_1("device.scalar.factor", actuatorId) as Float
                     _VibratorFactorOid[i] = AddSliderOption("Downscale Factor", factor, "{2}")
                     _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
-                    AddEmptyOption();
+                    AddEmptyOption()
                 EndIf
 
                 If isStroker
@@ -252,7 +263,6 @@ Event OnPageReset(String page)
                     _StrokerInvertOid[i] = AddToggleOption("Invert Pos", invertPos)
                 EndIf
             EndIf
-
             i += 1
         EndWhile
 
