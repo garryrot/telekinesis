@@ -114,6 +114,10 @@ This mod is free software and can be used under the terms of the [Apache License
 
 ## Changelog
 
+### 1.3.3
+
+- Fix issue with actuator specific device settings re-setting in certain situations
+
 ### 1.3.2
 
 - Fix OStim MCM

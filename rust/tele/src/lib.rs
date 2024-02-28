@@ -410,6 +410,17 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         },
     })
     .def_qry_str1(ApiQryStr1 {
+        name: "device.actuator_type",
+        default: "None",
+        exec: |tk, actuator_id| {
+            match tk.settings.try_get_actuator_settings(actuator_id) {
+                ActuatorSettings::None => "None".into(),
+                ActuatorSettings::Scalar(_) => "Scalar".into(),
+                ActuatorSettings::Linear(_) => "Linear".into(),
+            }
+        },
+    })
+    .def_qry_str1(ApiQryStr1 {
         name: "device.actuator.index",
         default: "1",
         exec: |tk, actuator_id| {

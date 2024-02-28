@@ -157,6 +157,13 @@ impl TkSettings {
         }
     }
 
+    pub fn try_get_actuator_settings(&mut self, actuator_id: &str) -> ActuatorSettings {
+        if let Some(setting) = self.get_device(actuator_id) {
+            return setting.actuator_settings;
+        }
+        ActuatorSettings::None
+    }
+
     pub fn get_or_create_linear(&mut self, actuator_id: &str) -> (TkDeviceSettings, LinearRange) {
         let mut device = self.get_or_create(actuator_id);
         if let ActuatorSettings::Scalar(ref scalar) = device.actuator_settings {
