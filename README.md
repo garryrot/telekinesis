@@ -1,4 +1,4 @@
-# Telekinesis (Bluetooth Toy Control for Skyrim) 1.3.0
+# Telekinesis (Bluetooth Toy Control for Skyrim) 1.3.3
 
 Telekinesis is a mod that brings native support for naughty devices (bluetooth or others) to Skyrim SE, AE.
 
