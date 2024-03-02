@@ -1,0 +1,3 @@
+[submodule "rust/bp_scheduler"]
+	path = rust/bp_scheduler
+	url = https://github.com/garryrot/bp_scheduler
