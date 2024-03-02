@@ -19,6 +19,7 @@ using namespace REL;
 constexpr std::string_view PapyrusClass = "Tele_Api";
 bool TeleMainThreadStarted = false;
 std::thread TeleMainThread;
+std::thread BoneThread;
 RE::TESQuest* TeleMainQuest = NULL;
 
 /// Rust FFI functions to telekinesis crate
@@ -72,6 +73,25 @@ void Tele_Event_Thread() {
         }
     }
 }
+
+void Bone_Monitoring_Prototype() {
+    while (true)
+    {
+        std::this_thread::sleep_for(100ms);
+        RE::Actor* player = RE::PlayerCharacter::GetSingleton();
+        auto bone = player->GetNodeByName("NPC Anus Deep1");
+        if (bone != NULL) {
+            float x = bone->world.translate.x;
+            float y = bone->world.translate.y;
+            float z = bone->world.translate.z;
+            auto str = std::format("[bone] npc anus deep1 x={}, y={} z={}", x, y, z);
+            tk_log_info(str);
+        }
+        else {
+            tk_log_info("bone is null");
+        }
+    } 
+}
  
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Loaded", PapyrusClass, Tele::ApiLoaded);
@@ -102,6 +122,7 @@ void InitializeMessaging() {
                     }
                     TeleMainThreadStarted = true;
                     TeleMainThread = std::thread(Tele_Event_Thread);
+                    // BoneThread = std::thread(Bone_Monitoring_Prototype);
                     break;
             }
         })) {

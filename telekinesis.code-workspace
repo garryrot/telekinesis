@@ -16,7 +16,8 @@
             "xmemory": "cpp",
             "xstring": "cpp",
             "xtr1common": "cpp",
-            "xutility": "cpp"
+            "xutility": "cpp",
+            "thread": "cpp"
         },
         "search.exclude": {
             "**/rust/target/build": true
