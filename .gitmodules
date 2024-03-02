@@ -1,3 +1,6 @@
 [submodule "rust/bp_scheduler"]
 	path = rust/bp_scheduler
 	url = https://github.com/garryrot/bp_scheduler
+[submodule "rust/bp_fakes"]
+	path = rust/bp_fakes
+	url = https://github.com/garryrot/bp_fakes
