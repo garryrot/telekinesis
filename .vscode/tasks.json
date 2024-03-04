@@ -4,7 +4,7 @@
 		{
 			"label": "Build Papyrus (Debug)",
 			"type": "pyro",
-			"projectFile": "Debug.ppj",
+			"projectFile": "contrib\\Debug.ppj",
 			"gamePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Skyrim Special Edition\\",
 			"problemMatcher": [
 				"$PapyrusCompiler"
@@ -16,7 +16,7 @@
 		{
 			"label": "Build Papyrus (Release)",
 			"type": "pyro",
-			"projectFile": "Release.ppj",
+			"projectFile": "contrib\\Release.ppj",
 			"gamePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Skyrim Special Edition\\",
 			"problemMatcher": [
 				"$PapyrusCompiler"
