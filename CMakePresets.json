@@ -18,8 +18,8 @@
             "hidden": true,
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                "VCPKG_TARGET_TRIPLET": "x64-windows-skse",
-                "VCPKG_HOST_TRIPLET": "x64-windows-skse",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+                "VCPKG_HOST_TRIPLET": "x64-windows-static-md",
                 "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
             }
@@ -28,15 +28,8 @@
             "name": "win32",
             "hidden": true,
             "environment": {
+                "COMMONLIBSSE_TEXT": "-DUNICODE -D_UNICODE",
                 "COMMONLIBSSE_PLATFORM": "-DWIN32_LEAN_AND_MEAN -DNOMINMAX"
-            }
-        },
-        {
-            "name": "win32-unicode",
-            "hidden": true,
-            "inherits": "win32",
-            "environment": {
-                "COMMONLIBSSE_TEXT": "-DUNICODE -D_UNICODE"
             }
         },
         {
@@ -44,7 +37,7 @@
             "hidden": true,
             "architecture": {
                 "value": "x64",
-                "strategy": "external"
+                "strategy": "set"
             }
         },
         {
@@ -62,37 +55,17 @@
             }
         },
         {
-            "name": "build-debug-msvc",
+            "name": "build",
+            "displayName": "Release Build",
+            "description": "Release build for VS2022",
             "inherits": [
                 "base",
                 "vcpkg",
-                "win32-unicode",
+                "win32",
                 "x64",
                 "msvc"
             ],
-            "displayName": "Debug",
-            "description": "Debug build for testing.",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/debug-msvc",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": {
-                    "type": "STRING",
-                    "value": "Debug"
-                }
-            }
-        },
-        {
-            "name": "build-release-msvc",
-            "inherits": [
-                "base",
-                "vcpkg",
-                "win32-unicode",
-                "x64",
-                "msvc"
-            ],
-            "displayName": "Release",
-            "description": "Optimized release build.",
-            "generator": "Ninja",
+            "generator": "Visual Studio 17 2022",
             "binaryDir": "${sourceDir}/build/release-msvc",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": {
@@ -104,16 +77,10 @@
     ],
     "buildPresets": [
         {
-            "name": "release-msvc",
+            "name": "build",
             "displayName": "Release (MSVC)",
-            "configurePreset": "build-release-msvc",
+            "configurePreset": "build",
             "description": "Optimized release build."
-        },
-        {
-            "name": "debug-msvc",
-            "displayName": "Debug (MSVC) (this is broken)",
-            "configurePreset": "build-debug-msvc",
-            "description": "Debug build for testing."
         }
     ]
 }

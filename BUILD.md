@@ -1,33 +1,39 @@
-# Build from Source
+# Building Telekinesis.dll
 
-If you just intent to create mods with the papyrus functions, you can ignore this page and go straight to the [User Documentation](README.md)
+This build outputs `Telekinesis.dll`, a SKSE64 plugin based on CommonLibSSE NG.
 
-## Building Dll
+There should really be no need for you to do this, unless you:
 
-The build outputs `Telekinesis.dll` (An SKSE64 plugin using CommonLibSSE NG), a Skyrim Plugin file `.esp` and the compiled pyparus files `.psx` required to use the Telekinesis API from within other mods.
+- Want to port the native library to a skyrim version that I currently don't support
+- Want to fork this project and change the native library
 
-I do not provide detailed build instructions (and won't promise that I ever will), but building this project should be fairly similar to the [CommonLibSSE NG Sample Plugin](https://gitlab.com/colorglass/commonlibsse-sample-plugin), which has amazingly well documented build instructions. You probably want to do the following:
+## Build Requirements
 
- 1. [Install Rust](https://www.rust-lang.org/tools/install)
- 2. See if you can get the [CommonLibSSE NG Sample Plugin](https://gitlab.com/colorglass/commonlibsse-sample-plugin) up and running
- 3. Try to build this project in the same way as the Sample Plugin
+ 1. [Rust](https://www.rust-lang.org/tools/install) - executables like `cargo` should be present in your PATH
+ 2. [Visual Studio 2022](https://visualstudio.microsoft.com/de/) with a C++ compiler
+ 3. [CMake](https://cmake.org/download/) - make sure that its added to your PATH environment variable
+ 4. [VCPKG](https://github.com/microsoft/vcpkg) - set environment variable VCPKG_ROOT to the vcpkg installation folder
 
-### Dependencies
- 
- * Rust
-    * Buttplug.io (Rust Crate)
-    * All rust crates listed in the toml
- * CommonLibSSE NG and all of its dependencies
- * CMake/Visual Studio 2022/See Sample Plugin dock
+## Step-By-Step
 
-## Building Plugin Code
+1. Make sure the submodule of CommonLibSSE-NG is initialised:
 
-You need to include all dependency psc scripts that are not fetched with ninja in contrib/Dependencies
+```ps
+git submodule update --init --recursive
+```
+2. Test VCPKG_ROOT is set in your build terminal. This should return the path:
 
-For example:
-   - SkyUI
-   - Devious Devices [SE][AE][VR] 5.2 5.2
-   - Sexlab Framework
-   - MfgFix
-   - And their respective dependencies (a lot)
+```
+echo %VCPKG_ROOT%
+```
 
+3. Build the project
+
+```ps
+cmake --preset build-release-msvc
+cmake --build --preset release-msvc --config Release
+```
+
+# Building Papyrus Scripts 
+
+*to be done*
