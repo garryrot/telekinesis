@@ -2,15 +2,15 @@
 <PapyrusProject xmlns="PapyrusProject.xsd"
     Flags="TESV_Papyrus_Flags.flg"
     Game="sse"
-    Output="contrib/Distribution/Scripts"
+    Output="Distribution/Scripts"
     Optimize="true"
     Release="true"
     Anonymize="true"
     Final="true">
     <Imports>
         <Import>.\Dependencies</Import>
-        <Import>..\build\release-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skse</Import>
-        <Import>..\build\release-msvc\vcpkg_installed\x64-windows-skse\contrib\papyrus\skyrim</Import>
+        <Import>C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Source\Scripts</Import>
+        <Import>C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source</Import>
     </Imports>
     <Folders>
         <Folder>.\Distribution\Source\Scripts</Folder>
