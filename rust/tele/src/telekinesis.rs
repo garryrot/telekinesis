@@ -551,7 +551,7 @@ mod tests {
     ) -> (Telekinesis, i32) {
         let settings = TkSettings::default();
         let pattern_path =
-            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+            String::from("../deploy/Distribution/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk = Telekinesis::connect_with(
             || async move { in_process_connector() },
             Some(settings),
@@ -825,7 +825,7 @@ mod tests {
         // act
         let mut settings = settings.unwrap_or(TkSettings::default());
         settings.pattern_path =
-            String::from("../contrib/Distribution/SKSE/Plugins/Telekinesis/Patterns");
+            String::from("../deploy/Distribution/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk = Telekinesis::connect_with(
             || async move { connector },
             Some(settings),

@@ -533,12 +533,12 @@ FodyWeavers.xsd
 
 build/
 
-contrib/**/*.dll
-contrib/**/*.pdb
-contrib/**/*.pex
+deploy/**/*.dll
+deploy/**/*.pdb
+deploy/**/*.pex
 
 ### Mod Package
 *.7z
 
 ### Papyrus Sources for mod dependencies
-contrib/Dependencies/**.psc
+deploy/Dependencies/**.psc

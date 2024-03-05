@@ -87,10 +87,10 @@ install(TARGETS ${PROJECT_NAME}
         DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
 ########################################################################################################################
-## Copy build result to contrib/data directory
+## Copy build result to deploy/data directory
 ########################################################################################################################
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Distribution/SKSE/Plugins/")
+COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/deploy/Distribution/SKSE/Plugins/")
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Distribution/SKSE/Plugins/")
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> "${CMAKE_CURRENT_SOURCE_DIR}/deploy/Distribution/SKSE/Plugins/")

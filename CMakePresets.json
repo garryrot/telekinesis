@@ -2,44 +2,19 @@
     "version": 2,
     "configurePresets": [
         {
-            "name": "base",
+            "name": "msvc",
             "hidden": true,
+            "environment": {
+                "COMMONLIBSSE_TEXT": "-DUNICODE -D_UNICODE",
+                "COMMONLIBSSE_PLATFORM": "-DWIN32_LEAN_AND_MEAN -DNOMINMAX",
+                "COMMONLIBSSE_COMPILER": "/permissive- /Zc:preprocessor /EHsc $penv{CXXFLAGS}"
+            },
             "cacheVariables": {
-                "CMAKE_CXX_FLAGS": "$env{COMMONLIBSSE_COMPILER} $env{COMMONLIBSSE_PLATFORM} $env{COMMONLIBSSE_TEXT}"
-            }
-        },
-        {
-            "name": "vcpkg",
-            "hidden": true,
-            "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_CXX_FLAGS": "$env{COMMONLIBSSE_COMPILER} $env{COMMONLIBSSE_PLATFORM} $env{COMMONLIBSSE_TEXT}",
                 "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
                 "VCPKG_HOST_TRIPLET": "x64-windows-static-md",
                 "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
-            }
-        },
-        {
-            "name": "win32",
-            "hidden": true,
-            "environment": {
-                "COMMONLIBSSE_TEXT": "-DUNICODE -D_UNICODE",
-                "COMMONLIBSSE_PLATFORM": "-DWIN32_LEAN_AND_MEAN -DNOMINMAX"
-            }
-        },
-        {
-            "name": "x64",
-            "hidden": true,
-            "architecture": {
-                "value": "x64",
-                "strategy": "set"
-            }
-        },
-        {
-            "name": "msvc",
-            "hidden": true,
-            "environment": {
-                "COMMONLIBSSE_COMPILER": "/permissive- /Zc:preprocessor /EHsc $penv{CXXFLAGS}"
             },
             "vendor": {
                 "microsoft.com/VisualStudioSettings/CMake/1.0": {
@@ -47,22 +22,21 @@
                     "enableMicrosoftCodeAnalysis": true,
                     "enableClangTidyCodeAnalysis": true
                 }
+            },
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
             }
         },
         {
             "name": "build",
             "displayName": "Release Build",
-            "description": "Release build for VS2022",
-            "inherits": [
-                "base",
-                "vcpkg",
-                "win32",
-                "x64",
-                "msvc"
-            ],
+            "description": "Release Build for VS2022",
+            "inherits": ["msvc"],
             "generator": "Visual Studio 17 2022",
-            "binaryDir": "${sourceDir}/build/release-msvc",
+            "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
                 "CMAKE_BUILD_TYPE": {
                     "type": "STRING",
                     "value": "Release"
