@@ -10,7 +10,7 @@ use input::{get_duration_from_secs, read_scalar_actuator};
 use itertools::Itertools;
 use pattern::{get_pattern_names, read_pattern};
 use std::sync::{Arc, Mutex};
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 use cxx::{CxxString, CxxVector};
 use telekinesis::{Telekinesis, ERROR_HANDLE};
@@ -414,7 +414,15 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         default: "None",
         exec: |tk, actuator_id| {
             match tk.settings.try_get_actuator_settings(actuator_id) {
-                ActuatorSettings::None => "None".into(),
+                ActuatorSettings::None => {
+                    if let Some(entry) = tk.status.get_actuator(actuator_id) {
+                        return match entry.actuator {
+                            ActuatorType::Position => "Linear".into(),
+                            _ => "Scalar".into()
+                        };
+                    }
+                    "None".into()
+                },
                 ActuatorSettings::Scalar(_) => "Scalar".into(),
                 ActuatorSettings::Linear(_) => "Linear".into(),
             }

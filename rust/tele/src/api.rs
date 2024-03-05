@@ -318,14 +318,15 @@ pub trait Api<T> {
     fn try_exec<F, R>(&mut self, func: F, default: R) -> R
     where
         F: FnOnce(&mut T) -> R,
+        R: std::fmt::Debug
     {
         let tele = &self.state();
         if let Ok(mut guard) = tele.try_lock() {
             match guard.take() {
                 Some(mut tk) => {
-                    debug!("calling...");
                     let result = func(&mut tk);
                     guard.replace(tk);
+                    debug!("result: {:?}", result);
                     return result;
                 }
                 None => error!("dispatch on 'None'"),
