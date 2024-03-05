@@ -3,7 +3,7 @@
 	xmlns="PapyrusProject.xsd"
     Flags="TESV_Papyrus_Flags.flg"
     Game="sse"
-    Output="Distribution/Scripts"
+    Output="Data/Scripts"
     Optimize="false"
     Release="false"
     Anonymize="true"
@@ -14,6 +14,6 @@
         <Import>C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\Scripts\Source</Import>
     </Imports>
     <Folders>
-        <Folder>.\Distribution\Source\Scripts</Folder>
+        <Folder>.\Data\Source\Scripts</Folder>
     </Folders>
 </PapyrusProject>
