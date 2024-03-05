@@ -5,7 +5,6 @@
         "repository": "https://gitlab.com/colorglass/vcpkg-colorglass",
         "baseline": "ef8d43afe4d26e842de3d034bff1081cb7990f07",
         "packages": [
-          "articuno",
           "bethesda-skyrim-scripts",
           "commonlibsse-ng",
           "gluino",

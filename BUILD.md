@@ -30,8 +30,8 @@ echo %VCPKG_ROOT%
 3. Build the project
 
 ```ps
-cmake --preset build-release-msvc
-cmake --build --preset release-msvc --config Release
+cmake --preset build
+cmake --build --preset build --config Release
 ```
 
 # Building Papyrus Scripts 
