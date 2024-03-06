@@ -13,13 +13,6 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 
-# libraries that are required for linking with the rust library statically
-# this list was created by trial- and error and might need to be extended
-# or adapted in the future if any of the rust dependencies changes the system calls it uses. 
-# If the linker complains about weird symbols missing and those symbols are windows system libraries,
-# you might want to add that library here
-set(STATIC_LINK_LIBS ws2_32.lib bcrypt.lib userenv.lib Advapi32.lib crypt32.lib secur32.lib Setupapi.lib ntdll.lib ncrypt.lib)
-
 include(GNUInstallDirs)
 include(ExternalProject)
 
@@ -42,16 +35,20 @@ source_group(
 ## Rust library
 ########################################################################################################################
 
-set(RUST_LIBRARY telekinesis_plug)
-set_directory_properties(PROPERTIES EP_PREFIX ${CMAKE_BINARY_DIR}/plug)
-ExternalProject_Add(
-    ${RUST_LIBRARY}
-    DOWNLOAD_COMMAND ""
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND cargo build COMMAND cargo build --release
-    BINARY_DIR "${CMAKE_SOURCE_DIR}/rust"
-    INSTALL_COMMAND ""
-    LOG_BUILD ON)
+set(CARGO_MANIFEST ${CMAKE_SOURCE_DIR}/rust/Cargo.toml)
+set(CARGO_TARGET_DIR ${CMAKE_SOURCE_DIR}/rust/target)
+set(RUST_SOURCE_DIR ${CMAKE_SOURCE_DIR}/rust/tele/src)
+set(RUST_SOURCE_FILES ${RUST_SOURCE_DIR}/lib.rs ${RUST_SOURCE_DIR}/api.rs ${RUST_SOURCE_DIR}/telekinesis.rs)
+set(RUST_BRIDGE_CPP ${CARGO_TARGET_DIR}/cxxbridge/plug/src/lib.rs.cc ${CARGO_TARGET_DIR}/cxxbridge/plug/src/logging.rs.cc)
+set(RUST_LIBRARY ${CARGO_TARGET_DIR}/release/${CMAKE_STATIC_LIBRARY_PREFIX}telekinesis_plug${CMAKE_STATIC_LIBRARY_SUFFIX})
+
+add_custom_command(
+    OUTPUT ${RUST_BRIDGE_CPP} ${RUST_LIBRARY}
+    COMMAND cargo build --manifest-path ${CARGO_MANIFEST} --release
+    DEPENDS ${RUST_SOURCE_FILES}
+    USES_TERMINAL
+    COMMENT "Running cargo..."
+)
 
 ########################################################################################################################
 ## Configure target DLL
@@ -59,7 +56,12 @@ ExternalProject_Add(
 
 find_package(CommonLibSSE CONFIG REQUIRED)
 
-add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${headers} ${sources})
+add_commonlibsse_plugin(
+        ${PROJECT_NAME} 
+        SOURCES 
+        ${headers}
+        ${sources}
+        ${RUST_BRIDGE_CPP})
 add_library("${PROJECT_NAME}::${PROJECT_NAME}" ALIAS "${PROJECT_NAME}")
 
 target_include_directories(${PROJECT_NAME}
@@ -72,14 +74,25 @@ target_include_directories(${PROJECT_NAME}
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 
-# Link rust library
-add_dependencies(${PROJECT_NAME} ${RUST_LIBRARY})
-target_link_libraries(${PROJECT_NAME}
+########################################################################################################################
+## Link rust library
+########################################################################################################################
+
+# libraries that are required for linking with the rust library statically
+# this list was created by trial- and error and might need to be extended
+# or adapted in the future if any of the rust dependencies changes the system calls it uses. 
+# If the linker complains about weird symbols missing and those symbols are windows system libraries,
+# you might want to add that library here
+
+set(STATIC_LINK_LIBS ws2_32.lib bcrypt.lib userenv.lib Advapi32.lib crypt32.lib secur32.lib Setupapi.lib ntdll.lib ncrypt.lib)
+target_link_libraries(
+        ${PROJECT_NAME}
         PRIVATE
-        optimized "${CMAKE_SOURCE_DIR}/rust/target/release/${RUST_LIBRARY}.lib"
+        ${RUST_LIBRARY}
         ${STATIC_LINK_LIBS})
- 
-target_precompile_headers(${PROJECT_NAME}
+
+target_precompile_headers(
+        ${PROJECT_NAME}
         PRIVATE
         src/PCH.h)
 
@@ -89,6 +102,7 @@ install(TARGETS ${PROJECT_NAME}
 ########################################################################################################################
 ## Copy build result to deploy/data directory
 ########################################################################################################################
+
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/deploy/Data/SKSE/Plugins/")
 
