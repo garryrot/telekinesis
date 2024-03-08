@@ -5,6 +5,7 @@
 #include <thread>
 #include <chrono>
 #include <stdlib.h>     //for using the function sleep
+#include <functional>
 
 using namespace RE;
 using namespace RE::BSScript;
@@ -51,6 +52,7 @@ namespace Tele {
     bool Tele_Stop(SFT, int handle) { return tk->tk_stop(handle); }
 }
 
+
 void Tele_Event_Thread() {
     while (true) {
         auto list = Tele::tk->tk_qry_nxt_evt();
@@ -92,7 +94,7 @@ void Bone_Monitoring_Prototype() {
         }
     } 
 }
- 
+
 bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Loaded", PapyrusClass, Tele::ApiLoaded);
     vm->RegisterFunction("Cmd", PapyrusClass, Tele::Cmd);
@@ -107,7 +109,15 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     vm->RegisterFunction("Tele_Control", PapyrusClass, Tele::Tele_Control);
     vm->RegisterFunction("Tele_Update", PapyrusClass, Tele::Tele_Update);
     vm->RegisterFunction("Tele_Stop", PapyrusClass, Tele::Tele_Stop);
+    skse_init_papyrus( vm );
     return true;
+}
+
+void RegisterFunc0( IVirtualMachine *vm,
+                    rust::Str name,
+                    rust::Str className,
+                    NativeFuncImpl_Void_0 callback) {
+    vm->RegisterFunction( (std::string) name, (std::string) className, callback );
 }
 
 void InitializeMessaging() {
@@ -157,7 +167,6 @@ SKSEPluginLoad(const LoadInterface* skse) {
     Init(skse);
     InitializePapyrus();
     InitializeMessaging();
-
     tk_log_info(std::format("{} has finished loading.", plugin->GetName()));
     return true;
 }

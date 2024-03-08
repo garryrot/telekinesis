@@ -5,20 +5,21 @@ use bp_scheduler::{
 };
 use buttplug::core::message::ActuatorType;
 use connection::{Task, TkConnectionEvent};
-use ffi::SKSEModEvent;
+use ffi::{IVirtualMachine, SKSEModEvent};
 use input::{get_duration_from_secs, read_scalar_actuator};
 use itertools::Itertools;
 use pattern::{get_pattern_names, read_pattern};
-use std::sync::{Arc, Mutex};
-use tracing::{debug, info, instrument};
+use std::{ffi::c_void, sync::{Arc, Mutex}};
+use tracing::{error, instrument};
 
-use cxx::{CxxString, CxxVector};
+use cxx::{CxxString, CxxVector, type_id, ExternType};
 use telekinesis::{Telekinesis, ERROR_HANDLE};
 
 use crate::{
     input::{parse_csv, read_input_string},
     settings::{TkConnectionType, TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
+
 
 mod api;
 mod connection;
@@ -76,6 +77,63 @@ mod ffi {
         // blocking
         fn tk_qry_nxt_evt(&mut self) -> Vec<SKSEModEvent>;
     }
+
+    // Global Init
+    #[namespace = "RE::BSScript"]
+    unsafe extern "C++" {
+        include!("PCH.h");
+        type IVirtualMachine;
+    }
+    extern "Rust" {
+        unsafe fn skse_init_papyrus(vm: *mut IVirtualMachine); 
+    }
+
+    // Create Callback 0 -> 0
+    extern "C++" {
+        include!("Plugin.h");
+        type NativeFuncImpl_Void_0 = crate::NativeFuncImpl_Void_0;
+        unsafe fn RegisterFunc0(
+            vm: *mut IVirtualMachine,
+            name: &str,
+            className: &str,
+            callback: NativeFuncImpl_Void_0,
+        );
+    }
+}
+
+#[repr(transparent)]
+pub struct NativeFuncImpl_Void_0(
+    pub extern "C" fn(_: *mut c_void),
+);
+unsafe impl ExternType for NativeFuncImpl_Void_0 {
+    type Id = type_id!("NativeFuncImpl_Void_0");
+    type Kind = cxx::kind::Trivial;
+}
+
+// #################################################
+
+fn skse_init_papyrus(vm: *mut IVirtualMachine) {
+    error!("skse_init_papyrus... IVirtualMachine");
+
+    // -----------------------  Register callback0_1
+    extern "C" fn callback0_1(_sft: *mut c_void) {
+        error!("Hello callback 1");
+    }
+    unsafe {
+        ffi::RegisterFunc0(vm, "HelloWorld", "Tele_Api", NativeFuncImpl_Void_0(callback0_1));
+    }
+    // -----------------
+
+    // -----------------------   Register callback0_1
+    extern "C" fn callback0_2(_sft: *mut c_void) {
+        error!("Hello callback 2");
+    }
+    unsafe {
+        ffi::RegisterFunc0(vm, "HelloWorld2", "Tele_Api", NativeFuncImpl_Void_0(callback0_2) );
+    }
+    // -----------------
+
+    error!("skse_init_papyrus... DONE");
 }
 
 impl SKSEModEvent {

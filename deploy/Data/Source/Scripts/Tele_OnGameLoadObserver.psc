@@ -14,6 +14,9 @@ EndEvent
 Function LoadTelekinesis(Tele_Devices devices)
     Tele_Integration integration = GetOwningQuest() as Tele_Integration
 
+    Tele_Api.HelloWorld()
+    Tele_Api.HelloWorld2()
+
     If Game.GetModByName("Devious Devices - Expansion.esm") != 255
         integration.ZadLib = Quest.GetQuest("zadQuest")
     Else
