@@ -1,5 +1,7 @@
 #include <stddef.h>
 
+#define GENERATE_CB_BODIES
+
 #include "../rust/target/cxxbridge/plug/src/lib.rs.h"
 #include "../rust/target/cxxbridge/plug/src/logging.rs.h"
 #include <thread>
@@ -113,12 +115,6 @@ bool RegisterPapyrusCalls(IVirtualMachine* vm) {
     return true;
 }
 
-void RegisterFunc0( IVirtualMachine *vm,
-                    rust::Str name,
-                    rust::Str className,
-                    NativeFuncImpl_Void_0 callback) {
-    vm->RegisterFunction( (std::string) name, (std::string) className, callback );
-}
 
 void InitializeMessaging() {
     if (!GetMessagingInterface()->RegisterListener([](MessagingInterface::Message* message) {

@@ -115,7 +115,8 @@
             "xlocnum": "cpp",
             "xloctime": "cpp",
             "xstddef": "cpp",
-            "xtree": "cpp"
+            "xtree": "cpp",
+            "string_view": "cpp"
         },
         "search.exclude": {
             "**/rust/target/build": true
