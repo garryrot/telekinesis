@@ -79,7 +79,7 @@ mod ffi {
     }
 
     // ########################################### Global Init
-    
+
     #[namespace = "RE::BSScript"]
     unsafe extern "C++" {
         include!("PCH.h");
@@ -89,18 +89,19 @@ mod ffi {
         unsafe fn skse_init_papyrus(vm: *mut IVirtualMachine); 
     }
 
-    // ########################################### Create Callback 0 -> 0
+    // ########################################### Create Callback 0 -> 0 --->
+
     extern "C++" {
         include!("Plugin.h");
         type NativeFn_void_0 = crate::NativeFn_void_0;
-
-        unsafe fn RegisterFunc0(
-            vm: *mut IVirtualMachine,
-            name: &str,
-            className: &str,
-            callback: NativeFn_void_0,
-        );
+        unsafe fn RegisterFunc0(vm: *mut IVirtualMachine, name: &str, className: &str, callback: NativeFn_void_0);
     }
+
+    // ########################################### Create Callback 0 Int -> 0 --->
+    // extern "C++" {
+    //     include!("Plugin.h");
+    //     type NativeFn_int_0 = crate::NativeFn_int_0;
+    // }
 }
 
 #[repr(transparent)]
@@ -112,24 +113,67 @@ unsafe impl ExternType for NativeFn_void_0 {
     type Kind = cxx::kind::Trivial;
 }
 
+
+// ####################### <----
+
+#[repr(transparent)]
+pub struct NativeFn_int_0(
+    pub extern "C" fn(sft: *mut c_void),
+);
+unsafe impl cxx::ExternType for NativeFn_int_0 {
+    type Id = cxx::type_id!("NativeFn_void_0");
+    type Kind = cxx::kind::Trivial;
+}
+
+static API_CLASS: &str = "Tele_Api";
+
+// macro_rules! register_papyrus {
+//     ( fn $fn_name:ident( $($arg:ident:$type:ty),* ) -> $ret:ty, $body:expr ) => {
+//         extern "C" fn $fn_name( _sft: *mut c_void, $($arg:$type,)* ) -> $ret {
+//             $body
+//         }
+//         unsafe { ffi::RegisterFunc0( vm, "$fn_name", API_CLASS, NativeFn_int_0($fn_name) ); }
+//     };
+// }
+
+// register_papyrus!( fn someName() -> i32 {
+//    
+// }) 
+
+/*
+    =>
+
+    extern "C" fn $fn_name (_sft: *mut c_void, $arg1, $arg2, ...) {
+        error!("Hello callback 1");
+    }
+    unsafe { ffi::RegisterFunc0(vm, "HelloWorld", "Tele_Api", NativeFn_void_0(callback0_1)); }
+*/
+
+extern "C" fn callback0_1(_sft: *mut c_void) {
+    error!("Hello callback 1");
+}
+
+extern "C" fn callback0_2(_sft: *mut c_void) {
+    error!("Hello callback 2");
+}
+
 // #################################################
 
 fn skse_init_papyrus(vm: *mut IVirtualMachine) {
     error!("skse_init_papyrus... IVirtualMachine");
 
-    // ###########################################  Register callback0_1
-    extern "C" fn callback0_1(_sft: *mut c_void) {
-        error!("Hello callback 1");
-    }
-    unsafe { ffi::RegisterFunc0(vm, "HelloWorld", "Tele_Api", NativeFn_void_0(callback0_1)); }
-    // -----------------
+    // register_papyrus!(fn foobar() -> i32, { 
+    //     let aa = 10;
+    //     aa
+    // });
 
-    // ###########################################   Register callback0_1
-    extern "C" fn callback0_2(_sft: *mut c_void) {
-        error!("Hello callback 2");
-    }
+
+
+    // ###########################################  Register callback0_1
+  
+    unsafe { ffi::RegisterFunc0(vm, "HelloWorld", "Tele_Api", NativeFn_void_0(callback0_1)); }
     unsafe { ffi::RegisterFunc0(vm, "HelloWorld2", "Tele_Api", NativeFn_void_0(callback0_2) ); }
-    // -----------------
+
     error!("skse_init_papyrus... DONE");
 }
 
@@ -137,6 +181,7 @@ impl SKSEModEvent {
     pub fn new(event_name: &str, str_arg: &str, num_arg: f64) -> SKSEModEvent {
         SKSEModEvent {
             event_name: String::from(event_name),
+
             str_arg: String::from(str_arg),
             num_arg,
         }

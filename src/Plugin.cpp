@@ -34,26 +34,14 @@ namespace Tele {
     bool Cmd_2(SFT, std::string cmd, std::string arg0, std::string arg1) { return tk->tk_cmd_2(cmd, arg0, arg1); }
     std::string Qry_Str(SFT, std::string qry) { return (std::string)tk->tk_qry_str(qry); }
     std::string Qry_Str_1(SFT, std::string qry, std::string arg0) { return (std::string)tk->tk_qry_str_1(qry, arg0); }
-    std::vector<std::string> Qry_Lst(SFT, std::string qry) {
-        auto list = tk->tk_qry_lst(qry);
-        return std::vector<std::string>(list.begin(), list.end());
-    }
-    std::vector<std::string> Qry_Lst_1(SFT, std::string qry, std::string arg0) {
-        auto list = tk->tk_qry_lst_1(qry, arg0);
-        return std::vector<std::string>(list.begin(), list.end());
-    }
+    std::vector<std::string> Qry_Lst(SFT, std::string qry) { auto list = tk->tk_qry_lst(qry); return std::vector<std::string>(list.begin(), list.end()); }
+    std::vector<std::string> Qry_Lst_1(SFT, std::string qry, std::string arg0) { auto list = tk->tk_qry_lst_1(qry, arg0); return std::vector<std::string>(list.begin(), list.end()); }
     bool Qry_Bool(SFT, std::string qry) { return tk->tk_qry_bool(qry); }
     bool Qry_Bool_1(SFT, std::string qry, std::string arg0) { return tk->tk_qry_bool_1(qry, arg0); }
-    int Tele_Control(SFT, std::string actuator, int speed, float time_sec, std::string pattern,
-                    std::vector<std::string> events) {
-        return tk->tk_control(actuator, speed, time_sec, pattern, events);
-    }
-    int Tele_Update(SFT, int handle, int speed) {
-        return tk->tk_update(handle, speed);
-    }
+    int Tele_Control(SFT, std::string actuator, int speed, float time_sec, std::string pattern, std::vector<std::string> events) { return tk->tk_control(actuator, speed, time_sec, pattern, events); }
+    int Tele_Update(SFT, int handle, int speed) { return tk->tk_update(handle, speed); }
     bool Tele_Stop(SFT, int handle) { return tk->tk_stop(handle); }
 }
-
 
 void Tele_Event_Thread() {
     while (true) {
