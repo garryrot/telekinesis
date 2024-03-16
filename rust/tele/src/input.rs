@@ -1,11 +1,12 @@
 use std::{sync::Arc, time::Duration};
 
-use bp_scheduler::{actuator::Actuator, settings::ActuatorSettings};
+use bp_scheduler::actuator::Actuator;
 use buttplug::core::message::ActuatorType;
 use cxx::{CxxString, CxxVector};
+use funscript::FScript;
 use tracing::{debug, error};
 
-use crate::settings::TkDeviceSettings;
+use crate::{connection::Task, settings::TkDeviceSettings};
 
 pub fn sanitize_name_list(list: &[String]) -> Vec<String> {
     list.iter()
@@ -21,6 +22,33 @@ pub fn parse_csv(input: &str) -> Vec<String> {
         }
     }
     list
+}
+
+#[derive(Debug)]
+pub struct DeviceCommand {
+    pub task: Task,
+    pub duration: Duration,
+    pub fscript: Option<FScript>,
+    pub body_parts: Vec<String>,
+    pub actuator_types: Vec<ActuatorType>,
+}
+
+impl DeviceCommand {
+    pub fn from_inputs(
+        task: Task,
+        actuator_type: &[ActuatorType],
+        time_sec: f32,
+        body_parts: &CxxVector<CxxString>,
+        fscript: Option<FScript>,
+    ) -> Self {
+        Self {
+            actuator_types: actuator_type.to_vec(),
+            task,
+            duration: get_duration_from_secs(time_sec),
+            fscript,
+            body_parts: read_input_string(body_parts),
+        }
+    }
 }
 
 pub fn get_duration_from_secs(secs: f32) -> Duration {
@@ -82,8 +110,6 @@ impl TkParams {
                 .filter( |x| selected.contains( & x.identifier().to_owned() ) )
                 .cloned()
                 .collect::<Vec<Arc<Actuator>>>();
-
-        let actuator_settings = used.iter().map(|x| device_settings.iter().find( |y| y.actuator_id == x.identifier() ) );
 
         debug!("connected: {:?}", actuators.iter().map( |x| x.identifier() ).collect::<Vec<&str>>());
         debug!(?used);

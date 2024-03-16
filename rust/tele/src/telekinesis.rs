@@ -4,7 +4,6 @@ use bp_scheduler::settings::LinearRange;
 use bp_scheduler::speed::Speed;
 use bp_scheduler::ButtplugScheduler;
 use bp_scheduler::PlayerSettings;
-use buttplug::core::message::ActuatorType;
 use buttplug::{
     client::ButtplugClient,
     core::{
@@ -19,11 +18,9 @@ use buttplug::{
         ButtplugServerBuilder,
     },
 };
-use funscript::FScript;
 use futures::Future;
 use tracing::instrument;
 
-use std::time::Duration;
 use std::{
     fmt::{self},
     time::Instant,
@@ -33,10 +30,11 @@ use tokio::{runtime::Runtime, sync::mpsc::channel};
 use tracing::{debug, error, info};
 
 use crate::connection::Task;
+use crate::input::DeviceCommand;
 use crate::input::TkParams;
 use crate::status::Status;
 use crate::{
-    connection::{handle_connection, TkCommand, TkConnectionEvent},
+    connection::{handle_connection, ConnectionCommand, TkConnectionEvent},
     settings::{TkConnectionType, TkSettings},
 };
 
@@ -47,7 +45,7 @@ pub struct Telekinesis {
     pub connection_events: crossbeam_channel::Receiver<TkConnectionEvent>,
     pub status: Status,
     runtime: Runtime,
-    command_sender: Sender<TkCommand>,
+    command_sender: Sender<ConnectionCommand>,
     scheduler: ButtplugScheduler,
     client_event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
     status_event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
@@ -132,7 +130,7 @@ impl Telekinesis {
 
     pub fn scan_for_devices(&self) -> bool {
         info!("start scan");
-        if self.command_sender.try_send(TkCommand::Scan).is_err() {
+        if self.command_sender.try_send(ConnectionCommand::Scan).is_err() {
             error!("Failed to start scan");
             return false;
         }
@@ -141,167 +139,11 @@ impl Telekinesis {
 
     pub fn stop_scan(&self) -> bool {
         info!("stop scan");
-        if self.command_sender.try_send(TkCommand::StopScan).is_err() {
+        if self.command_sender.try_send(ConnectionCommand::StopScan).is_err() {
             error!("Failed to stop scan");
             return false;
         }
         true
-    }
-
-    pub fn scalar(
-        &mut self,
-        task: Task,
-        duration: Duration,
-        body_parts: Vec<String>,
-        fscript: Option<FScript>,
-        actuator_types: &[ActuatorType],
-    ) -> i32 {
-        info!("scalar");
-        self.scheduler.clean_finished_tasks();
-
-        let task_clone = task.clone();
-        let actuators = self.status.connected_actuators();
-
-        let devices = TkParams::filter_devices(
-            &actuators,
-            &body_parts,
-            actuator_types,
-            &self.settings.devices,
-        );
-        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
-        let player = self.scheduler.create_player_with_settings(devices, settings);
-
-        let handle = player.handle;
-        let client_sender_clone = self.client_event_sender.clone();
-        let status_sender_clone = self.status_event_sender.clone();
-        self.runtime.spawn(async move {
-            let now = Instant::now();
-            client_sender_clone
-                .send(TkConnectionEvent::ActionStarted(
-                    task_clone.clone(),
-                    player.actuators.clone(),
-                    body_parts,
-                    player.handle,
-                ))
-                .expect("never full");
-            let result = match task {
-                Task::Scalar(speed) => player.play_scalar(duration, speed).await,
-                Task::Pattern(speed, _, _) => {
-                    player
-                        .play_scalar_pattern(duration, fscript.unwrap(), speed)
-                        .await
-                }
-                Task::Linear(_, _) => panic!(),
-                Task::LinearOscillate(_, _) => todo!(),
-            };
-            let event = match result {
-                Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
-                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
-            };
-            client_sender_clone.send(event.clone()).expect("never full");
-            status_sender_clone.send(event.clone()).expect("never full");
-        });
-        handle
-    }
-
-    pub fn linear_pattern(
-        &mut self,
-        task: Task,
-        duration: Duration,
-        body_parts: Vec<String>,
-        fscript: FScript,
-    ) -> i32 {
-        info!("linear pattern");
-
-        self.scheduler.clean_finished_tasks();
-        let task_clone = task.clone();
-
-        let actuators = self.status.connected_actuators();
-
-        let devices = TkParams::filter_devices(
-            &actuators,
-            &body_parts,
-            &[ActuatorType::Position],
-            &self.settings.devices,
-        );
-        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
-        let player = self.scheduler.create_player_with_settings(devices, settings);
-        let handle = player.handle;
-
-        let client_sender_clone = self.client_event_sender.clone();
-        let status_sender_clone = self.status_event_sender.clone();
-        self.runtime.spawn(async move {
-            let now = Instant::now();
-            client_sender_clone
-                .send(TkConnectionEvent::ActionStarted(
-                    task_clone.clone(),
-                    player.actuators.clone(),
-                    body_parts,
-                    player.handle,
-                ))
-                .expect("never full");
-            let result = match task {
-                Task::Linear(speed, _) => player.play_linear(duration, fscript).await,
-                _ => panic!(),
-            };
-            let event = match result {
-                Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
-                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
-            };
-            client_sender_clone.send(event.clone()).expect("never full");
-            status_sender_clone.send(event.clone()).expect("never full");
-        });
-        handle
-    }
-
-    pub fn linear_oscillate(
-        &mut self,
-        task: Task,
-        duration: Duration,
-        range: &str,
-        body_parts: Vec<String>,
-    ) -> i32 {
-        info!("linear oscillate");
-
-        self.scheduler.clean_finished_tasks();
-        let task_clone = task.clone();
-
-        let actuators = self.status.connected_actuators();
-
-        let devices = TkParams::filter_devices(
-            &actuators,
-            &body_parts,
-            &[ActuatorType::Position],
-            &self.settings.devices,
-        );
-        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
-        let player = self.scheduler.create_player_with_settings(devices, settings);
-        let handle = player.handle;
-
-        let client_sender_clone = self.client_event_sender.clone();
-        let status_sender_clone = self.status_event_sender.clone();
-        self.runtime.spawn(async move {
-            let now = Instant::now();
-            client_sender_clone
-                .send(TkConnectionEvent::ActionStarted(
-                    task_clone.clone(),
-                    player.actuators.clone(),
-                    body_parts,
-                    player.handle,
-                ))
-                .expect("never full");
-            let result = match task {
-                Task::LinearOscillate(speed, _) => player.play_oscillate_linear(duration, speed, LinearRange::max()).await,
-                _ => panic!(),
-            };
-            let event = match result {
-                Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
-                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
-            };
-            client_sender_clone.send(event.clone()).expect("never full");
-            status_sender_clone.send(event.clone()).expect("never full");
-        });
-        handle
     }
 
     #[instrument(skip(self))]
@@ -322,7 +164,7 @@ impl Telekinesis {
     pub fn stop_all(&mut self) -> bool {
         info!("stop all");
         self.scheduler.stop_all();
-        if self.command_sender.try_send(TkCommand::StopAll).is_err() {
+        if self.command_sender.try_send(ConnectionCommand::StopAll).is_err() {
             error!("Failed to queue stop_all");
             return false;
         }
@@ -332,11 +174,57 @@ impl Telekinesis {
     #[instrument(skip(self))]
     pub fn disconnect(&mut self) {
         info!("disconnect");
-        if self.command_sender.try_send(TkCommand::Disconect).is_err() {
+        if self.command_sender.try_send(ConnectionCommand::Disconect).is_err() {
             error!("Failed to send disconnect");
         }
     }
 
+    pub fn dispatch_cmd(&mut self, cmd: DeviceCommand) -> i32 {
+        self.scheduler.clean_finished_tasks();
+        let task_clone = cmd.task.clone();
+        let actuators = self.status.connected_actuators();
+        let devices = TkParams::filter_devices(
+            &actuators,
+            &cmd.body_parts,
+            &cmd.actuator_types,
+            &self.settings.devices,
+        );
+
+        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
+        let player = self.scheduler.create_player_with_settings(devices, settings);
+
+        let handle = player.handle;
+        let client_sender_clone = self.client_event_sender.clone();
+        let status_sender_clone = self.status_event_sender.clone();
+        self.runtime.spawn(async move {
+            let now = Instant::now();
+            client_sender_clone
+                .send(TkConnectionEvent::ActionStarted(
+                    task_clone.clone(),
+                    player.actuators.clone(),
+                    cmd.body_parts,
+                    player.handle,
+                ))
+                .expect("never full");
+            let result = match cmd.task {
+                Task::Scalar(speed) => player.play_scalar(cmd.duration, speed).await,
+                Task::Pattern(speed, _, _) => {
+                    player
+                        .play_scalar_pattern(cmd.duration, cmd.fscript.unwrap(), speed)
+                        .await
+                }
+                Task::Linear(_, _) => player.play_linear(cmd.duration, cmd.fscript.unwrap()).await,
+                Task::LinearOscillate(speed, _) => player.play_oscillate_linear(cmd.duration, speed, LinearRange::max()).await,
+            };
+            let event = match result {
+                Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
+                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
+            };
+            client_sender_clone.send(event.clone()).expect("never full");
+            status_sender_clone.send(event.clone()).expect("never full");
+        });
+        handle
+    }
 }
 
 pub fn in_process_connector(
@@ -380,6 +268,7 @@ mod tests {
     use bp_fakes::{scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
     use bp_scheduler::speed::Speed;
     use buttplug::core::message::{ActuatorType, DeviceAdded};
+    use funscript::FScript;
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
 
@@ -405,6 +294,21 @@ mod tests {
     }
 
     /// Vibrate
+    fn tk_scalar(
+        tk: &mut Telekinesis, 
+        task: Task, 
+        duration: Duration,
+        body_parts: Vec<String>,
+        fscript: Option<FScript>,
+        actuator_types: &[ActuatorType]) -> i32 {
+            tk.dispatch_cmd(DeviceCommand {
+                task,
+                duration,
+                fscript,
+                body_parts,
+                actuator_types: actuator_types.to_vec(),
+            })
+    } 
 
     #[test]
     fn vibrate_infinitely_and_then_stop() {
@@ -413,7 +317,8 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
-        let handle = tk.scalar(
+        let handle = tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::MAX,
             vec![],
@@ -437,7 +342,8 @@ mod tests {
 
         // act
         thread::sleep(Duration::from_secs(1));
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_secs(1),
             vec![],
@@ -466,7 +372,8 @@ mod tests {
         for actuator_id in tk.status.get_known_actuator_ids() {
             tk.settings.set_enabled(&actuator_id, true);
         }
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::new(100)),
             Duration::from_millis(1),
             vec![],
@@ -489,7 +396,8 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from("does not exist")],
@@ -516,7 +424,8 @@ mod tests {
         tk.settings.set_enabled("vib2 (Vibrate)", false);
 
         // act
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![],
@@ -566,7 +475,8 @@ mod tests {
             .set_enabled(known_actuator_ids.first().unwrap(), true);
 
         let fscript = read_pattern(&pattern_path, pattern_name, vibration_pattern).unwrap();
-        let handle = tk.scalar(
+        let handle = tk_scalar(
+            &mut tk,
             Task::Pattern(Speed::max(), ActuatorType::Vibrate, pattern_name.into()),
             duration,
             vec![],
@@ -596,7 +506,8 @@ mod tests {
         for actuator in tk.status.actuators() {
             tk.settings.set_enabled(actuator.device.name(), true);
         }
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::MAX,
             vec![],
@@ -630,7 +541,8 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
         tk.settings.set_enabled("vib1 (Vibrate)", true);
         tk.settings.set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from("some event")],
@@ -719,7 +631,8 @@ mod tests {
         tk.settings.set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
         tk.settings.set_events("vib2 (Vibrate)", &[String::from("bogus")]);
 
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from("selected_event")],
@@ -739,7 +652,8 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
         tk.settings.set_enabled("vib1 (Vibrate)", true);
         tk.settings.set_events("vib1 (Vibrate)", &[String::from("some event")]);
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
             vec![String::from(" SoMe EvEnT    ")],
@@ -779,7 +693,8 @@ mod tests {
             TkConnectionType::Test,
         )
         .unwrap();
-        tk.scalar(
+    tk_scalar(
+        &mut tk,
             Task::Scalar(Speed::new(22)),
             Duration::from_millis(1),
             vec![],
@@ -797,14 +712,16 @@ mod tests {
             TkConnectionType::Test,
         )
         .unwrap();
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::new(10)),
             Duration::from_millis(100),
             vec![],
             None,
             &[ActuatorType::Vibrate],
         );
-        tk.scalar(
+        tk_scalar(
+            &mut tk,
             Task::Scalar(Speed::new(20)),
             Duration::from_millis(200),
             vec![],

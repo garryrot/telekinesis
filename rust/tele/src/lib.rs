@@ -6,17 +6,17 @@ use bp_scheduler::{
 use buttplug::core::message::ActuatorType;
 use connection::{Task, TkConnectionEvent};
 use ffi::SKSEModEvent;
-use input::{get_duration_from_secs, read_scalar_actuator};
+use input::{read_scalar_actuator, DeviceCommand};
 use itertools::Itertools;
 use pattern::{get_pattern_names, read_pattern};
 use std::sync::{Arc, Mutex};
-use tracing::{debug, info, instrument};
+use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
 use telekinesis::{Telekinesis, ERROR_HANDLE};
 
 use crate::{
-    input::{parse_csv, read_input_string},
+    input::parse_csv,
     settings::{TkConnectionType, TkSettings, SETTINGS_FILE, SETTINGS_PATH},
 };
 
@@ -304,65 +304,70 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     // controls
     .def_control(ApiControl {
         name: "vibrate",
-        exec: |tk, speed, time_sec, _, events| {
-            tk.scalar(
-                Task::Scalar(Speed::new(speed.into())),
-                get_duration_from_secs(time_sec),
-                read_input_string(events),
-                None,
-                &[ActuatorType::Vibrate],
-            )
+        exec: |tk, speed, time_sec, _, body_parts| {
+            let cmd = DeviceCommand::from_inputs(
+                Task::Scalar(Speed::new(speed.into())), 
+                &[ActuatorType::Vibrate], 
+                time_sec, 
+                body_parts, 
+                None);
+            tk.dispatch_cmd(cmd)
         },
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "scalar",
-        exec: |tk, speed, time_sec, actuator_type, events| {
-            tk.scalar(
-                Task::Scalar(Speed::new(speed.into())),
-                get_duration_from_secs(time_sec),
-                read_input_string(events),
-                None,
-                &[read_scalar_actuator(actuator_type)],
-            )
+        exec: |tk, speed, time_sec, actuator_type, body_parts: &CxxVector<CxxString>| {
+            let cmd = DeviceCommand::from_inputs(
+                Task::Scalar(Speed::new(speed.into())), 
+                &[read_scalar_actuator(actuator_type)], 
+                time_sec, 
+                body_parts, 
+                None);
+            tk.dispatch_cmd(cmd)
         },
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "vibrate.pattern",
-        exec: |tk, speed, time_sec, pattern_name, events| match read_pattern(
+        exec: |tk, speed, time_sec, pattern_name, body_parts| match read_pattern(
             &tk.settings.pattern_path,
             pattern_name,
             true,
         ) {
-            Some(fscript) => tk.scalar(
-                Task::Pattern(
-                    Speed::new(speed.into()),
-                    ActuatorType::Vibrate,
-                    pattern_name.into(),
-                ),
-                get_duration_from_secs(time_sec),
-                read_input_string(events),
-                Some(fscript),
-                &[ActuatorType::Vibrate],
-            ),
+            Some(fscript) => {
+                let cmd = DeviceCommand::from_inputs(
+                    Task::Pattern(
+                        Speed::new(speed.into()),
+                        ActuatorType::Vibrate,
+                        pattern_name.into(),
+                    ), 
+                    &[ActuatorType::Vibrate], 
+                    time_sec, 
+                    body_parts, 
+                    Some(fscript));
+                tk.dispatch_cmd(cmd)
+            } ,
             None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "linear.pattern",
-        exec: |tk, speed, time_sec, pattern_name, events| match read_pattern(
+        exec: |tk, speed, time_sec, pattern_name, body_parts| match read_pattern(
             &tk.settings.pattern_path,
             pattern_name,
             false,
         ) {
-            Some(fscript) => tk.linear_pattern(
-                Task::Linear(Speed::new(speed.into()), pattern_name.into()),
-                get_duration_from_secs(time_sec),
-                read_input_string(events),
-                fscript,
-            ),
+            Some(fscript) => {
+                let cmd = DeviceCommand::from_inputs(
+                    Task::Linear(Speed::new(speed.into()), pattern_name.into()), 
+                    &[], 
+                    time_sec, 
+                    body_parts, 
+                    Some(fscript));
+                tk.dispatch_cmd(cmd) 
+            } ,
             None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
@@ -370,12 +375,13 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_control(ApiControl {
         name: "linear.oscillate",
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
-            tk.linear_oscillate(
-                Task::LinearOscillate(Speed::new(speed.into()), pattern_name.into()),
-                get_duration_from_secs(time_sec),
-                pattern_name,
-                read_input_string(body_parts),
-            )
+            let cmd = DeviceCommand::from_inputs(
+                Task::LinearOscillate(Speed::new(speed.into()), pattern_name.into()), 
+                &[], 
+                time_sec, 
+                body_parts,
+                None);
+            tk.dispatch_cmd(cmd)
         },
         default: ERROR_HANDLE,
     })

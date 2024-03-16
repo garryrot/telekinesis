@@ -22,7 +22,7 @@ use crate::settings::TkConnectionType;
 /// Global commands on connection level, i.e. connection handling
 /// or emergency stop
 #[derive(Clone, Debug)]
-pub enum TkCommand {
+pub enum ConnectionCommand {
     Scan,
     StopScan,
     StopAll,
@@ -34,7 +34,7 @@ pub enum Task {
     Scalar(Speed),
     Pattern(Speed, ActuatorType, String),
     Linear(Speed, String),
-    LinearOscillate(Speed, String)
+    LinearOscillate(Speed, String),
 }
 
 #[derive(Clone, Debug)]
@@ -51,14 +51,14 @@ pub enum TkConnectionEvent {
 pub async fn handle_connection(
     event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
     event_sender_internal: crossbeam_channel::Sender<TkConnectionEvent>,
-    mut command_receiver: tokio::sync::mpsc::Receiver<TkCommand>,
+    mut command_receiver: tokio::sync::mpsc::Receiver<ConnectionCommand>,
     client: ButtplugClient,
     connection_type: TkConnectionType,
 ) {
     let sender_interla_clone = event_sender_internal.clone();
     let mut buttplug_events = client.event_stream();
     let sender_clone = event_sender.clone();
-    Handle::current().spawn(async move {   
+    Handle::current().spawn(async move {
         // let span = span!(Level::INFO, "tk_conn_events");
         // let _enter = span.enter();
         debug!("starting...");
@@ -68,7 +68,7 @@ pub async fn handle_connection(
             if let Some(cmd) = next_cmd {
                 debug!("Executing command {:?}", cmd);
                 match cmd {
-                    TkCommand::Scan => {
+                    ConnectionCommand::Scan => {
                         if let Err(err) = client.start_scanning().await {
                             let error = err.to_string();
                             error!("connection failure {}", error);
@@ -84,7 +84,7 @@ pub async fn handle_connection(
                             try_send_event(&event_sender_internal, connected);
                         }
                     }
-                    TkCommand::StopScan => {
+                    ConnectionCommand::StopScan => {
                         if let Err(err) = client.stop_scanning().await {
                             let error = err.to_string();
                             error!(error, "failed stop scan");
@@ -93,14 +93,14 @@ pub async fn handle_connection(
                             try_send_event(&event_sender_internal, err);
                         }
                     }
-                    TkCommand::Disconect => {
+                    ConnectionCommand::Disconect => {
                         client
                             .disconnect()
                             .await
                             .unwrap_or_else(|_| error!("failed to disconnect"));
                         break;
                     }
-                    TkCommand::StopAll => {
+                    ConnectionCommand::StopAll => {
                         client
                             .stop_all_devices()
                             .await
