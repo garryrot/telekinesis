@@ -1,23 +1,25 @@
-use api::*;
-use bp_scheduler::{
-    settings::{ActuatorSettings, LinearRange},
-    speed::Speed,
-};
-use buttplug::core::message::ActuatorType;
-use connection::{Task, TkConnectionEvent};
-use ffi::SKSEModEvent;
-use input::{read_scalar_actuator, DeviceCommand};
-use itertools::Itertools;
-use pattern::{get_pattern_names, read_pattern};
+
 use std::sync::{Arc, Mutex};
+use itertools::Itertools;
 use tracing::instrument;
 
 use cxx::{CxxString, CxxVector};
-use telekinesis::{Telekinesis, ERROR_HANDLE};
 
+use buttplug::core::message::ActuatorType;
+
+use bp_scheduler::{
+    settings::*,
+    speed::*,
+};
+
+use ffi::SKSEModEvent;
 use crate::{
-    input::parse_csv,
-    settings::{TkConnectionType, TkSettings, SETTINGS_FILE, SETTINGS_PATH},
+    api::*,
+    pattern::*,
+    input::*,
+    telekinesis::*,
+    connection::*,
+    settings::*,
 };
 
 mod api;
@@ -28,7 +30,6 @@ mod pattern;
 mod settings;
 mod status;
 pub mod telekinesis;
-mod util;
 
 #[derive(Debug)]
 pub struct TkApi {
@@ -306,10 +307,10 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "vibrate",
         exec: |tk, speed, time_sec, _, body_parts| {
             let cmd = DeviceCommand::from_inputs(
-                Task::Scalar(Speed::new(speed.into())), 
-                &[ActuatorType::Vibrate], 
-                time_sec, 
-                body_parts, 
+                Task::Scalar(Speed::new(speed.into())),
+                &[ActuatorType::Vibrate],
+                time_sec,
+                body_parts,
                 None);
             tk.dispatch_cmd(cmd)
         },
@@ -319,10 +320,10 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "scalar",
         exec: |tk, speed, time_sec, actuator_type, body_parts: &CxxVector<CxxString>| {
             let cmd = DeviceCommand::from_inputs(
-                Task::Scalar(Speed::new(speed.into())), 
-                &[read_scalar_actuator(actuator_type)], 
-                time_sec, 
-                body_parts, 
+                Task::Scalar(Speed::new(speed.into())),
+                &[read_scalar_actuator(actuator_type)],
+                time_sec,
+                body_parts,
                 None);
             tk.dispatch_cmd(cmd)
         },
@@ -341,13 +342,13 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
                         Speed::new(speed.into()),
                         ActuatorType::Vibrate,
                         pattern_name.into(),
-                    ), 
-                    &[ActuatorType::Vibrate], 
-                    time_sec, 
-                    body_parts, 
+                    ),
+                    &[ActuatorType::Vibrate],
+                    time_sec,
+                    body_parts,
                     Some(fscript));
                 tk.dispatch_cmd(cmd)
-            } ,
+            },
             None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
@@ -361,13 +362,13 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         ) {
             Some(fscript) => {
                 let cmd = DeviceCommand::from_inputs(
-                    Task::Linear(Speed::new(speed.into()), pattern_name.into()), 
-                    &[], 
-                    time_sec, 
-                    body_parts, 
+                    Task::Linear(Speed::new(speed.into()), pattern_name.into()),
+                    &[],
+                    time_sec,
+                    body_parts,
                     Some(fscript));
-                tk.dispatch_cmd(cmd) 
-            } ,
+                tk.dispatch_cmd(cmd)
+            },
             None => ERROR_HANDLE,
         },
         default: ERROR_HANDLE,
@@ -376,9 +377,9 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "linear.oscillate",
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
             let cmd = DeviceCommand::from_inputs(
-                Task::LinearOscillate(Speed::new(speed.into()), pattern_name.into()), 
-                &[], 
-                time_sec, 
+                Task::LinearOscillate(Speed::new(speed.into()), pattern_name.into()),
+                &[],
+                time_sec,
                 body_parts,
                 None);
             tk.dispatch_cmd(cmd)
@@ -418,20 +419,18 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_str1(ApiQryStr1 {
         name: "device.actuator_type",
         default: "None",
-        exec: |tk, actuator_id| {
-            match tk.settings.try_get_actuator_settings(actuator_id) {
-                ActuatorSettings::None => {
-                    if let Some(entry) = tk.status.get_actuator(actuator_id) {
-                        return match entry.actuator {
-                            ActuatorType::Position => "Linear".into(),
-                            _ => "Scalar".into()
-                        };
-                    }
-                    "None".into()
-                },
-                ActuatorSettings::Scalar(_) => "Scalar".into(),
-                ActuatorSettings::Linear(_) => "Linear".into(),
+        exec: |tk, actuator_id| match tk.settings.try_get_actuator_settings(actuator_id) {
+            ActuatorSettings::None => {
+                if let Some(entry) = tk.status.get_actuator(actuator_id) {
+                    return match entry.actuator {
+                        ActuatorType::Position => "Linear".into(),
+                        _ => "Scalar".into()
+                    };
+                }
+                "None".into()
             }
+            ActuatorSettings::Scalar(_) => "Scalar".into(),
+            ActuatorSettings::Linear(_) => "Linear".into(),
         },
     })
     .def_qry_str1(ApiQryStr1 {

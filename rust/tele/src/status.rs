@@ -2,12 +2,13 @@ use std::{
     fmt::{self, Display},
     sync::Arc,
 };
-
-use bp_scheduler::actuator::{get_actuators, Actuator};
-use buttplug::client::ButtplugClientDevice;
 use crossbeam_channel::Receiver;
 use itertools::Itertools;
 use tracing::debug;
+
+use buttplug::client::ButtplugClientDevice;
+
+use bp_scheduler::actuator::{get_actuators, Actuator};
 
 use crate::{connection::TkConnectionEvent, settings::TkSettings};
 

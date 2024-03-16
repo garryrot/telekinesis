@@ -1,11 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
-use bp_scheduler::actuator::Actuator;
 use buttplug::core::message::ActuatorType;
 use cxx::{CxxString, CxxVector};
 use funscript::FScript;
 use tracing::{debug, error};
 
+use bp_scheduler::actuator::Actuator;
 use crate::{connection::Task, settings::TkDeviceSettings};
 
 pub fn sanitize_name_list(list: &[String]) -> Vec<String> {

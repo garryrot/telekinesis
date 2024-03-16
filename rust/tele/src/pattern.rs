@@ -1,7 +1,8 @@
 use std::{path::PathBuf, time::Instant, fs};
 use anyhow::anyhow;
-use funscript::FScript;
 use tracing::{error, debug};
+
+use funscript::FScript;
 
 pub fn get_pattern_names(pattern_path: &str, vibration_patterns: bool) -> Vec<String> {
     match get_pattern_paths(pattern_path) {

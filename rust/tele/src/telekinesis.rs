@@ -1,10 +1,17 @@
 use anyhow::Error;
 use anyhow::anyhow;
 
-use bp_scheduler::settings::LinearRange;
-use bp_scheduler::speed::Speed;
-use bp_scheduler::ButtplugScheduler;
-use bp_scheduler::PlayerSettings;
+use std::{
+    fmt::{self},
+    time::Instant,
+};
+
+use futures::Future;
+use tracing::{instrument, debug, error, info};
+
+use tokio::sync::mpsc::Sender;
+use tokio::{runtime::Runtime, sync::mpsc::channel};
+
 use buttplug::{
     client::ButtplugClient,
     core::{
@@ -19,24 +26,16 @@ use buttplug::{
         ButtplugServerBuilder,
     },
 };
-use futures::Future;
-use tracing::instrument;
 
-use std::{
-    fmt::{self},
-    time::Instant,
-};
-use tokio::sync::mpsc::Sender;
-use tokio::{runtime::Runtime, sync::mpsc::channel};
-use tracing::{debug, error, info};
+use bp_scheduler::settings::*;
+use bp_scheduler::speed::*;
+use bp_scheduler::*;
 
-use crate::connection::Task;
-use crate::input::DeviceCommand;
-use crate::input::TkParams;
-use crate::status::Status;
 use crate::{
-    connection::{handle_connection, ConnectionCommand, TkConnectionEvent},
-    settings::{TkConnectionType, TkSettings},
+    connection::*,
+    settings::*,
+    input::*,
+    status::*
 };
 
 #[cfg(feature = "testing")]
@@ -243,8 +242,8 @@ impl Telekinesis {
     }
 }
 
-pub fn in_process_connector(
-) -> impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage> {
+pub fn in_process_connector() 
+    -> impl ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage> {
     ButtplugInProcessClientConnectorBuilder::default()
         .server(
             ButtplugServerBuilder::default()

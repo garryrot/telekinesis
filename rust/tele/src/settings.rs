@@ -3,12 +3,13 @@ use std::{
     fs::{self},
     path::PathBuf,
 };
-
-use bp_scheduler::{actuator::Actuator, settings::{ActuatorSettings, LinearRange, LinearSpeedScaling, ScalarRange}};
-use buttplug::core::message::ActuatorType;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, event, info, instrument, Level};
+
+use buttplug::core::message::ActuatorType;
+
+use bp_scheduler::{actuator::Actuator, settings::{ActuatorSettings, LinearRange, LinearSpeedScaling, ScalarRange}};
 
 use crate::input::sanitize_name_list;
 

@@ -17,7 +17,7 @@ use futures::StreamExt;
 use tokio::runtime::Handle;
 use tracing::{debug, error, info};
 
-use crate::settings::TkConnectionType;
+use crate::*;
 
 /// Global commands on connection level, i.e. connection handling
 /// or emergency stop
