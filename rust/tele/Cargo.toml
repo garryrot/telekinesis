@@ -11,7 +11,6 @@ crate-type = ["staticlib", "rlib"]
 bp_scheduler = { path = "../bp_scheduler" }
 bp_fakes = { path = "../bp_fakes", optional = true }
 crossbeam-channel = " 0.5.1"
-lazy_static = "1.4.0"
 anyhow = "1.0.68"
 buttplug = "7.1.13"
 futures = "0.3.25"
@@ -19,7 +18,6 @@ tokio = { version = "1.23.0", features = ["full", "sync"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
 cxx = "1.0.95"
-tokio-test = "0.4.2"
 serde = "1.0.164"
 serde_json = "1.0.99"
 itertools = "0.11.0"
@@ -28,6 +26,7 @@ tokio-util = "0.7.8"
 
 [dev-dependencies]
 bp_fakes = { path = "../bp_fakes" }
+tokio-test = "0.4.2"
 nonparallel = "0.1.0"
 tempfile = "3.7.0"
 
