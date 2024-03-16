@@ -9,7 +9,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 bp_scheduler = { path = "../bp_scheduler" }
-bp_fakes = { path = "../bp_fakes" }
+bp_fakes = { path = "../bp_fakes", optional = true }
 crossbeam-channel = " 0.5.1"
 lazy_static = "1.4.0"
 anyhow = "1.0.68"
@@ -27,8 +27,12 @@ funscript = "0.5.3"
 tokio-util = "0.7.8"
 
 [dev-dependencies]
+bp_fakes = { path = "../bp_fakes" }
 nonparallel = "0.1.0"
 tempfile = "3.7.0"
 
 [build-dependencies]
 cxx-build = "1.0"
+
+[features]
+testing = ["dep:bp_fakes"]

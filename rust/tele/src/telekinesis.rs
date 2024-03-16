@@ -1,5 +1,6 @@
 use anyhow::Error;
-use bp_fakes::FakeDeviceConnector;
+use anyhow::anyhow;
+
 use bp_scheduler::settings::LinearRange;
 use bp_scheduler::speed::Speed;
 use bp_scheduler::ButtplugScheduler;
@@ -37,6 +38,9 @@ use crate::{
     connection::{handle_connection, ConnectionCommand, TkConnectionEvent},
     settings::{TkConnectionType, TkSettings},
 };
+
+#[cfg(feature = "testing")]
+use bp_fakes::FakeDeviceConnector;
 
 pub static ERROR_HANDLE: i32 = -1;
 
@@ -103,6 +107,20 @@ impl Telekinesis {
     }
 }
 
+#[cfg(feature = "testing")]
+pub fn get_test_connection(settings: TkSettings) -> Result<Telekinesis, Error> {
+    Telekinesis::connect_with(
+        || async move { FakeDeviceConnector::device_demo().0 },
+        Some(settings),
+        TkConnectionType::Test,
+    )
+}
+
+#[cfg(not(feature = "testing"))]
+pub fn get_test_connection(_: TkSettings) -> Result<Telekinesis, Error> {
+    Err(anyhow!("Compiled without testing support"))
+}
+
 impl Telekinesis {
     pub fn connect(settings: TkSettings) -> Result<Telekinesis, Error> {
         let settings_clone = settings.clone();
@@ -120,11 +138,9 @@ impl Telekinesis {
                 Some(settings),
                 TkConnectionType::InProcess,
             ),
-            TkConnectionType::Test => Telekinesis::connect_with(
-                || async move { FakeDeviceConnector::device_demo().0 },
-                Some(settings),
-                TkConnectionType::Test,
-            ),
+            TkConnectionType::Test => {
+                get_test_connection(settings)
+            },
         }
     }
 
