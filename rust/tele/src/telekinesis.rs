@@ -204,11 +204,11 @@ impl Telekinesis {
             &cmd.actuator_types,
             &self.settings.devices,
         );
-
         let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
         let player = self.scheduler.create_player_with_settings(devices, settings);
-
         let handle = player.handle;
+
+        info!(handle, "dispatching {:?}", cmd);
         let client_sender_clone = self.client_event_sender.clone();
         let status_sender_clone = self.status_event_sender.clone();
         self.runtime.spawn(async move {
@@ -231,6 +231,7 @@ impl Telekinesis {
                 Task::Linear(_, _) => player.play_linear(cmd.duration, cmd.fscript.unwrap()).await,
                 Task::LinearOscillate(speed, _) => player.play_oscillate_linear(cmd.duration, speed, LinearRange::max()).await,
             };
+            info!(handle, "done");
             let event = match result {
                 Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
                 Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),

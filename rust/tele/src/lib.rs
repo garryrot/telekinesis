@@ -1,7 +1,11 @@
 
 use std::sync::{Arc, Mutex};
 use itertools::Itertools;
-use tracing::instrument;
+
+use tracing::{
+    instrument,
+    info
+};
 
 use cxx::{CxxString, CxxVector};
 
@@ -224,6 +228,7 @@ pub fn get_next_events_blocking(
     connection_events: &crossbeam_channel::Receiver<TkConnectionEvent>,
 ) -> Option<SKSEModEvent> {
     if let Ok(result) = connection_events.recv() {
+        info!("Sending SKSE Event: {:?}", result);
         let event = match result {
             TkConnectionEvent::Connected(connector) => {
                 SKSEModEvent::from("Tele_Connected", &connector)
