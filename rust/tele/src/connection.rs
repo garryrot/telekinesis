@@ -41,8 +41,9 @@ pub enum Task {
 pub enum TkConnectionEvent {
     Connected(String),
     ConnectionFailure(String),
-    DeviceAdded(Arc<ButtplugClientDevice>),
+    DeviceAdded(Arc<ButtplugClientDevice>, Option<i32>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
+    BatteryLevel(Arc<ButtplugClientDevice>, Option<i32>),
     ActionStarted(Task, Vec<Arc<Actuator>>, Vec<String>, i32),
     ActionDone(Task, Duration, i32),
     ActionError(Arc<Actuator>, String),
@@ -120,7 +121,12 @@ pub async fn handle_connection(
                 let actuators = get_actuators(vec![device.clone()]);
                 info!(name, index, ?actuators, "device connected");
 
-                let added = TkConnectionEvent::DeviceAdded(device);
+                let battery = if device.has_battery_level() {
+                    device.battery_level().await.ok().map( |x| (x * 100.0) as i32 )
+                } else {
+                    None
+                };
+                let added = TkConnectionEvent::DeviceAdded(device, battery);
                 try_send_event(&sender_interla_clone, added.clone());
                 try_send_event(&event_sender, added);
             }

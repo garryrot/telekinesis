@@ -161,21 +161,18 @@ impl Telekinesis {
         true
     }
 
-    #[instrument(skip(self))]
     pub fn update(&mut self, handle: i32, speed: Speed) -> bool {
         info!("update");
         self.scheduler.clean_finished_tasks();
         self.scheduler.update_task(handle, speed)
     }
 
-    #[instrument(skip(self))]
     pub fn stop(&mut self, handle: i32) -> bool {
         info!("stop");
         self.scheduler.stop_task(handle);
         true
     }
 
-    #[instrument(skip(self))]
     pub fn stop_all(&mut self) -> bool {
         info!("stop all");
         self.scheduler.stop_all();
@@ -186,7 +183,6 @@ impl Telekinesis {
         true
     }
 
-    #[instrument(skip(self))]
     pub fn disconnect(&mut self) {
         info!("disconnect");
         if self.command_sender.try_send(ConnectionCommand::Disconect).is_err() {
@@ -208,7 +204,7 @@ impl Telekinesis {
         let player = self.scheduler.create_player_with_settings(devices, settings);
         let handle = player.handle;
 
-        info!(handle, "dispatching {:?}", cmd);
+        info!(handle, "dispatching {:?}", cmd.task);
         let client_sender_clone = self.client_event_sender.clone();
         let status_sender_clone = self.status_event_sender.clone();
         self.runtime.spawn(async move {
@@ -688,12 +684,12 @@ mod tests {
         let (mut tk, _) =
             wait_for_connection(vec![scalar(1, "existing", ActuatorType::Vibrate)], None);
         assert_eq!(
-            tk.status.get_actuator_status("existing (Vibrate)"),
+            tk.status.get_actuator_connection_status("existing (Vibrate)"),
             TkConnectionStatus::Connected,
             "Existing device returns connected"
         );
         assert_eq!(
-            tk.status.get_actuator_status("not existing (Vibrate)"),
+            tk.status.get_actuator_connection_status("not existing (Vibrate)"),
             TkConnectionStatus::NotConnected,
             "Non-existing device returns not connected"
         );

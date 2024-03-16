@@ -12,11 +12,19 @@ use bp_scheduler::actuator::{get_actuators, Actuator};
 
 use crate::{connection::TkConnectionEvent, settings::TkSettings};
 
+/// Its actually device status but this makes it easier to housekeep
+#[derive(Clone, Debug)]
+pub struct ActuatorStatus {
+    pub actuator: Arc<Actuator>,
+    pub connection_status: TkConnectionStatus,
+    pub battery_level: Option<i32>
+}
+
 pub struct Status {
     status_events: Receiver<TkConnectionEvent>,
     connection: TkConnectionStatus,
-    actuators: Vec<(Arc<Actuator>, TkConnectionStatus)>,
-    known_actuators: Vec<String>,
+    actuators: Vec<ActuatorStatus>,
+    known_actuators: Vec<String>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,19 +55,19 @@ impl Status {
 
     pub fn actuators(&mut self) -> Vec<Arc<Actuator>> {
         self.process_status_events();
-        self.actuators.iter().map(|x| x.0.clone()).collect()
+        self.actuators.iter().map(|x| x.actuator.clone()).collect()
     }
 
     pub fn connected_actuators(&mut self) -> Vec<Arc<Actuator>> {
         self.process_status_events();
         self.actuators
             .iter()
-            .filter(|x| x.1 != TkConnectionStatus::NotConnected)
-            .map(|x| x.0.clone())
+            .filter(|x| x.connection_status != TkConnectionStatus::NotConnected)
+            .map(|x| x.actuator.clone())
             .collect()
     }
 
-    pub fn actuator_status(&mut self) -> &Vec<(Arc<Actuator>, TkConnectionStatus)> {
+    pub fn actuator_status(&mut self) -> &Vec<ActuatorStatus> {
         self.process_status_events();
         &self.actuators
     }
@@ -71,16 +79,18 @@ impl Status {
             .cloned()
     }
 
-    pub fn get_actuator_status(&mut self, actuator_id: &str) -> TkConnectionStatus {
-        self.process_status_events();
-        let entry: Option<&(Arc<Actuator>, TkConnectionStatus)> = self
-            .actuator_status()
-            .iter()
-            .find(|x| x.0.identifier() == actuator_id);
-        if let Some(status) = entry {
-            return status.1.clone();
+    pub fn get_actuator_connection_status(&mut self, actuator_id: &str) -> TkConnectionStatus {
+        if let Some(status) = self.get_actuator_status(actuator_id) {
+            return status.connection_status.clone();
         }
         TkConnectionStatus::NotConnected
+    }
+
+    pub fn get_actuator_status(&mut self, actuator_id: &str) -> Option<&ActuatorStatus> {
+        self.process_status_events();
+        self.actuator_status()
+            .iter()
+            .find(|x| x.actuator.identifier() == actuator_id)
     }
 
     pub fn get_known_actuator_ids(&mut self) -> Vec<String> {
@@ -101,30 +111,33 @@ impl Status {
                 TkConnectionEvent::ConnectionFailure(err) => {
                     self.connection = TkConnectionStatus::Failed(err)
                 }
-                TkConnectionEvent::DeviceAdded(device) => {
-                    self.set_status(device.clone(), TkConnectionStatus::Connected);
+                TkConnectionEvent::DeviceAdded(device, battery_level) => {
+                    self.set_status(device.clone(), TkConnectionStatus::Connected, battery_level);
                 }
                 TkConnectionEvent::DeviceRemoved(device) => {
-                    self.set_status(device.clone(), TkConnectionStatus::NotConnected)
+                    self.set_status(device.clone(), TkConnectionStatus::NotConnected, None)
                 }
                 TkConnectionEvent::ActionError(actuator, err) => {
-                    self.set_status(actuator.device.clone(), TkConnectionStatus::Failed(err))
+                    self.set_status(actuator.device.clone(), TkConnectionStatus::Failed(err), None)
                 }
+                TkConnectionEvent::BatteryLevel(device, battery_level) => {
+                    self.set_status(device.clone(), TkConnectionStatus::NotConnected, battery_level)
+                },
                 TkConnectionEvent::ActionStarted(_, _, _, _) => {}
                 TkConnectionEvent::ActionDone(_, _, _) => {}
             };
         }
     }
 
-    fn set_status(&mut self, device: Arc<ButtplugClientDevice>, status: TkConnectionStatus) {
+    fn set_status(&mut self, device: Arc<ButtplugClientDevice>, connection_status: TkConnectionStatus, battery_level: Option<i32>) {
         let new_actuators = get_actuators(vec![device.clone()])
             .into_iter()
-            .map(|x| (x, status.clone()));
+            .map(|actuator| ActuatorStatus { actuator, connection_status: connection_status.clone(), battery_level});
         self.actuators = self
             .actuators
             .clone()
             .into_iter()
-            .filter(|x| x.0.device.index() != device.index())
+            .filter(|x| x.actuator.device.index() != device.index())
             .chain(new_actuators)
             .collect();
         debug!("device status updated: {:?}", self.actuators)

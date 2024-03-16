@@ -227,13 +227,7 @@ Event OnPageReset(String page)
                 EndIf
 
                 _UseDeviceOids[i] = AddToggleOption("Enabled", connects, enabled_flag)
-                If isStroker
-                    Int minMs = Tele_Api.Qry_Str_1("device.linear.min_ms", actuatorId) as Int
-                    _StrokerMinMsOid[i] = AddSliderOption("Fastest Stroke", minMs, "{0} ms")
-                Elseif isVibrator
-                    Int minSpeed = Tele_Api.Qry_Str_1("device.scalar.min_speed", actuatorId) as Int
-                    _VibratorMinSpeedOid[i] = AddSliderOption("Min Speed", minSpeed, "{0} %")
-                EndIf
+                _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
 
                 String statusText = status
                 If statusText == "Connected"
@@ -242,32 +236,43 @@ Event OnPageReset(String page)
                 AddTextOption("State", statusText, OPTION_FLAG_DISABLED)
 
                 If isStroker
+                    Int minMs = Tele_Api.Qry_Str_1("device.linear.min_ms", actuatorId) as Int
+                    _StrokerMinMsOid[i] = AddSliderOption("Fastest Stroke", minMs, "{0} ms")
+                Elseif isVibrator
+                    Int minSpeed = Tele_Api.Qry_Str_1("device.scalar.min_speed", actuatorId) as Int
+                    _VibratorMinSpeedOid[i] = AddSliderOption("Min Speed", minSpeed, "{0} %")
+                EndIf
+                
+                String motor = Tele_Api.Qry_Str_1("device.actuator", actuatorId)
+                AddTextOption("Motor", motor + " " + actuatorIndex, OPTION_FLAG_DISABLED)
+
+                If isStroker
                     Int maxMs = Tele_Api.Qry_Str_1("device.linear.max_ms", actuatorId) as Int
                     _StrokerMaxMsOid[i] = AddSliderOption("Slowest Stroke", maxMs, "{0} ms")
                 Elseif isVibrator
                     Int maxSpeed = Tele_Api.Qry_Str_1("device.scalar.max_speed", actuatorId) as Int
                     _VibratorMaxSpeedOid[i] = AddSliderOption("Max Speed", maxSpeed, "{0} %")
                 EndIf
+                
+                If Tele_Api.Qry_Bool_1("device.has_battery_level", actuatorId)
+                    String percent = Tele_Api.Qry_Str_1("device.get_battery_level", actuatorId)
+                    AddSliderOption("Battery", percent as Int, "{0}%", OPTION_FLAG_DISABLED)
+                Else
+                    AddSliderOption("Battery", 0, "n/a", OPTION_FLAG_DISABLED)
+                EndIf
 
-                String motor = Tele_Api.Qry_Str_1("device.actuator", actuatorId)
-                AddTextOption("Motor", motor + " " + actuatorIndex, OPTION_FLAG_DISABLED)
                 If isStroker
                     Float minPos = Tele_Api.Qry_Str_1("device.linear.min_pos", actuatorId) as Float
                     _StrokerMinPosOid[i] = AddSliderOption("Full In", minPos, "{2}")
                 Elseif isVibrator
                     Float factor = Tele_Api.Qry_Str_1("device.scalar.factor", actuatorId) as Float
                     _VibratorFactorOid[i] = AddSliderOption("Downscale Factor", factor, "{2}")
-                    _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
-                    AddEmptyOption()
                 EndIf
-
                 If isStroker
-                    _DeviceEventOids[i] = AddInputOption("Body Parts", Join(events, ","))
-                    Float maxPos = Tele_Api.Qry_Str_1("device.linear.max_pos", actuatorId) as Float
-                    _StrokerMaxPosOid[i] = AddSliderOption("Full Out", maxPos, "{2}")
-                    AddEmptyOption()
                     Bool invertPos = Tele_Api.Qry_Bool_1("device.linear.invert", actuatorId)
                     _StrokerInvertOid[i] = AddToggleOption("Invert Pos", invertPos)
+                    Float maxPos = Tele_Api.Qry_Str_1("device.linear.max_pos", actuatorId) as Float
+                    _StrokerMaxPosOid[i] = AddSliderOption("Full Out", maxPos, "{2}")
                 EndIf
             EndIf
             i += 1

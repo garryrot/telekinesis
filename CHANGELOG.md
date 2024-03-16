@@ -1,3 +1,34 @@
+
+## 1.3.3
+
+- Fix issue with actuator specific device settings re-setting in certain situations
+
+## 1.3.2
+
+- Fix OStim MCM
+
+## 1.3.0
+
+- Increased Buttplug.io to 7.1.13, supporting lots of new devices
+
+- Add support for linear devices (Strokers)
+  * Stroking mode controls speed based on animation speed 
+  * The funcsript selection for strokers is very limited, but you can easily add your own to `SKSE/Telekinesis/Patterns/*.funscripts`
+  * Unfortunately I forgot to add stroker support to `Toys & Love`, I will do that in the next version.
+
+- Support device/actuator specific speed/range settings
+  * Control min/max speed/strength/range (depending on device type)
+  * Support inverting strokers
+  * Specificy scaling factor for vibrators
+
+#### Bugfixes
+
+- Hopefully fixed the MCM not loading issue
+
+- Fix issue in event handling that caused frezees
+
+- Logging level in Telekinesis.json is now actually used
+
 ## 1.2.1
 
 Fix issue with PlayerRef that cause Telekinesis to not load in certain scenarios

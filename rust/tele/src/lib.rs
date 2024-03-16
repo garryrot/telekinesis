@@ -12,8 +12,8 @@ use cxx::{CxxString, CxxVector};
 use buttplug::core::message::ActuatorType;
 
 use bp_scheduler::{
-    settings::*,
-    speed::*,
+    settings::*, 
+    speed::*
 };
 
 use ffi::SKSEModEvent;
@@ -224,9 +224,7 @@ impl TkApi {
     }
 }
 
-pub fn get_next_events_blocking(
-    connection_events: &crossbeam_channel::Receiver<TkConnectionEvent>,
-) -> Option<SKSEModEvent> {
+pub fn get_next_events_blocking(connection_events: &crossbeam_channel::Receiver<TkConnectionEvent>,) -> Option<SKSEModEvent> {
     if let Ok(result) = connection_events.recv() {
         info!("Sending SKSE Event: {:?}", result);
         let event = match result {
@@ -236,8 +234,10 @@ pub fn get_next_events_blocking(
             TkConnectionEvent::ConnectionFailure(err) => {
                 SKSEModEvent::from("Tele_ConnectionError", &err)
             }
-            TkConnectionEvent::DeviceAdded(device) => {
-                SKSEModEvent::from("Tele_DeviceAdded", device.name())
+            TkConnectionEvent::DeviceAdded(device, battery_level) => {
+                let mut evt = SKSEModEvent::from("Tele_DeviceAdded", device.name());
+                evt.num_arg = battery_level.unwrap_or(0).into();
+                evt
             }
             TkConnectionEvent::DeviceRemoved(device) => {
                 SKSEModEvent::from("Tele_DeviceRemoved", device.name())
@@ -262,6 +262,9 @@ pub fn get_next_events_blocking(
             TkConnectionEvent::ActionError(_, err) => {
                 SKSEModEvent::new("Tele_DeviceError", &err, 0.0)
             }
+            TkConnectionEvent::BatteryLevel(device, battery_level) => {
+                SKSEModEvent::new("Tele_BatteryLevel", device.name(), battery_level.unwrap_or(0).into())
+            },
         };
         return Some(event);
     }
@@ -410,6 +413,25 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_lst(ApiQryList {
         name: "devices",
         exec: |tk| tk.status.get_known_actuator_ids(),
+    })
+    .def_qry_bool_1(ApiQryBool1 { 
+        name: "device.has_battery_level", 
+        exec: |tk, actuator_id| {
+            if let Some(actuator) = tk.status.get_actuator(actuator_id)  {
+                return actuator.device.has_battery_level();
+            }
+            false
+        }
+    })
+    .def_qry_str1(ApiQryStr1 { 
+        name: "device.get_battery_level", 
+        exec: |tk, actuator_id| {
+            if let Some(actuator_status) = tk.status.get_actuator_status(actuator_id)  {
+                return actuator_status.battery_level.map(|x| x.to_string()).unwrap_or("".to_owned());
+            }
+            "".into()
+        },
+        default: ""
     })
     .def_qry_str1(ApiQryStr1 {
         name: "device.actuator",
@@ -616,12 +638,12 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_str1(ApiQryStr1 {
         name: "device.connection.status",
         default: "Not Connected",
-        exec: |tk, actuator_id| tk.status.get_actuator_status(actuator_id).to_string(),
+        exec: |tk, actuator_id| tk.status.get_actuator_connection_status(actuator_id).to_string(),
     })
     .def_qry_str1(ApiQryStr1 {
         name: "device.connection.status",
         default: "Not Connected",
-        exec: |tk, actuator_id| tk.status.get_actuator_status(actuator_id).to_string(),
+        exec: |tk, actuator_id| tk.status.get_actuator_connection_status(actuator_id).to_string(),
     })
     // patterns
     .def_qry_lst(ApiQryList {
