@@ -59,8 +59,6 @@ pub async fn handle_connection(
     let mut buttplug_events = client.event_stream();
     let sender_clone = event_sender.clone();
     Handle::current().spawn(async move {
-        // let span = span!(Level::INFO, "tk_conn_events");
-        // let _enter = span.enter();
         debug!("starting...");
 
         loop {
@@ -113,9 +111,6 @@ pub async fn handle_connection(
         }
         info!("stream closed");
     });
-
-    // let span = span!(Level::INFO, "tk_device_events");
-    // let _enter = span.enter();
 
     while let Some(event) = buttplug_events.next().await {
         match event.clone() {
