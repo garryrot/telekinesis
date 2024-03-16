@@ -235,7 +235,12 @@ Event OnPageReset(String page)
                     _VibratorMinSpeedOid[i] = AddSliderOption("Min Speed", minSpeed, "{0} %")
                 EndIf
 
-                AddTextOption("State", status, OPTION_FLAG_DISABLED)
+                String statusText = status
+                If statusText == "Connected"
+                    statusText = "<font color='#34eb46'>Connected</font>"
+                EndIf
+                AddTextOption("State", statusText, OPTION_FLAG_DISABLED)
+
                 If isStroker
                     Int maxMs = Tele_Api.Qry_Str_1("device.linear.max_ms", actuatorId) as Int
                     _StrokerMaxMsOid[i] = AddSliderOption("Slowest Stroke", maxMs, "{0} ms")
