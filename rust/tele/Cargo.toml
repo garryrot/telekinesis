@@ -34,4 +34,4 @@ tempfile = "3.7.0"
 cxx-build = "1.0"
 
 [features]
-testing = ["dep:bp_fakes"]
+testing = ["dep:bp_fakes"] # support for test/demo connetion with fake devices 
