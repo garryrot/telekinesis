@@ -4,6 +4,7 @@ members = [
     "bp_scheduler",
     "tele"
 ]
+resolver = "2"
 
 [profile.release]
 opt-level = "z"
