@@ -81,7 +81,7 @@ Event OnVersionUpdate(int newVersion)
 EndEvent
 
 Function InitLocals()
-    Pages = new String[10]
+    Pages = new String[11]
     Pages[0] = "General"
     Pages[1] = "Devices"
     Pages[2] = "Funscript Patterns"
@@ -92,6 +92,7 @@ Function InitLocals()
     Pages[7] = "Skyrim Chain Beasts"
     Pages[8] = "Debug"
     Pages[9] = "Troubleshooting"
+    Pages[10] = "Milk Mod Economy"
 
     _ConnectionMenuOptions = new String[3]
     _ConnectionMenuOptions[0] = "In-Process"
@@ -651,6 +652,47 @@ Event OnPageReset(String page)
         AddTextOptionST("HELP_DEVICE_NOT_VIBRATING", "Device not vibrating", "Read below")
         AddTextOptionST("HELP_DEVICE_ERRORS", "Device Errors", "Read below")
     EndIf
+
+    If page == "Milk Mod Economy"
+        SetCursorFillMode(TOP_TO_BOTTOM)
+
+        If TIntegration.MilkMod
+            AddHeaderOption("In-Game Vibrators")
+            AddToggleOptionST("OPTION_MILK_VIBRATE", "Enable Vibrators", TIntegration.MilkMod_Vibrate)
+            Int milk_mod_vibrate_selector_flag = OPTION_FLAG_DISABLED
+            If TIntegration.MilkMod_Vibrate
+                milk_mod_vibrate_selector_flag = OPTION_FLAG_NONE
+            EndIf
+
+            AddSliderOptionST("SLIDER_MILK_VIBRATION_STRENGTH", "Strength (Linear)", TIntegration.MilkMod_Vibrate_Strength, "{0}")
+
+            AddHeaderOption("Devices")
+            AddMenuOptionST("MENU_MILK_VIBRATE_DEVICE_SELECTOR", "Filter", _DeviceSelectorOptions[TIntegration.MilkMod_Vibrate_DeviceSelector], milk_mod_vibrate_selector_flag)
+
+            Int milk_mod_vibrate_event_flag = OPTION_FLAG_DISABLED
+            If TIntegration.MilkMod_Vibrate && TIntegration.MilkMod_Vibrate_DeviceSelector == 1
+                milk_mod_vibrate_event_flag = OPTION_FLAG_NONE
+            EndIf
+            AddInputOptionST("OPTION_MILK_EVENT_ANAL", "Event 'Anal Device'", TIntegration.MilkMod_Vibrate_Event_Anal_Default, milk_mod_vibrate_event_flag)
+            AddInputOptionST("OPTION_MILK_EVENT_VAGINAL", "Event 'Vaginal Device'", TIntegration.MilkMod_Vibrate_Event_Vaginal, milk_mod_vibrate_event_flag)
+            AddInputOptionST("OPTION_MILK_EVENT_NIPPLE", "Event 'Nipple Device'", TIntegration.MilkMod_Vibrate_Event_Nipple, milk_mod_vibrate_event_flag)
+        
+            AddHeaderOption("Actions")
+            Int milk_mod_vibrate_pattern_flag = OPTION_FLAG_DISABLED
+            If TIntegration.MilkMod_Vibrate
+                milk_mod_vibrate_pattern_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_MILK_MOD_VIBRATE_PATTERN", "Vibrate Pattern", _PatternSelectorOptions[TIntegration.MilkMod_Vibrate_Pattern], milk_mod_vibrate_pattern_flag)
+        
+            Int milk_mod_vibrate_funscript_flag = OPTION_FLAG_DISABLED
+            If TIntegration.MilkMod_Vibrate && TIntegration.MilkMod_Vibrate_Pattern == 1
+                milk_mod_vibrate_funscript_flag = OPTION_FLAG_NONE
+            EndIf
+            AddMenuOptionST("MENU_MILK_MOD_VIBRATE_FUNSCRIPT", "Vibrate Funscript", TIntegration.MilkMod_Vibrate_Funscript, milk_mod_vibrate_funscript_flag)
+        Else
+            AddTextOption("Milk Mod Economy", "Mod not found", OPTION_FLAG_DISABLED)
+        EndIf
+    EndIf
 EndEvent
 
 ; General
@@ -910,6 +952,163 @@ State MENU_DEVIOUS_DEVICES_VIBRATE_FUNSCRIPT
 
     Event OnMenuAcceptST(int index)
         TIntegration.DeviousDevices_Vibrate_Funscript = _VibrateFunscriptNames[index]
+        SetMenuOptionValueST(_VibrateFunscriptNames[index])
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_VibrateFunscriptNames[0])
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Select a funscript pattern. Patterns are stored in Data/SKSE/Plugins/Telekinesis/Patterns/*.vibration.funscript")
+    EndEvent
+EndState
+
+; Milk Mod
+
+State OPTION_MILK_VIBRATE
+    Event OnSelectST()
+        TIntegration.MilkMod_Vibrate = !TIntegration.MilkMod_Vibrate
+        SetToggleOptionValueST(TIntegration.MilkMod_Vibrate)
+        ForcePageReset()
+    EndEvent
+    
+    Event OnDefaultST()
+        TIntegration.MilkMod_Vibrate = TIntegration.MilkMod_Vibrate
+        SetToggleOptionValueST(TIntegration.MilkMod_Vibrate)
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Enable vibration support for milk mod milking events")
+    EndEvent
+EndState
+
+State SLIDER_MILK_VIBRATION_STRENGTH
+	Event OnSliderOpenST()
+		SetSliderDialogStartValue(TIntegration.MilkMod_Vibrate_Strength)
+		SetSliderDialogDefaultValue(TIntegration.MilkMod_Vibrate_Strength_Default)
+		SetSliderDialogRange(0, 100)
+		SetSliderDialogInterval(1)
+	EndEvent
+
+	Event OnSliderAcceptST(float value)
+		TIntegration.MilkMod_Vibrate_Strength = value as int
+		SetSliderOptionValueST(TIntegration.MilkMod_Vibrate_Strength)
+	EndEvent
+
+	Event OnDefaultST()
+		TIntegration.MilkMod_Vibrate_Strength = TIntegration.MilkMod_Vibrate_Strength_Default
+		SetSliderOptionValueST(TIntegration.MilkMod_Vibrate_Strength)
+	EndEvent
+
+	Event OnHighlightST()
+		SetInfoText("Vibration strength adjustment")
+	EndEvent
+EndState
+
+State MENU_MILK_VIBRATE_DEVICE_SELECTOR
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(TIntegration.MilkMod_Vibrate_DeviceSelector)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_DeviceSelectorOptions)
+    EndEvent
+
+    event OnMenuAcceptST(int index)
+        TIntegration.MilkMod_Vibrate_DeviceSelector = index
+        SetMenuOptionValueST(_DeviceSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        TIntegration.MilkMod_Vibrate_DeviceSelector = TIntegration.MilkMod_Vibrate_DeviceSelector
+        SetMenuOptionValueST(_DeviceSelectorOptions[TIntegration.MilkMod_Vibrate_DeviceSelector])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        String text = "Set to 'Match Body Parts' if you only want to vibrate devices that correspond to a matching in-game item\n"
+        SetInfoText(text)
+    EndEvent
+EndState
+
+State OPTION_MILK_EVENT_ANAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TIntegration.MilkMod_Vibrate_Event_Anal_Default)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TIntegration.MilkMod_Vibrate_Event_Anal_Default = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Change the device that will act as the Milk mod anal plug. Set to 'disable' to turn off anal vibration during events. This device plays for the duration of all types of milking (both stationary and armor milking).  Default: Anal")
+    EndEvent
+EndState
+
+State OPTION_MILK_EVENT_NIPPLE
+	Event OnInputOpenST()
+		SetInputDialogStartText(TIntegration.MilkMod_Vibrate_Event_Nipple)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TIntegration.MilkMod_Vibrate_Event_Nipple = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Change the event that is triggered for the Milk Mod milking cups. Default: Nipple")
+    EndEvent
+EndState
+
+State OPTION_MILK_EVENT_VAGINAL
+	Event OnInputOpenST()
+		SetInputDialogStartText(TIntegration.MilkMod_Vibrate_Event_Vaginal)
+	EndEvent
+	
+	Event OnInputAcceptST(String value)
+		TIntegration.MilkMod_Vibrate_Event_Vaginal = value
+		SetInputOptionValueST(value)
+	EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Change event that is triggered for the Milk Mod fucking machine. Default: Vaginal")
+    EndEvent
+EndState
+
+State MENU_MILK_MOD_VIBRATE_PATTERN
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_PatternSelectorOptions)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TIntegration.MilkMod_Vibrate_Pattern = index
+        SetMenuOptionValueST(_PatternSelectorOptions[index])
+        ForcePageReset()
+    EndEvent
+
+    Event OnDefaultST()
+        SetMenuOptionValueST(_PatternSelectorOptions[0])
+        ForcePageReset()
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("'Linear': Constant speed based on event data. 'Funscript': Vibration is controlled by a named funscript file. 'Random Funscript': Use a randomly selected funscript.")
+    EndEvent
+EndState
+
+State MENU_MILK_MOD_VIBRATE_FUNSCRIPT
+    Event OnMenuOpenST()
+        SetMenuDialogStartIndex(0)
+        SetMenuDialogDefaultIndex(0)
+        SetMenuDialogOptions(_VibrateFunscriptNames)
+    EndEvent
+
+    Event OnMenuAcceptST(int index)
+        TIntegration.MilkMod_Vibrate_Funscript = _VibrateFunscriptNames[index]
         SetMenuOptionValueST(_VibrateFunscriptNames[index])
     EndEvent
 
