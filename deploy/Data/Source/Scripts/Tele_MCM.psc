@@ -47,7 +47,7 @@ String[] _ActuatorIds
 Bool _DebugSpellsAdded
 
 Int Function GetVersion()
-    return 16
+    return 17
 EndFunction
 
 Event OnConfigInit()
@@ -73,11 +73,13 @@ Event OnVersionUpdate(int newVersion)
         TIntegration.MigrateToV12()
     EndIf
 
-    If CurrentVersion < 16
-        ;  Older than 1.3.0
+    If CurrentVersion < 17
+        ;  v16:  1.3.0
+        ;  v17:  1.4.x
         InitLocals()
         TIntegration.InitDefaultListeners()
     EndIf
+
 EndEvent
 
 Function InitLocals()
