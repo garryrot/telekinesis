@@ -92,9 +92,9 @@ Function InitLocals()
     Pages[5] = "Toys & Love"
     Pages[6] = " OStim"
     Pages[7] = "Skyrim Chain Beasts"
-    Pages[8] = "Debug"
-    Pages[9] = "Troubleshooting"
-    Pages[10] = "Milk Mod Economy"
+    Pages[8] = "Milk Mod Economy"
+    Pages[9] = "Debug"
+    Pages[10] = "Troubleshooting"
 
     _ConnectionMenuOptions = new String[3]
     _ConnectionMenuOptions[0] = "In-Process"
