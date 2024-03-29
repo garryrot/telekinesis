@@ -46,11 +46,11 @@ pub enum TkLogLevel {
 impl From<TkLogLevel> for Level {
     fn from(val: TkLogLevel) -> Self {
         match val {
-            crate::settings::TkLogLevel::Trace => Level::TRACE,
-            crate::settings::TkLogLevel::Debug => Level::DEBUG,
-            crate::settings::TkLogLevel::Info => Level::INFO,
-            crate::settings::TkLogLevel::Warn => Level::WARN,
-            crate::settings::TkLogLevel::Error => Level::ERROR,
+            TkLogLevel::Trace => Level::TRACE,
+            TkLogLevel::Debug => Level::DEBUG,
+            TkLogLevel::Info => Level::INFO,
+            TkLogLevel::Warn => Level::WARN,
+            TkLogLevel::Error => Level::ERROR,
         }
     }
 }
