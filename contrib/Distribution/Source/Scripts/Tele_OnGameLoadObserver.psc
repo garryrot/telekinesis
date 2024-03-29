@@ -43,6 +43,12 @@ Function LoadTelekinesis(Tele_Devices devices)
     Else
         integration.HasOStim = False
     EndIf
+
+    If Game.GetModByName("MilkModNEW.esp") != 255 || Game.GetModByName("MilkModNew.esp") != 255
+        integration.MilkMod = True
+    Else
+        integration.MilkMod = False
+    EndIf
     
     integration.PlayerRef = Game.GetPlayer()
     integration.Maintenance()
