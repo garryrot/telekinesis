@@ -259,7 +259,7 @@ pub fn get_next_events_blocking(connection_events: &crossbeam_channel::Receiver<
                 let str_arg = format!("{} done after {:.1}s", task, duration.as_secs());
                 SKSEModEvent::new("Tele_DeviceActionDone", &str_arg, f64::from(handle))
             }
-            TkConnectionEvent::ActionError(_, err) => {
+            TkConnectionEvent::ActionError(_actuator, err) => {
                 SKSEModEvent::new("Tele_DeviceError", &err, 0.0)
             }
             TkConnectionEvent::BatteryLevel(device, battery_level) => {
@@ -371,7 +371,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             Some(fscript) => {
                 let cmd = DeviceCommand::from_inputs(
                     Task::Linear(Speed::new(speed.into()), pattern_name.into()),
-                    &[],
+                    &[ActuatorType::Position],
                     time_sec,
                     body_parts,
                     Some(fscript));
@@ -386,7 +386,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
             let cmd = DeviceCommand::from_inputs(
                 Task::LinearOscillate(Speed::new(speed.into()), pattern_name.into()),
-                &[],
+                &[ActuatorType::Oscillate],
                 time_sec,
                 body_parts,
                 None);
