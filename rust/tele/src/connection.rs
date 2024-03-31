@@ -27,6 +27,7 @@ pub enum ConnectionCommand {
     StopScan,
     StopAll,
     Disconect,
+    GetBattery
 }
 
 #[derive(Clone, Debug)]
@@ -52,15 +53,17 @@ pub enum TkConnectionEvent {
 pub async fn handle_connection(
     event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
     event_sender_internal: crossbeam_channel::Sender<TkConnectionEvent>,
+    mut command_sender: tokio::sync::mpsc::Sender<ConnectionCommand>, // TODO: just use crossbeam?
     mut command_receiver: tokio::sync::mpsc::Receiver<ConnectionCommand>,
     client: ButtplugClient,
     connection_type: TkConnectionType,
 ) {
     let sender_interla_clone = event_sender_internal.clone();
     let mut buttplug_events = client.event_stream();
+
     let sender_clone = event_sender.clone();
     Handle::current().spawn(async move {
-        debug!("starting...");
+        debug!("starting connection thread...");
 
         loop {
             let next_cmd = command_receiver.recv().await;
@@ -88,6 +91,8 @@ pub async fn handle_connection(
                             let error = err.to_string();
                             error!(error, "failed stop scan");
                             let err = TkConnectionEvent::ConnectionFailure(error);
+
+                            // todo move double send to inner fn
                             try_send_event(&sender_clone, err.clone());
                             try_send_event(&event_sender_internal, err);
                         }
@@ -105,12 +110,30 @@ pub async fn handle_connection(
                             .await
                             .unwrap_or_else(|_| error!("failed to stop all devices"));
                     }
+                    ConnectionCommand::GetBattery => {
+                        for device in client.devices() {
+                            if device.connected() && device.has_battery_level() {
+                                let battery = device.battery_level().await.ok().map( |x| (x * 100.0) as i32 ); // TODO: Move this to GUI?
+                                let evt = TkConnectionEvent::BatteryLevel(device.clone(), battery);
+                                try_send_event(&sender_clone, evt.clone());
+                                try_send_event(&event_sender_internal, evt);
+                            }
+                        }
+                    },
                 }
             } else {
                 break;
             }
         }
         info!("stream closed");
+    });
+
+    Handle::current().spawn(async move {
+        debug!("starting battery thread");
+        loop {
+            tokio::time::sleep(Duration::from_secs(300)).await;
+            let _ = command_sender.send(ConnectionCommand::GetBattery).await;
+        }
     });
 
     while let Some(event) = buttplug_events.next().await {
@@ -122,7 +145,7 @@ pub async fn handle_connection(
                 info!(name, index, ?actuators, "device connected");
 
                 let battery = if device.has_battery_level() {
-                    device.battery_level().await.ok().map( |x| (x * 100.0) as i32 )
+                    device.battery_level().await.ok().map( |x| (x * 100.0) as i32 ) // TODO: Move to event handler?
                 } else {
                     None
                 };

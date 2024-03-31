@@ -114,15 +114,15 @@ impl Status {
                 TkConnectionEvent::DeviceAdded(device, battery_level) => {
                     self.set_status(device.clone(), TkConnectionStatus::Connected, battery_level);
                 }
+                TkConnectionEvent::BatteryLevel(device, battery_level) => {
+                    self.set_status(device.clone(), TkConnectionStatus::Connected, battery_level);
+                }
                 TkConnectionEvent::DeviceRemoved(device) => {
-                    self.set_status(device.clone(), TkConnectionStatus::NotConnected, None)
+                    self.set_status(device.clone(), TkConnectionStatus::NotConnected, None);
                 }
                 TkConnectionEvent::ActionError(actuator, err) => {
-                    self.set_status(actuator.device.clone(), TkConnectionStatus::Failed(err), None)
+                    self.set_status(actuator.device.clone(), TkConnectionStatus::Failed(err), None);
                 }
-                TkConnectionEvent::BatteryLevel(device, battery_level) => {
-                    self.set_status(device.clone(), TkConnectionStatus::NotConnected, battery_level)
-                },
                 TkConnectionEvent::ActionStarted(_, _, _, _) => {}
                 TkConnectionEvent::ActionDone(_, _, _) => {}
             };
@@ -132,7 +132,11 @@ impl Status {
     fn set_status(&mut self, device: Arc<ButtplugClientDevice>, connection_status: TkConnectionStatus, battery_level: Option<i32>) {
         let new_actuators = get_actuators(vec![device.clone()])
             .into_iter()
-            .map(|actuator| ActuatorStatus { actuator, connection_status: connection_status.clone(), battery_level});
+            .map(|actuator| ActuatorStatus { 
+                actuator, 
+                connection_status: connection_status.clone(), 
+                battery_level
+            });
         self.actuators = self
             .actuators
             .clone()

@@ -75,7 +75,7 @@ impl Telekinesis {
         });
 
         let telekinesis = Telekinesis {
-            command_sender,
+            command_sender: command_sender.clone(),
             connection_events: event_receiver,
             runtime: Runtime::new()?,
             settings: settings.clone(),
@@ -90,6 +90,7 @@ impl Telekinesis {
             handle_connection(
                 event_sender_client,
                 event_sender_internal,
+                command_sender,
                 command_receiver,
                 client,
                 type_name,
