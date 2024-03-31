@@ -315,11 +315,11 @@ Function InitMilkModHandlers()
 	RegisterForModEvent("MilkQuest.StopMilkingMachine",  "OnMilkModVibrateEffectStop")	
     RegisterForModEvent("MilkQuest.StartMilkingMachine", "OnStartMilkingMachine")
 	RegisterForModEvent("MilkQuest.FeedingStage", "OnFeedingStage")
-	RegisterForModEvent("MilkQuest.MilkingStage",  "onMilkingStage")
+	RegisterForModEvent("MilkQuest.MilkingStage",  "OnMilkingStage")
 	RegisterForModEvent("MilkQuest.FuckMachineStage", "OnFuckMachineStage")
 EndFunction
 
-Event OnStartMilkingMachine(Form Who, int mpas, int MilkingType)
+Event OnStartMilkingMachine(Form Who, Int mpas, Int MilkingType)
     Debug.Trace("[Tele] Milk Mod Handler vibrating on milking", 0)
     If !_MilkMod_Vibrate || Who != playerref
         return
@@ -334,7 +334,7 @@ Event OnStartMilkingMachine(Form Who, int mpas, int MilkingType)
     _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, StartMilkingStrength, events)
 EndEvent
 
-Event OnFuckMachineStage(Form Who, int mpas, int MilkingType)
+Event OnFuckMachineStage(Form Who, Int mpas, Int MilkingType)
     Debug.Trace("[Tele] Milk Mod Handler vibrating on Fuck Machine", 0)
     If !_MilkMod_Vibrate || Who != playerref
         return
@@ -348,7 +348,7 @@ Event OnFuckMachineStage(Form Who, int mpas, int MilkingType)
     _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, MilkMod_Vibrate_Strength, events)
 EndEvent
 
-Event onMilkingStage(Form Who, int mpas, int MilkingType)
+Event OnMilkingStage(Form Who, Int mpas, Int MilkingType)
     Debug.Trace("[Tele] Milk Mod Handler vibrating on milking", 0)
     If !_MilkMod_Vibrate || Who != playerref
         return
@@ -362,7 +362,7 @@ Event onMilkingStage(Form Who, int mpas, int MilkingType)
     _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, MilkMod_Vibrate_Strength, events)
 EndEvent
 
-Event OnFeedingStage(Form Who, int mpas, int MilkingType)
+Event OnFeedingStage(Form Who, Int mpas, Int MilkingType)
     Debug.Trace("[Tele] Milk Mod Handler vibrating on feeding", 0)
     If !_MilkMod_Vibrate || Who != playerref
         return
@@ -377,7 +377,7 @@ Event OnFeedingStage(Form Who, int mpas, int MilkingType)
     _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, StartMilkingStrength, events)
 EndEvent
 
-Event OnMilkModVibrateEffectStop(Form Who, int mpas, int MilkingType)
+Event OnMilkModVibrateEffectStop(Form Who, Int mpas, Int MilkingType)
     If !_MilkMod_Vibrate || Who != playerref
         return
     EndIf
@@ -459,7 +459,7 @@ Event OnVibrateEffectStart(String eventName, String actorName, Float vibrationSt
     _DeviousDevicesVibrateHandle = StartVibration(DeviousDevices_Vibrate_DeviceSelector, -1, DeviousDevices_Vibrate_Pattern, DeviousDevices_Vibrate_Funscript, strength, events)
 EndEvent
 
-Event OnVibrateEffectStop(string eventName, string actorName, float argNum, form sender)
+Event OnVibrateEffectStop(String eventName, String actorName, Float argNum, form sender)
     If !_DeviousDevices_Vibrate || ZadLib == None
         return
     EndIf
@@ -586,7 +586,7 @@ Bool Property Sexlab_ActorEdge Hidden
     EndFunction
 EndProperty
 
-Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
+Event OnSexlabAnimationStart(Int threadID, bool hasPlayer)
 	If !hasPlayer
 		return
 	EndIf
@@ -618,7 +618,7 @@ Event OnSexlabAnimationStart(int threadID, bool hasPlayer)
     EndIf
 EndEvent
 
-Event OnSexlabAnimationEnd(int _, bool hasPlayer)
+Event OnSexlabAnimationEnd(Int _, bool hasPlayer)
 	If !hasPlayer
 		return
 	EndIf
@@ -639,11 +639,11 @@ Event OnSexlabAnimationEnd(int _, bool hasPlayer)
     UnregisterForUpdate()
 EndEvent
 
-Event OnDeviceActorOrgasm(string eventName, string strArg, float numArg, Form sender)
+Event OnDeviceActorOrgasm(String eventName, String strArg, Float numArg, Form sender)
 	TDevices.Vibrate(Utility.RandomInt(10, 100), Utility.RandomFloat(5.0, 20.0))
 EndEvent
 
-Event OnDeviceEdgedActor(string eventName, string strArg, float numArg, Form sender)
+Event OnDeviceEdgedActor(String eventName, String strArg, Float numArg, Form sender)
 	TDevices.Vibrate(Utility.RandomInt(1, 20), Utility.RandomFloat(3.0, 8.0))
 EndEvent
 
@@ -729,12 +729,12 @@ Bool Property Ostim_Oscillator Hidden
     EndFunction
 EndProperty
 
-Event OnOStimStart(string eventName, string strArg, float numArg, Form sender)
+Event OnOStimStart(String eventName, String strArg, Float numArg, Form sender)
     ; TDevices.LogDebug("OnOStimStart")
     UpdateRousingControlledSexScene()
 EndEvent
 
-Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
+Event OnOstimEnd(String eventName, String sceneID, Float numArg, Form sender)
     ; TDevices.LogDebug("OnOstimEnd")
     If _OstimSceneVibrationHandle != -1
         TDevices.StopHandle(_OstimSceneVibrationHandle)
@@ -751,7 +751,7 @@ Event OnOstimEnd(string eventName, string sceneID, float numArg, Form sender)
     UnregisterForUpdate()
 EndEvent
 
-Event OnOStimSceneChanged(string eventName, string sceneID, float numArg, Form sender)
+Event OnOStimSceneChanged(String eventName, String sceneID, Float numArg, Form sender)
     If OThread.GetScene(0) != sceneID
         return
     EndIf
@@ -1109,7 +1109,7 @@ Bool Property Toys_Denial Hidden
     EndFunction
 EndProperty
 
-Event OnToysPulsate(string eventName, string argString, float argNum, form sender)
+Event OnToysPulsate(String eventName, String argString, Float argNum, form sender)
     ; Duration is random lasting from approx. 12 to 35 seconds
     Int duration = Utility.RandomInt(12,35)
     String[] events = new String[1]
@@ -1118,27 +1118,27 @@ Event OnToysPulsate(string eventName, string argString, float argNum, form sende
 EndEvent
 
 Int _ToysFondleHandle = -1
-Event OnToysFondleStart(string eventName, string argString, float argNum, form sender)
+Event OnToysFondleStart(String eventName, String argString, Float argNum, form sender)
     ; Fondle started - successfully increased rousing
 	_ToysFondleHandle = TDevices.Vibrate(40, -1)
 EndEvent
 
-Event OnToysFondleEnd(string eventName, string argString, float argNum, form sender)
+Event OnToysFondleEnd(String eventName, String argString, Float argNum, form sender)
     ; Fondle animation has ended (no player controls locking). Anim duration is 10 to 18 seconds.
 	TDevices.StopHandle(_ToysFondleHandle)
 EndEvent
 
-Event OnToysSquirt(string eventName, string argString, float argNum, form sender)
+Event OnToysSquirt(String eventName, String argString, Float argNum, form sender)
     ; SquirtingEffect has started. There can be numerous in a single scene. Is not sent if turned off in MCM. Duration is 12 seconds
 	TDevices.Vibrate(100, 12.0)
 EndEvent
 
-Event OnToysLoveSceneInfo(string loveName, Bool playerInScene, int numStages, Bool playerConsent, Form actInPos1, Form actInPos2, Form actInPos3, Form actInPos4, Form actInPos5)
+Event OnToysLoveSceneInfo(String loveName, Bool playerInScene, Int numStages, Bool playerConsent, Form actInPos1, Form actInPos2, Form actInPos3, Form actInPos4, Form actInPos5)
     ; - ToysLoveSceneInfo - Dual purpose event: 1) Get Scene Info. 2) Event indicates start of animating. It's the moment actors are in place and the first animation has started. Scene Info includes:
     ; 	- LoveName, PlayerInScene, NumStages, PlayerConsent, ActInPos1.. Pos2.. Pos3.. Pos4.. Pos5
     ; 	- Actors as Form, given in scene position. The Player will always be in Position 1 or 2
     ; 	- event is sent for Player-less scenes. The param PlayerInScene will be false
-    ; 	**Custom Parameters** Event <callbackName>(string LoveName, Bool PlayerInScene, int NumStages, Bool PlayerConsent, Form ActInPos1, Form ActInPos2, Form ActInPos3, Form ActInPos4, Form ActInPos5)
+    ; 	**Custom Parameters** Event <callbackName>(String LoveName, Bool PlayerInScene, Int NumStages, Bool PlayerConsent, Form ActInPos1, Form ActInPos2, Form ActInPos3, Form ActInPos4, Form ActInPos5)
     If ! playerInScene
         return
     EndIf
@@ -1170,37 +1170,37 @@ String[] Function GetLoveTags(String loveName)
     return events
 EndFunction
 
-Event OnToysSceneEnd(string eventName, string argString, float argNum, form sender)
+Event OnToysSceneEnd(String eventName, String argString, Float argNum, form sender)
     _InToysScene = false
     TDevices.StopHandle(_ToysSceneVibrationHandle)
 EndEvent
 
-Event OnToysClimax(string eventName, string argString, float argNum, form sender)
+Event OnToysClimax(String eventName, String argString, Float argNum, form sender)
     ; Simultaneous Orgasm. Both player & NPC have climaxed. This can happen multiple times. Sent in addition to other climax events. This event always first
 	TDevices.Vibrate(80, 5)
 EndEvent
 
-Event OnToysClimaxSimultaneous(string eventName, string argString, float argNum, form sender)
+Event OnToysClimaxSimultaneous(String eventName, String argString, Float argNum, form sender)
 	TDevices.Vibrate(100, 7)
 EndEvent
 
-Event OnToysDenied(string eventName, string argString, float argNum, form sender)
+Event OnToysDenied(String eventName, String argString, Float argNum, form sender)
 	TDevices.Vibrate(0, 7)
 EndEvent
 
-Event OnToysVaginalPenetration(string eventName, string argString, float argNum, form sender)
+Event OnToysVaginalPenetration(String eventName, String argString, Float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Vaginal"
     TDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
 EndEvent
 
-Event OnToysAnalPenetration(string eventName, string argString, float argNum, form sender)
+Event OnToysAnalPenetration(String eventName, String argString, Float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Anal"
     TDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
 EndEvent
 
-Event OnToysOralPenetration(string eventName, string argString, float argNum, form sender)
+Event OnToysOralPenetration(String eventName, String argString, Float argNum, form sender)
     String[] events = new String[1]
     events[0] = "Oral"
     TDevices.VibrateEvents(Utility.RandomInt(80, 100), 12, events)
@@ -1241,7 +1241,7 @@ Bool Property Chainbeasts_Vibrate Hidden
     EndFunction
 EndProperty
 
-Event OnSCB_VibeEvent(string eventName, string strArg, float numArg, Form sender)
+Event OnSCB_VibeEvent(String eventName, String strArg, Float numArg, Form sender)
     String[] evts = new String[1]
     evts[0] = Chainbeasts_Vibrate_Event
     StartVibration(Chainbeasts_Vibrate_DeviceSelector, 3, Chainbeasts_Vibrate_Pattern, Chainbeasts_Vibrate_Funscript, Chainbeasts_Vibrate_Linear_Strength, evts)
