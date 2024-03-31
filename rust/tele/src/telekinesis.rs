@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::Future;
-use tracing::{instrument, debug, error, info};
+use tracing::{debug, error, info};
 
 use tokio::sync::mpsc::Sender;
 use tokio::{runtime::Runtime, sync::mpsc::channel};
@@ -229,8 +229,8 @@ impl Telekinesis {
             };
             info!(handle, "done");
             let event = match result {
-                Ok(_) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
-                Err(err) => TkConnectionEvent::ActionError(actuators[0].clone(), err.to_string()),
+                Ok(()) => TkConnectionEvent::ActionDone(task_clone, now.elapsed(), handle),
+                Err(err) => TkConnectionEvent::ActionError(err.actuator, err.bp_error.to_string()),
             };
             client_sender_clone.send(event.clone()).expect("never full");
             status_sender_clone.send(event.clone()).expect("never full");
