@@ -81,7 +81,6 @@ I do not own Skyrim VR or Skyrim LE and won't be able to test it.
 - If you encounter issues, please report them to me
 - Your device-specific or MCM settings might be dropped on upgrade
 
-
 ### What do if devices don't connect?
 
 Assure that:
@@ -114,11 +113,17 @@ This mod is free software and can be used under the terms of the [Apache License
 
 ## Changelog
 
-
 ## 1.4.0
 
-- Connected status in device menu is now marked green
-- Display battery level
+### Features
 
+- Support Milk Mod Economy (thanks to PR by Sylphia Nox)
+- Active connections are now marked green
+- Display battery level (if supported)
+
+### Bug Fixes
+
+- Fix connection errors being attached to the wrong actuator
+- Reduce binary size greatly
 
 [Older Entries...](CHANGELOG.md)
