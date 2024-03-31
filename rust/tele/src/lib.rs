@@ -236,7 +236,7 @@ pub fn get_next_events_blocking(connection_events: &crossbeam_channel::Receiver<
             }
             TkConnectionEvent::DeviceAdded(device, battery_level) => {
                 let mut evt = SKSEModEvent::from("Tele_DeviceAdded", device.name());
-                evt.num_arg = battery_level.unwrap_or(0).into();
+                evt.num_arg = battery_level.unwrap_or(0.0);
                 evt
             }
             TkConnectionEvent::DeviceRemoved(device) => {
@@ -263,7 +263,7 @@ pub fn get_next_events_blocking(connection_events: &crossbeam_channel::Receiver<
                 SKSEModEvent::new("Tele_DeviceError", &err, 0.0)
             }
             TkConnectionEvent::BatteryLevel(device, battery_level) => {
-                SKSEModEvent::new("Tele_BatteryLevel", device.name(), battery_level.unwrap_or(0).into())
+                SKSEModEvent::new("Tele_BatteryLevel", device.name(), battery_level.unwrap_or(0.0))
             },
         };
         return Some(event);
@@ -427,7 +427,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.get_battery_level", 
         exec: |tk, actuator_id| {
             if let Some(actuator_status) = tk.status.get_actuator_status(actuator_id)  {
-                return actuator_status.battery_level.map(|x| x.to_string()).unwrap_or("".to_owned());
+                return actuator_status.battery_level.map(|x| ((x * 100.0) as i32).to_string()).unwrap_or("".to_owned());
             }
             "".into()
         },

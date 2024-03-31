@@ -17,7 +17,7 @@ use crate::{connection::TkConnectionEvent, settings::TkSettings};
 pub struct ActuatorStatus {
     pub actuator: Arc<Actuator>,
     pub connection_status: TkConnectionStatus,
-    pub battery_level: Option<i32>
+    pub battery_level: Option<f64>
 }
 
 pub struct Status {
@@ -129,7 +129,7 @@ impl Status {
         }
     }
 
-    fn set_status(&mut self, device: Arc<ButtplugClientDevice>, connection_status: TkConnectionStatus, battery_level: Option<i32>) {
+    fn set_status(&mut self, device: Arc<ButtplugClientDevice>, connection_status: TkConnectionStatus, battery_level: Option<f64>) {
         let new_actuators = get_actuators(vec![device.clone()])
             .into_iter()
             .map(|actuator| ActuatorStatus { 

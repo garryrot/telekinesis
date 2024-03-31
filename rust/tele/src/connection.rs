@@ -42,9 +42,9 @@ pub enum Task {
 pub enum TkConnectionEvent {
     Connected(String),
     ConnectionFailure(String),
-    DeviceAdded(Arc<ButtplugClientDevice>, Option<i32>),
+    DeviceAdded(Arc<ButtplugClientDevice>, Option<f64>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
-    BatteryLevel(Arc<ButtplugClientDevice>, Option<i32>),
+    BatteryLevel(Arc<ButtplugClientDevice>, Option<f64>),
     ActionStarted(Task, Vec<Arc<Actuator>>, Vec<String>, i32),
     ActionDone(Task, Duration, i32),
     ActionError(Arc<Actuator>, String),
@@ -53,18 +53,20 @@ pub enum TkConnectionEvent {
 pub async fn handle_connection(
     event_sender: crossbeam_channel::Sender<TkConnectionEvent>,
     event_sender_internal: crossbeam_channel::Sender<TkConnectionEvent>,
-    mut command_sender: tokio::sync::mpsc::Sender<ConnectionCommand>, // TODO: just use crossbeam?
+    command_sender: tokio::sync::mpsc::Sender<ConnectionCommand>, // TODO: just use crossbeam?
     mut command_receiver: tokio::sync::mpsc::Receiver<ConnectionCommand>,
     client: ButtplugClient,
     connection_type: TkConnectionType,
 ) {
     let sender_interla_clone = event_sender_internal.clone();
     let mut buttplug_events = client.event_stream();
-
     let sender_clone = event_sender.clone();
+    let try_send_events = move |event: TkConnectionEvent| {
+        try_send_event(&sender_clone, event.clone());
+        try_send_event(&event_sender_internal, event);
+    };
     Handle::current().spawn(async move {
         debug!("starting connection thread...");
-
         loop {
             let next_cmd = command_receiver.recv().await;
             if let Some(cmd) = next_cmd {
@@ -74,16 +76,11 @@ pub async fn handle_connection(
                         if let Err(err) = client.start_scanning().await {
                             let error = err.to_string();
                             error!("connection failure {}", error);
-                            let failure = TkConnectionEvent::ConnectionFailure(err.to_string());
-                            try_send_event(&sender_clone, failure.clone());
-                            try_send_event(&event_sender_internal, failure);
+                            try_send_events(TkConnectionEvent::ConnectionFailure(err.to_string()));
                         } else {
                             let settings = connection_type.to_string();
                             info!(settings, "connection success");
-
-                            let connected = TkConnectionEvent::Connected(settings.clone());
-                            try_send_event(&sender_clone, connected.clone());
-                            try_send_event(&event_sender_internal, connected);
+                            try_send_events(TkConnectionEvent::Connected(settings.clone()));
                         }
                     }
                     ConnectionCommand::StopScan => {
@@ -91,10 +88,7 @@ pub async fn handle_connection(
                             let error = err.to_string();
                             error!(error, "failed stop scan");
                             let err = TkConnectionEvent::ConnectionFailure(error);
-
-                            // todo move double send to inner fn
-                            try_send_event(&sender_clone, err.clone());
-                            try_send_event(&event_sender_internal, err);
+                            try_send_events(err);
                         }
                     }
                     ConnectionCommand::Disconect => {
@@ -113,10 +107,7 @@ pub async fn handle_connection(
                     ConnectionCommand::GetBattery => {
                         for device in client.devices() {
                             if device.connected() && device.has_battery_level() {
-                                let battery = device.battery_level().await.ok().map( |x| (x * 100.0) as i32 ); // TODO: Move this to GUI?
-                                let evt = TkConnectionEvent::BatteryLevel(device.clone(), battery);
-                                try_send_event(&sender_clone, evt.clone());
-                                try_send_event(&event_sender_internal, evt);
+                                try_send_events(TkConnectionEvent::BatteryLevel(device.clone(),device.battery_level().await.ok()));
                             }
                         }
                     },
@@ -143,9 +134,8 @@ pub async fn handle_connection(
                 let index = device.index();
                 let actuators = get_actuators(vec![device.clone()]);
                 info!(name, index, ?actuators, "device connected");
-
                 let battery = if device.has_battery_level() {
-                    device.battery_level().await.ok().map( |x| (x * 100.0) as i32 ) // TODO: Move to event handler?
+                    device.battery_level().await.ok()
                 } else {
                     None
                 };
