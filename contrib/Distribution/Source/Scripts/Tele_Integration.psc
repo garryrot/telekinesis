@@ -29,6 +29,9 @@ Quest Property Toys Auto Hidden
 ; Type SlaFrameworkScr
 Quest Property SexLabAroused Auto Hidden
 
+; Type MilkQuest
+Bool Property MilkMod Auto Hidden
+
 ; Using the type OSexIntegrationMain breaks the script loading
 Bool Property HasOStim Auto Hidden
 
@@ -69,6 +72,7 @@ Function InitDefaultListeners()
     InitDeviousDevicesHandlers()
     InitOstimHandlers()
     InitSexlabHandlers()
+    InitMilkModHandlers()
 EndFunction
 
 Function InitDefaultOnEventHandlers()
@@ -76,6 +80,7 @@ Function InitDefaultOnEventHandlers()
     DeviousDevices_Vibrate = true
     Toys_Vibrate = true
     Chainbeasts_Vibrate = true
+    MilkMod_Vibrate = true
 EndFunction
 
 Function UpdateRousingControlledSexScene()
@@ -168,6 +173,14 @@ Function ResetIntegrationSettings()
     DeviousDevices_Vibrate_Event_Nipple = DeviousDevices_Vibrate_Event_Nipple_Default
     DeviousDevices_Vibrate_Funscript = DeviousDevices_Vibrate_Funscript_Default
     DeviousDevices_Vibrate_Pattern = DeviousDevices_Vibrate_Pattern_Default
+    MilkMod_Vibrate = MilkMod_Vibrate_Default
+    MilkMod_Vibrate_DeviceSelector = MilkMod_Vibrate_DeviceSelector_Default
+    MilkMod_Vibrate_Event_Anal = MilkMod_Vibrate_Event_Anal_Default
+    MilkMod_Vibrate_Event_Vaginal = MilkMod_Vibrate_Event_Vaginal_Default
+    MilkMod_Vibrate_Event_Nipple = MilkMod_Vibrate_Event_Nipple_Default
+    MilkMod_Vibrate_Funscript = MilkMod_Vibrate_Funscript_Default
+    MilkMod_Vibrate_Pattern = MilkMod_Vibrate_Pattern_Default
+    MilkMod_Vibrate_Strength = MilkMod_Vibrate_Strength_Default
     Sexlab_Animation = Sexlab_Animation_Default
     Sexlab_Animation_DeviceSelector = Sexlab_Animation_DeviceSelector_Default
     Sexlab_Animation_Funscript = Sexlab_Animation_Funscript_Default
@@ -261,6 +274,117 @@ Event OnKeyUp(Int keyCode, Float HoldTime)
         TDevices.LogDebug("Unregistered keypress code: " + KeyCode)
     EndIf
 EndEvent
+
+
+;               __  ____ ____      __  ___          __   ______                                      
+;              /  |/  (_) / /__   /  |/  /___  ____/ /  / ____/________  ____  ____  ____ ___  __  __
+;             / /|_/ / / / //_/  / /|_/ / __ \/ __  /  / __/ / ___/ __ \/ __ \/ __ \/ __ `__ \/ / / /
+;            / /  / / / / ,<    / /  / / /_/ / /_/ /  / /___/ /__/ /_/ / / / / /_/ / / / / / / /_/ / 
+;           /_/  /_/_/_/_/|_|  /_/  /_/\____/\__,_/  /_____/\___/\____/_/ /_/\____/_/ /_/ /_/\__, /  
+;                                                                                           /____/   
+
+
+Int _MilkModVibrateHandle = -1
+Int Property MilkMod_Vibrate_DeviceSelector = 0 Auto Hidden
+Int Property MilkMod_Vibrate_DeviceSelector_Default = 0 AutoReadOnly Hidden
+String Property MilkMod_Vibrate_Event_Anal = "Anal" Auto Hidden
+String Property MilkMod_Vibrate_Event_Anal_Default = "Anal" Auto Hidden
+String Property MilkMod_Vibrate_Event_Vaginal = "Vaginal" Auto Hidden
+String Property MilkMod_Vibrate_Event_Vaginal_Default = "Vaginal" Auto Hidden
+String Property MilkMod_Vibrate_Event_Nipple = "Nipple" Auto Hidden
+String Property MilkMod_Vibrate_Event_Nipple_Default = "Nipple" Auto Hidden
+Int Property MilkMod_Vibrate_Pattern = 0 Auto Hidden
+Int Property MilkMod_Vibrate_Pattern_Default = 0 AutoReadOnly Hidden
+Bool Property MilkMod_Vibrate_Default = true AutoReadOnly Hidden
+String Property MilkMod_Vibrate_Funscript = "30_Sawtooth" Auto Hidden
+String Property MilkMod_Vibrate_Funscript_Default = "30_Sawtooth" Auto Hidden
+Int Property MilkMod_Vibrate_Strength = 60 Auto Hidden
+Int Property MilkMod_Vibrate_Strength_Default = 60 Auto Hidden
+
+Bool _MilkMod_Vibrate = false
+Bool Property MilkMod_Vibrate Hidden
+    Function Set(Bool enable)
+        _MilkMod_Vibrate = enable
+    EndFunction
+    Bool Function Get()
+        return _MilkMod_Vibrate
+    EndFunction
+EndProperty
+
+Function InitMilkModHandlers()
+	RegisterForModEvent("MilkQuest.StopMilkingMachine",  "OnMilkModVibrateEffectStop")	
+    RegisterForModEvent("MilkQuest.StartMilkingMachine", "OnStartMilkingMachine")
+	RegisterForModEvent("MilkQuest.FeedingStage", "OnFeedingStage")
+	RegisterForModEvent("MilkQuest.MilkingStage",  "onMilkingStage")
+	RegisterForModEvent("MilkQuest.FuckMachineStage", "OnFuckMachineStage")
+EndFunction
+
+Event OnStartMilkingMachine(Form Who, int mpas, int MilkingType)
+    Debug.Trace("[Tele] Milk Mod Handler vibrating on milking", 0)
+    If !_MilkMod_Vibrate || Who != playerref
+        return
+    EndIf
+
+    String[] events = new String[3]
+    events[1] = MilkMod_Vibrate_Event_Anal
+    events[2] = MilkMod_Vibrate_Event_Nipple
+
+    TDevices.StopHandle(_MilkModVibrateHandle)
+    Int StartMilkingStrength = Math.Floor(MilkMod_Vibrate_Strength * 0.6)
+    _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, StartMilkingStrength, events)
+EndEvent
+
+Event OnFuckMachineStage(Form Who, int mpas, int MilkingType)
+    Debug.Trace("[Tele] Milk Mod Handler vibrating on Fuck Machine", 0)
+    If !_MilkMod_Vibrate || Who != playerref
+        return
+    EndIf
+
+    String[] events = new String[3]
+    events[0] = MilkMod_Vibrate_Event_Vaginal
+    events[1] = MilkMod_Vibrate_Event_Anal
+
+    TDevices.StopHandle(_MilkModVibrateHandle)
+    _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, MilkMod_Vibrate_Strength, events)
+EndEvent
+
+Event onMilkingStage(Form Who, int mpas, int MilkingType)
+    Debug.Trace("[Tele] Milk Mod Handler vibrating on milking", 0)
+    If !_MilkMod_Vibrate || Who != playerref
+        return
+    EndIf
+
+    String[] events = new String[3]
+    events[1] = MilkMod_Vibrate_Event_Anal
+    events[2] = MilkMod_Vibrate_Event_Nipple
+
+    TDevices.StopHandle(_MilkModVibrateHandle)
+    _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, MilkMod_Vibrate_Strength, events)
+EndEvent
+
+Event OnFeedingStage(Form Who, int mpas, int MilkingType)
+    Debug.Trace("[Tele] Milk Mod Handler vibrating on feeding", 0)
+    If !_MilkMod_Vibrate || Who != playerref
+        return
+    EndIf
+
+    String[] events = new String[3]
+    events[1] = MilkMod_Vibrate_Event_Anal
+    events[2] = MilkMod_Vibrate_Event_Nipple
+
+    TDevices.StopHandle(_MilkModVibrateHandle)
+    Int StartMilkingStrength = Math.Floor(MilkMod_Vibrate_Strength * 0.6)
+    _MilkModVibrateHandle = StartVibration(MilkMod_Vibrate_DeviceSelector, -1, MilkMod_Vibrate_Pattern, MilkMod_Vibrate_Funscript, StartMilkingStrength, events)
+EndEvent
+
+Event OnMilkModVibrateEffectStop(Form Who, int mpas, int MilkingType)
+    If !_MilkMod_Vibrate || Who != playerref
+        return
+    EndIf
+
+    TDevices.StopHandle(_MilkModVibrateHandle)
+EndEvent
+
 
 
 ;               ____            _                      ____            _               
