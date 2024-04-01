@@ -226,7 +226,7 @@ impl Telekinesis {
                         .await
                 }
                 Task::Linear(_, _) => player.play_linear(cmd.duration, cmd.fscript.unwrap()).await,
-                Task::LinearOscillate(speed, _) => player.play_oscillate_linear(cmd.duration, speed, LinearRange::max()).await,
+                Task::LinearStroke(speed, _) => player.play_linear_stroke(cmd.duration, speed, LinearRange::max()).await,
             };
             info!(handle, "done");
             let event = match result {
@@ -274,17 +274,17 @@ impl fmt::Debug for Telekinesis {
 
 #[cfg(test)]
 mod tests {
+    use buttplug::core::message::{ActuatorType, DeviceAdded};
+    use std::time::Instant;
+    use std::{thread, time::Duration, vec};
+    use funscript::FScript;
+    
+    use crate::*;
+    use bp_fakes::*;
+    use bp_scheduler::speed::Speed;
     use crate::pattern::read_pattern;
     use crate::status::TkConnectionStatus;
     use crate::telekinesis::in_process_connector;
-    use crate::*;
-    use bp_fakes::{scalar, FakeConnectorCallRegistry, FakeDeviceConnector};
-    use bp_scheduler::speed::Speed;
-    use buttplug::core::message::{ActuatorType, DeviceAdded};
-    use funscript::FScript;
-    use std::time::Instant;
-    use std::{thread, time::Duration, vec};
-
     use super::Telekinesis;
 
     macro_rules! assert_timeout {
@@ -307,7 +307,7 @@ mod tests {
     }
 
     /// Vibrate
-    fn tk_scalar(
+    fn test_cmd(
         tk: &mut Telekinesis, 
         task: Task, 
         duration: Duration,
@@ -324,13 +324,13 @@ mod tests {
     } 
 
     #[test]
-    fn vibrate_infinitely_and_then_stop() {
+    fn test_vibrate_and_stop() {
         // arrange
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
-        let handle = tk_scalar(
+        let handle = test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::MAX,
@@ -338,7 +338,6 @@ mod tests {
             None,
             &[ActuatorType::Vibrate],
         );
-
         thread::sleep(Duration::from_secs(1));
         call_registry.get_device(1)[0].assert_strenth(1.0);
 
@@ -348,14 +347,14 @@ mod tests {
     }
 
     #[test]
-    fn vibrate_linear_then_cancel() {
+    fn test_vibrate_and_stop_all() {
         // arrange
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
         thread::sleep(Duration::from_secs(1));
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_secs(1),
@@ -385,7 +384,7 @@ mod tests {
         for actuator_id in tk.status.get_known_actuator_ids() {
             tk.settings.set_enabled(&actuator_id, true);
         }
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::new(100)),
             Duration::from_millis(1),
@@ -409,7 +408,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
 
         // act
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -437,7 +436,7 @@ mod tests {
         tk.settings.set_enabled("vib2 (Vibrate)", false);
 
         // act
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -488,7 +487,7 @@ mod tests {
             .set_enabled(known_actuator_ids.first().unwrap(), true);
 
         let fscript = read_pattern(&pattern_path, pattern_name, vibration_pattern).unwrap();
-        let handle = tk_scalar(
+        let handle = test_cmd(
             &mut tk,
             Task::Pattern(Speed::max(), ActuatorType::Vibrate, pattern_name.into()),
             duration,
@@ -519,7 +518,7 @@ mod tests {
         for actuator in tk.status.actuators() {
             tk.settings.set_enabled(actuator.device.name(), true);
         }
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::MAX,
@@ -554,7 +553,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
         tk.settings.set_enabled("vib1 (Vibrate)", true);
         tk.settings.set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -644,7 +643,7 @@ mod tests {
         tk.settings.set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
         tk.settings.set_events("vib2 (Vibrate)", &[String::from("bogus")]);
 
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -665,7 +664,7 @@ mod tests {
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
         tk.settings.set_enabled("vib1 (Vibrate)", true);
         tk.settings.set_events("vib1 (Vibrate)", &[String::from("some event")]);
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
             Duration::from_millis(1),
@@ -706,7 +705,7 @@ mod tests {
             TkConnectionType::Test,
         )
         .unwrap();
-    tk_scalar(
+    test_cmd(
         &mut tk,
             Task::Scalar(Speed::new(22)),
             Duration::from_millis(1),
@@ -725,7 +724,7 @@ mod tests {
             TkConnectionType::Test,
         )
         .unwrap();
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::new(10)),
             Duration::from_millis(100),
@@ -733,7 +732,7 @@ mod tests {
             None,
             &[ActuatorType::Vibrate],
         );
-        tk_scalar(
+        test_cmd(
             &mut tk,
             Task::Scalar(Speed::new(20)),
             Duration::from_millis(200),
