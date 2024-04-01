@@ -137,7 +137,7 @@ Int Function Linear(Int speed, Float duration_sec = -1.0, String[] events)
     { Move all specified devices for the given duration
       Returns an Int handle to stop the  early, see StopHandle(Int) }
     If Connects()
-        Int handle = Tele_Api.Tele_Control("linear.oscillate", InRange(speed, 0, 100), duration_sec, "", events)
+        Int handle = Tele_Api.Tele_Control("linear.stroke", InRange(speed, 0, 100), duration_sec, "", events)
         Trace("(Linear) speed='" + speed + "' duration='" + duration_sec + "' events=" + events + " handle=" + handle)
         return handle
     EndIf

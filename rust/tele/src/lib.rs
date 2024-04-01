@@ -382,11 +382,11 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
-        name: "linear.oscillate",
+        name: "linear.stroke",
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
             let cmd = DeviceCommand::from_inputs(
                 Task::LinearOscillate(Speed::new(speed.into()), pattern_name.into()),
-                &[ActuatorType::Oscillate],
+                &[ActuatorType::Position],
                 time_sec,
                 body_parts,
                 None);
