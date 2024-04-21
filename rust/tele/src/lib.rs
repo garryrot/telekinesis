@@ -23,7 +23,7 @@ use crate::{
     input::*,
     telekinesis::*,
     connection::*,
-    settings::*,
+    settings::*
 };
 
 mod api;

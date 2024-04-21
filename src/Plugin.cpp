@@ -4,6 +4,7 @@
 #include "../rust/target/cxxbridge/plug/src/logging.rs.h"
 #include <thread>
 #include <chrono>
+#include <codecvt> 
 #include <stdlib.h>     //for using the function sleep
 
 using namespace RE;
@@ -139,12 +140,23 @@ void InitializePapyrus() {
     }
 }
 
+std::string unicode_to_utf8(std::wstring in) {
+    using convert_type = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_type, wchar_t> converter;
+    std::string converted_str = converter.to_bytes( in );
+    return converted_str;
+}
+
 std::string GetLogFile() {
     auto path = log_directory();
     if (!path) {
         report_and_fail("Unable to lookup SKSE logs directory.");
     }
-    return std::format("{}\\{}.log", path->string(), PluginDeclaration::GetSingleton()->GetName());
+    std::optional<std::string> utf8Path = unicode_to_utf8(path->wstring());
+    if (!utf8Path.has_value()) {
+        report_and_fail("Fail decoding path to utf8");
+    }
+    return std::format("{}\\{}.log", utf8Path.value(), PluginDeclaration::GetSingleton()->GetName());
 }
 
 SKSEPluginLoad(const LoadInterface* skse) {
