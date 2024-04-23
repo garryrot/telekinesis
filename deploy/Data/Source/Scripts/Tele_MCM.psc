@@ -643,6 +643,7 @@ Event OnPageReset(String page)
         AddToggleOptionST("OPTION_LOG_EVENTS", "Device Starts Moving", TDevices.LogDeviceEvents)
         AddToggleOptionST("OPTION_LOG_EVENTS_ENDS", "Device Stops Moving", TDevices.LogDeviceEvents)
         AddToggleOptionST("OPTION_LOG_DEBUG", "Other messages", TDevices.LogDebugEvents)
+        AddToggleOptionST("OPTION_LOG_ERROS", "Errors", TDevices.LogErrors)
 
         AddHeaderOption("Spells")
         AddToggleOptionST("ACTION_ADD_SPELLS_TO_PLAYER", "Learn debug spells", _DebugSpellsAdded)
@@ -2277,6 +2278,21 @@ State OPTION_LOG_CONNECTS
 
     Event OnHighlightST()
         SetInfoText("Show notification when a device connects/disconnects")
+    EndEvent
+EndState
+
+State OPTION_LOG_ERROS
+    Event OnSelectST()
+        TDevices.LogErrors = !TDevices.LogErrors
+        SetToggleOptionValueST(TDevices.LogErrors)
+    EndEvent
+    
+    Event OnDefaultST()
+        SetToggleOptionValueST(TDevices.LogErrors)
+    EndEvent
+
+    Event OnHighlightST()
+        SetInfoText("Red notification on connection or device errors")
     EndEvent
 EndState
 

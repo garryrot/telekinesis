@@ -1,4 +1,4 @@
-# Telekinesis (Bluetooth Toy Control for Skyrim) 1.4.0
+# Telekinesis (Bluetooth Toy Control for Skyrim) 1.4.1
 
 Telekinesis is a mod that brings native support for naughty devices (bluetooth or others) to Skyrim SE, AE.
 
@@ -112,6 +112,16 @@ If anything fails or behaves in an unexpected way, include the Papyrus logs `Pyp
 This mod is free software and can be used under the terms of the [Apache License V2](LICENSE) 
 
 ## Changelog
+
+## 1.4.1
+
+### Features
+
+- Add option to disable red error notifications (Page "Debug")
+
+### Bugfixes
+
+- Fix systems with unicode characters in skyrim path (previous version will crash on load due to encoding issues)
 
 ## 1.4.0
 

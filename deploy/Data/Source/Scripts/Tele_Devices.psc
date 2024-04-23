@@ -11,7 +11,7 @@ Spell Property Tele_Stop Auto
  
 Int Property MajorVersion = 1 AutoReadOnly Hidden
 Int Property MinorVersion = 4 AutoReadOnly Hidden
-Int Property PatchVersion = 0 AutoReadOnly Hidden
+Int Property PatchVersion = 1 AutoReadOnly Hidden
 String Property Revision = "" AutoReadOnly Hidden
 
 String Property Version Hidden
@@ -20,6 +20,7 @@ String Property Version Hidden
     EndFunction
 EndProperty 
 
+Bool Property LogErrors = true Auto Hidden
 Bool Property LogDeviceConnects = true Auto Hidden
 Bool Property LogDeviceEvents = false Auto Hidden
 Bool Property LogDeviceEventEnd = false Auto Hidden
@@ -297,7 +298,9 @@ EndFunction
 
 Function LogError(String msg)
     { Log Telekinesis Error }
-    Debug.Notification("<font color='#fc3503'>[Tele] " + msg)
+    If LogErrors
+        Debug.Notification("<font color='#fc3503'>[Tele] " + msg)
+    EndIf
     Trace(msg, 2)
 EndFunction
 
