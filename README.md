@@ -18,7 +18,7 @@ Watch the demo video:
 
 ## 1. Installation
 
-1. Install `Telekinesis.VERSION.7z` with a mod manager, which you can download from [releases page](https://github.com/garryrot/telekinesis/releases/tag/1.4.1)
+1. Install `Telekinesis.VERSION.7z` with a mod manager. You can download the package on the [releases page](https://github.com/garryrot/telekinesis/releases)
 2. Install dependencies `SKSE64`, `SkyUI`, `Address Library for SKSE Plugins`
 3. Install optional dependencies `Sexlab`, `Sexlab Arousal`, `Toys & Love`, `Ostim Standalone`
 
