@@ -11,28 +11,12 @@ use buttplug::core::message::ActuatorType;
 
 use bp_scheduler::{actuator::Actuator, settings::{ActuatorSettings, LinearRange, LinearSpeedScaling, ScalarRange}};
 
-use crate::input::sanitize_name_list;
+use crate::{connection::TkConnectionType, input::sanitize_name_list};
 
 pub static DEFAULT_PATTERN_PATH: &str = "Data\\SKSE\\Plugins\\Telekinesis\\Patterns";
 pub static SETTINGS_PATH: &str = "Data\\SKSE\\Plugins";
 pub static SETTINGS_FILE: &str = "Telekinesis.v2.json";
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum TkConnectionType {
-    InProcess,
-    WebSocket(String),
-    Test,
-}
-
-impl Display for TkConnectionType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TkConnectionType::InProcess => write!(f, "In-Process"),
-            TkConnectionType::WebSocket(host) => write!(f, "WebSocket {}", host),
-            TkConnectionType::Test => write!(f, "Test"),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TkLogLevel {

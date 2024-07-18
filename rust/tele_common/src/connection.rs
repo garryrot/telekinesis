@@ -14,10 +14,11 @@ use buttplug::{
 };
 use crossbeam_channel::Sender;
 use futures::StreamExt;
+use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use tracing::{debug, error, info};
 
-use crate::*;
+// use crate::*;
 
 /// Global commands on connection level, i.e. connection handling
 /// or emergency stop
@@ -48,6 +49,23 @@ pub enum TkConnectionEvent {
     ActionStarted(Task, Vec<Arc<Actuator>>, Vec<String>, i32),
     ActionDone(Task, Duration, i32),
     ActionError(Arc<Actuator>, String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum TkConnectionType {
+    InProcess,
+    WebSocket(String),
+    Test,
+}
+
+impl Display for TkConnectionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TkConnectionType::InProcess => write!(f, "In-Process"),
+            TkConnectionType::WebSocket(host) => write!(f, "WebSocket {}", host),
+            TkConnectionType::Test => write!(f, "Test"),
+        }
+    }
 }
 
 pub async fn handle_connection(

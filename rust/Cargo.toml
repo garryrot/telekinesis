@@ -2,6 +2,7 @@
 members = [
     "bp_fakes",
     "bp_scheduler",
+    "tele_common",
     "tele"
 ]
 resolver = "2"

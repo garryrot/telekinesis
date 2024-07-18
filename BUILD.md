@@ -2,10 +2,10 @@
 
 This build outputs `Telekinesis.dll`, a SKSE64 plugin based on CommonLibSSE NG.
 
-There should really be no need for you to do this, unless you:
+There is no need for you to do this, unless you...
 
-- Want to port the native library to a skyrim version that I currently don't support
-- Want to fork this project and change the native library
+- want to port the native library to a skyrim version that I currently don't support
+- want to fork this project and change the native library
 
 ## Build Requirements
 

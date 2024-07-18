@@ -1,7 +1,10 @@
 
 use std::sync::{Arc, Mutex};
-use itertools::Itertools;
 
+use itertools::Itertools;
+use tele_common::{
+    api::*, connection::{Task, TkConnectionEvent, TkConnectionType}, input::{parse_csv, read_scalar_actuator, DeviceCommand}, pattern::{get_pattern_names, read_pattern}, settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH}, telekinesis::{Telekinesis, ERROR_HANDLE}
+};
 use tracing::{
     instrument,
     info
@@ -17,23 +20,8 @@ use bp_scheduler::{
 };
 
 use ffi::SKSEModEvent;
-use crate::{
-    api::*,
-    pattern::*,
-    input::*,
-    telekinesis::*,
-    connection::*,
-    settings::*
-};
 
-mod api;
-mod connection;
-mod input;
 mod logging;
-mod pattern;
-mod settings;
-mod status;
-pub mod telekinesis;
 
 #[derive(Debug)]
 pub struct TkApi {
@@ -654,4 +642,82 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "patterns.stroker",
         exec: |tk| get_pattern_names(&tk.settings.pattern_path, false),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use bp_scheduler::speed::Speed;
+    use buttplug::core::message::ActuatorType;
+    use funscript::FScript;
+    use tele_common::{connection::{Task, TkConnectionType}, input::DeviceCommand, telekinesis::{in_process_connector, Telekinesis}};
+
+    use crate::get_next_events_blocking;
+
+    /// Vibrate
+    pub fn test_cmd(
+        tk: &mut Telekinesis, 
+        task: Task, 
+        duration: Duration,
+        body_parts: Vec<String>,
+        fscript: Option<FScript>,
+        actuator_types: &[ActuatorType]) -> i32 {
+            tk.dispatch_cmd(DeviceCommand {
+                task,
+                duration,
+                fscript,
+                body_parts,
+                actuator_types: actuator_types.to_vec(),
+            })
+    } 
+    
+
+    /// Events
+    #[test]
+    fn process_next_events_after_action_returns_1() {
+        let mut tk = Telekinesis::connect_with(
+            || async move { in_process_connector() },
+            None,
+            TkConnectionType::Test,
+        )
+        .unwrap();
+    test_cmd(
+        &mut tk,
+            Task::Scalar(Speed::new(22)),
+            Duration::from_millis(1),
+            vec![],
+            None,
+            &[ActuatorType::Vibrate],
+        );
+        get_next_events_blocking(&tk.connection_events);
+    }
+
+    #[test]
+    fn process_next_events_works() {
+        let mut tk = Telekinesis::connect_with(
+            || async move { in_process_connector() },
+            None,
+            TkConnectionType::Test,
+        )
+        .unwrap();
+        test_cmd(
+            &mut tk,
+            Task::Scalar(Speed::new(10)),
+            Duration::from_millis(100),
+            vec![],
+            None,
+            &[ActuatorType::Vibrate],
+        );
+        test_cmd(
+            &mut tk,
+            Task::Scalar(Speed::new(20)),
+            Duration::from_millis(200),
+            vec![],
+            None,
+            &[ActuatorType::Vibrate],
+        );
+        get_next_events_blocking(&tk.connection_events);
+        get_next_events_blocking(&tk.connection_events);
+    }
 }

@@ -31,11 +31,12 @@ use bp_scheduler::settings::*;
 use bp_scheduler::speed::*;
 use bp_scheduler::*;
 
+use crate::input::DeviceCommand;
+use crate::input::TkParams;
+use crate::status::Status;
 use crate::{
     connection::*,
     settings::*,
-    input::*,
-    status::*
 };
 
 #[cfg(feature = "testing")]
@@ -275,6 +276,9 @@ impl fmt::Debug for Telekinesis {
 #[cfg(test)]
 mod tests {
     use buttplug::core::message::{ActuatorType, DeviceAdded};
+    use connection::{Task, TkConnectionType};
+    use input::DeviceCommand;
+    use settings::TkSettings;
     use std::time::Instant;
     use std::{thread, time::Duration, vec};
     use funscript::FScript;
@@ -307,7 +311,7 @@ mod tests {
     }
 
     /// Vibrate
-    fn test_cmd(
+    pub fn test_cmd(
         tk: &mut Telekinesis, 
         task: Task, 
         duration: Duration,
@@ -693,55 +697,6 @@ mod tests {
             TkConnectionStatus::NotConnected,
             "Non-existing device returns not connected"
         );
-    }
-
-    /// Events
-
-    #[test]
-    fn process_next_events_after_action_returns_1() {
-        let mut tk = Telekinesis::connect_with(
-            || async move { in_process_connector() },
-            None,
-            TkConnectionType::Test,
-        )
-        .unwrap();
-    test_cmd(
-        &mut tk,
-            Task::Scalar(Speed::new(22)),
-            Duration::from_millis(1),
-            vec![],
-            None,
-            &[ActuatorType::Vibrate],
-        );
-        get_next_events_blocking(&tk.connection_events);
-    }
-
-    #[test]
-    fn process_next_events_works() {
-        let mut tk = Telekinesis::connect_with(
-            || async move { in_process_connector() },
-            None,
-            TkConnectionType::Test,
-        )
-        .unwrap();
-        test_cmd(
-            &mut tk,
-            Task::Scalar(Speed::new(10)),
-            Duration::from_millis(100),
-            vec![],
-            None,
-            &[ActuatorType::Vibrate],
-        );
-        test_cmd(
-            &mut tk,
-            Task::Scalar(Speed::new(20)),
-            Duration::from_millis(200),
-            vec![],
-            None,
-            &[ActuatorType::Vibrate],
-        );
-        get_next_events_blocking(&tk.connection_events);
-        get_next_events_blocking(&tk.connection_events);
     }
 
     fn wait_for_connection(
