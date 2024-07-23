@@ -1,5 +1,6 @@
 use anyhow::Error;
 use anyhow::anyhow;
+use settings::linear::LinearRange;
 
 use std::{
     fmt::{self},
@@ -27,17 +28,14 @@ use buttplug::{
     },
 };
 
-use bp_scheduler::settings::*;
 use bp_scheduler::speed::*;
 use bp_scheduler::*;
 
 use crate::input::DeviceCommand;
 use crate::input::TkParams;
+use crate::settings::TkSettings;
 use crate::status::Status;
-use crate::{
-    connection::*,
-    settings::*,
-};
+use crate::connection::*;
 
 #[cfg(feature = "testing")]
 use bp_fakes::FakeDeviceConnector;
@@ -112,7 +110,7 @@ impl Telekinesis {
 pub fn get_test_connection(settings: TkSettings) -> Result<Telekinesis, Error> {
     Telekinesis::connect_with(
         || async move { FakeDeviceConnector::device_demo().0 },
-        Some(settings),
+        Some(options),
         TkConnectionType::Test,
     )
 }
@@ -200,9 +198,9 @@ impl Telekinesis {
             &actuators,
             &cmd.body_parts,
             &cmd.actuator_types,
-            &self.settings.devices,
+            &self.settings.device_settings.devices,
         );
-        let settings = devices.iter().map(|x| self.settings.get_or_create(x.identifier()).actuator_settings ).collect();
+        let settings = devices.iter().map(|x| self.settings.device_settings.get_or_create(x.identifier()).actuator_settings ).collect();
         let player = self.scheduler.create_player_with_settings(devices, settings);
         let handle = player.handle;
 
@@ -386,7 +384,7 @@ mod tests {
                 .unwrap();
         tk.await_connect(count);
         for actuator_id in tk.status.get_known_actuator_ids() {
-            tk.settings.set_enabled(&actuator_id, true);
+            tk.settings.device_settings.set_enabled(&actuator_id, true);
         }
         test_cmd(
             &mut tk,
@@ -437,7 +435,7 @@ mod tests {
             ],
             None,
         );
-        tk.settings.set_enabled("vib2 (Vibrate)", false);
+        tk.settings.device_settings.set_enabled("vib2 (Vibrate)", false);
 
         // act
         test_cmd(
@@ -487,7 +485,7 @@ mod tests {
         tk.await_connect(1);
         thread::sleep(Duration::from_secs(2));
         let known_actuator_ids = tk.status.get_known_actuator_ids();
-        tk.settings
+        tk.settings.device_settings
             .set_enabled(known_actuator_ids.first().unwrap(), true);
 
         let fscript = read_pattern(&pattern_path, pattern_name, vibration_pattern).unwrap();
@@ -520,7 +518,7 @@ mod tests {
         ));
 
         for actuator in tk.status.actuators() {
-            tk.settings.set_enabled(actuator.device.name(), true);
+            tk.settings.device_settings.set_enabled(actuator.device.name(), true);
         }
         test_cmd(
             &mut tk,
@@ -555,8 +553,8 @@ mod tests {
     fn settings_are_trimmed_and_lowercased() {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
-        tk.settings.set_enabled("vib1 (Vibrate)", true);
-        tk.settings.set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
+        tk.settings.device_settings.set_enabled("vib1 (Vibrate)", true);
+        tk.settings.device_settings.set_events("vib1 (Vibrate)", &[String::from(" SoMe EvEnT    ")]);
         test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
@@ -601,7 +599,7 @@ mod tests {
     #[test]
     fn get_devices_contains_devices_from_settings() {
         let mut settings = TkSettings::default();
-        settings.set_enabled("foreign", true);
+        settings.device_settings.set_enabled("foreign", true);
 
         let (mut tk, _) = wait_for_connection(vec![], Some(settings));
         assert!(
@@ -627,12 +625,12 @@ mod tests {
             None,
         );
 
-        tk.settings.set_events("vib2", one_event);
-        tk.settings.set_events("vib3", two_events);
+        tk.settings.device_settings.set_events("vib2", one_event);
+        tk.settings.device_settings.set_events("vib3", two_events);
 
-        assert_eq!(tk.settings.get_events("vib1"), empty);
-        assert_eq!(tk.settings.get_events("vib2"), one_event);
-        assert_eq!(tk.settings.get_events("vib3"), two_events);
+        assert_eq!(tk.settings.device_settings.get_events("vib1"), empty);
+        assert_eq!(tk.settings.device_settings.get_events("vib2"), one_event);
+        assert_eq!(tk.settings.device_settings.get_events("vib3"), two_events);
     }
 
     #[test]
@@ -644,8 +642,8 @@ mod tests {
             ],
             None,
         );
-        tk.settings.set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
-        tk.settings.set_events("vib2 (Vibrate)", &[String::from("bogus")]);
+        tk.settings.device_settings.set_events("vib1 (Vibrate)", &[String::from("selected_event")]);
+        tk.settings.device_settings.set_events("vib2 (Vibrate)", &[String::from("bogus")]);
 
         test_cmd(
             &mut tk,
@@ -666,8 +664,8 @@ mod tests {
     fn event_is_trimmed_and_ignores_casing() {
         let (mut tk, call_registry) =
             wait_for_connection(vec![scalar(1, "vib1", ActuatorType::Vibrate)], None);
-        tk.settings.set_enabled("vib1 (Vibrate)", true);
-        tk.settings.set_events("vib1 (Vibrate)", &[String::from("some event")]);
+        tk.settings.device_settings.set_enabled("vib1 (Vibrate)", true);
+        tk.settings.device_settings.set_events("vib1 (Vibrate)", &[String::from("some event")]);
         test_cmd(
             &mut tk,
             Task::Scalar(Speed::max()),
@@ -719,7 +717,7 @@ mod tests {
         tk.await_connect(count);
 
         for actuator in tk.status.actuators() {
-            tk.settings.set_enabled(actuator.identifier(), true);
+            tk.settings.device_settings.set_enabled(actuator.identifier(), true);
         }
         (tk, call_registry)
     }

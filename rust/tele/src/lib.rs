@@ -3,7 +3,12 @@ use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
 use tele_common::{
-    api::*, connection::{Task, TkConnectionEvent, TkConnectionType}, input::{parse_csv, read_scalar_actuator, DeviceCommand}, pattern::{get_pattern_names, read_pattern}, settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH}, telekinesis::{Telekinesis, ERROR_HANDLE}
+    api::*, 
+    connection::*, 
+    input::*, 
+    pattern::*, 
+    settings::*, 
+    telekinesis::*
 };
 use tracing::{
     instrument,
@@ -15,7 +20,7 @@ use cxx::{CxxString, CxxVector};
 use buttplug::core::message::ActuatorType;
 
 use bp_scheduler::{
-    settings::*, 
+    settings::{ActuatorSettings, linear::LinearRange}, 
     speed::*
 };
 
@@ -434,7 +439,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_str1(ApiQryStr1 {
         name: "device.actuator_type",
         default: "None",
-        exec: |tk, actuator_id| match tk.settings.try_get_actuator_settings(actuator_id) {
+        exec: |tk, actuator_id| match tk.settings.device_settings.try_get_actuator_settings(actuator_id) {
             ActuatorSettings::None => {
                 if let Some(entry) = tk.status.get_actuator(actuator_id) {
                     return match entry.actuator {
@@ -461,44 +466,44 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_cmd1(ApiCmd1 {
         name: "device.settings.enable",
         exec: |tk, actuator_id| {
-            tk.settings.set_enabled(actuator_id, true);
+            tk.settings.device_settings.set_enabled(actuator_id, true);
             true
         },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.settings.disable",
         exec: |tk, actuator_id| {
-            tk.settings.set_enabled(actuator_id, false);
+            tk.settings.device_settings.set_enabled(actuator_id, false);
             true
         },
     })
     .def_qry_bool_1(ApiQryBool1 {
         name: "device.settings.enabled",
-        exec: |tk, actuator_id| tk.settings.get_enabled(actuator_id),
+        exec: |tk, actuator_id| tk.settings.device_settings.get_enabled(actuator_id),
     })
     .def_cmd2(ApiCmd2 {
         name: "device.settings.events",
         exec: |tk, actuator_id, events| {
-            tk.settings.set_events(actuator_id, &parse_csv(events));
+            tk.settings.device_settings.set_events(actuator_id, &parse_csv(events));
             true
         },
     })
     .def_qry_lst_1(ApiQryList1 {
         name: "device.settings.events",
-        exec: |tk, actuator_id| tk.settings.get_events(actuator_id),
+        exec: |tk, actuator_id| tk.settings.device_settings.get_events(actuator_id),
     })
     .def_qry_str1(ApiQryStr1 {
         name: "device.scalar.min_speed",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_scalar(actuator_id, |x| x.min_speed.to_string())
+            tk.settings.device_settings
+                .update_scalar(actuator_id, |x| x.min_speed.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.scalar.min_speed",
         exec: |tk, actuator_id, percent| {
-            tk.settings.access_scalar(actuator_id, |x| {
+            tk.settings.device_settings.update_scalar(actuator_id, |x| {
                 x.min_speed = percent.parse().unwrap_or(0);
             });
             true
@@ -508,14 +513,14 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.scalar.max_speed",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_scalar(actuator_id, |x| x.max_speed.to_string())
+            tk.settings.device_settings
+                .update_scalar(actuator_id, |x| x.max_speed.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.scalar.max_speed",
         exec: |tk, actuator_id, percent| {
-            tk.settings.access_scalar(actuator_id, |x| {
+            tk.settings.device_settings.update_scalar(actuator_id, |x| {
                 x.max_speed = percent.parse().unwrap_or(100);
             });
             true
@@ -525,14 +530,14 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.scalar.factor",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_scalar(actuator_id, |x| x.factor.to_string())
+            tk.settings.device_settings
+                .update_scalar(actuator_id, |x| x.factor.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.scalar.factor",
         exec: |tk, actuator_id, factor| {
-            tk.settings.access_scalar(actuator_id, |x| {
+            tk.settings.device_settings.update_scalar(actuator_id, |x| {
                 x.factor = factor.parse().unwrap_or(1.0);
             });
             true
@@ -542,14 +547,14 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.min_ms",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_linear(actuator_id, |x| x.min_ms.to_string())
+            tk.settings.device_settings
+                .update_linear(actuator_id, |x| x.min_ms.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.linear.min_ms",
         exec: |tk, actuator_id, percent| {
-            tk.settings.access_linear(actuator_id, |x| {
+            tk.settings.device_settings.update_linear(actuator_id, |x| {
                 x.min_ms = percent.parse().unwrap_or(0);
             });
             true
@@ -559,15 +564,15 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.max_ms",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_linear(actuator_id, |x| x.max_ms.to_string())
+            tk.settings.device_settings
+                .update_linear(actuator_id, |x| x.max_ms.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.linear.max_ms",
         exec: |tk, actuator_id, percent| {
-            tk.settings
-                .access_linear(actuator_id, |x| x.max_ms = percent.parse().unwrap_or(100));
+            tk.settings.device_settings
+                .update_linear(actuator_id, |x| x.max_ms = percent.parse().unwrap_or(100));
             true
         },
     })
@@ -575,15 +580,15 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.min_pos",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_linear(actuator_id, |x| x.min_pos.to_string())
+            tk.settings.device_settings
+                .update_linear(actuator_id, |x| x.min_pos.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.linear.min_pos",
         exec: |tk, actuator_id, percent| {
-            tk.settings
-                .access_linear(actuator_id, |x| x.min_pos = percent.parse().unwrap_or(0.0));
+            tk.settings.device_settings
+                .update_linear(actuator_id, |x| x.min_pos = percent.parse().unwrap_or(0.0));
             true
         },
     })
@@ -591,14 +596,14 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.max_pos",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings
-                .access_linear(actuator_id, |x| x.max_pos.to_string())
+            tk.settings.device_settings
+                .update_linear(actuator_id, |x| x.max_pos.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.linear.max_pos",
         exec: |tk, actuator_id, percent| {
-            tk.settings.access_linear(actuator_id, |x| {
+            tk.settings.device_settings.update_linear(actuator_id, |x| {
                 x.max_pos = percent.parse().unwrap_or(LinearRange::default().max_pos)
             });
             true
@@ -606,19 +611,19 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     })
     .def_qry_bool_1(ApiQryBool1 {
         name: "device.linear.invert",
-        exec: |tk, actuator_id| tk.settings.access_linear(actuator_id, |x| x.invert),
+        exec: |tk, actuator_id| tk.settings.device_settings.update_linear(actuator_id, |x| x.invert),
     })
     .def_cmd1(ApiCmd1 {
         name: "device.linear.invert.enable",
         exec: |tk, actuator_id| {
-            tk.settings.access_linear(actuator_id, |x| x.invert = true);
+            tk.settings.device_settings.update_linear(actuator_id, |x| x.invert = true);
             true
         },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.linear.invert.disable",
         exec: |tk, actuator_id| {
-            tk.settings.access_linear(actuator_id, |x| x.invert = false);
+            tk.settings.device_settings.update_linear(actuator_id, |x| x.invert = false);
             true
         },
     })

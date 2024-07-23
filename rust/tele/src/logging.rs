@@ -4,9 +4,8 @@ use std::{
 };
 
 
+use tele_common::settings::*;
 use tracing::{Level, info};
-
-use tele_common::settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH};
 
 #[cxx::bridge]
 mod ffi {

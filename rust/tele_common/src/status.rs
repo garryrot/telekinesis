@@ -10,7 +10,9 @@ use buttplug::client::ButtplugClientDevice;
 
 use bp_scheduler::actuator::{get_actuators, Actuator};
 
-use crate::{connection::TkConnectionEvent, settings::TkSettings};
+use crate::connection::TkConnectionEvent;
+
+use crate::settings::TkSettings;
 
 /// Its actually device status but this makes it easier to housekeep
 #[derive(Clone, Debug)]
@@ -41,6 +43,7 @@ impl Status {
             connection: TkConnectionStatus::NotConnected,
             actuators: vec![],
             known_actuators: settings
+                .device_settings
                 .devices
                 .iter()
                 .map(|x| x.actuator_id.clone())

@@ -5,14 +5,8 @@ use cxx::{CxxString, CxxVector};
 use funscript::FScript;
 use tracing::{debug, error};
 
-use bp_scheduler::actuator::Actuator;
-use crate::{connection::Task, settings::TkDeviceSettings};
-
-pub fn sanitize_name_list(list: &[String]) -> Vec<String> {
-    list.iter()
-        .map(|e| e.to_lowercase().trim().to_owned())
-        .collect()
-}
+use bp_scheduler::{actuator::Actuator, settings::devices::{sanitize_name_list, BpDeviceSettings}};
+use crate::connection::Task;
 
 pub fn parse_csv(input: &str) -> Vec<String> {
     let mut list = vec![];
@@ -89,7 +83,7 @@ impl TkParams {
         actuators: &[Arc<Actuator>],
         input_body_parts: &[String],
         actuator_types: &[ActuatorType],
-        device_settings: &[TkDeviceSettings]
+        device_settings: &[BpDeviceSettings]
         ) -> Vec<Arc<Actuator>> {
         let body_parts = sanitize_name_list(input_body_parts);
         let selected_settings = device_settings.iter().filter( |setting| { 
@@ -100,7 +94,7 @@ impl TkParams {
                 return true;
             }
             setting.events.iter().any( |y| body_parts.contains(y) )
-        }).cloned().collect::<Vec<TkDeviceSettings>>();
+        }).cloned().collect::<Vec<BpDeviceSettings>>();
 
         let selected = selected_settings.iter().map(|x| x.actuator_id.clone()).collect::<Vec<String>>();
         

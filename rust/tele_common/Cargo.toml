@@ -16,8 +16,8 @@ serde = "1.0.164"
 serde_json = "1.0.99"
 buttplug = "7.1.13"
 futures = "0.3.25"
-itertools = "0.11.0"
 bp_scheduler = { path = "../bp_scheduler" }
+itertools = "0.11.0"
 
 [dev-dependencies]
 bp_fakes = { path = "../bp_fakes" }
