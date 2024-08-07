@@ -65,7 +65,7 @@ impl Telekinesis {
         T: ButtplugConnector<ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage>
             + 'static,
     {
-        let settings = provided_settings.unwrap_or_else(TkSettings::default);
+        let settings = provided_settings.unwrap_or_else(TkSettings::new);
         let (event_sender_client, event_receiver) = crossbeam_channel::unbounded();
         let (event_sender_internal, event_receiver_internal) = crossbeam_channel::unbounded();
         let (command_sender, command_receiver) = channel(256);
@@ -472,7 +472,7 @@ mod tests {
         duration: Duration,
         vibration_pattern: bool,
     ) -> (Telekinesis, i32) {
-        let settings = TkSettings::default();
+        let settings = TkSettings::new();
         let pattern_path =
             String::from("../deploy/Data/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk = Telekinesis::connect_with(
@@ -505,7 +505,7 @@ mod tests {
     #[test]
     #[ignore = "Requires intiface to be connected, with a connected device (vibrates it)"]
     fn intiface_test_vibration() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.connection = TkConnectionType::WebSocket(String::from("127.0.0.1:12345"));
 
         let mut tk = Telekinesis::connect(settings).unwrap();
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn intiface_not_available_connection_status_error() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.connection = TkConnectionType::WebSocket(String::from("bogushost:6572"));
 
         let mut tk = Telekinesis::connect(settings).unwrap();
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn get_devices_contains_devices_from_settings() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.set_enabled("foreign", true);
 
         let (mut tk, _) = wait_for_connection(vec![], Some(settings));
@@ -705,7 +705,7 @@ mod tests {
         let count = connector.devices.len();
 
         // act
-        let mut settings = settings.unwrap_or(TkSettings::default());
+        let mut settings = settings.unwrap_or(TkSettings::new());
         settings.pattern_path =
             String::from("../deploy/Data/SKSE/Plugins/Telekinesis/Patterns");
         let mut tk = Telekinesis::connect_with(

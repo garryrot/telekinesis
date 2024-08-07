@@ -45,7 +45,7 @@ pub struct TkSettings {
 }
 
 impl TkSettings {
-    pub fn default() -> Self {
+    pub fn new() -> Self {
         TkSettings {
             version: 2,
             log_level: TkLogLevel::Debug,
@@ -66,12 +66,12 @@ impl TkSettings {
                 }
                 Err(err) => {
                     error!("Settings path '{}' could not be parsed. Error: {}. Using default configuration.", settings_path, err);
-                    TkSettings::default()
+                    TkSettings::new()
                 }
             },
             Err(err) => {
                 info!("Settings path '{}' could not be opened. Error: {}. Using default configuration.", settings_path, err);
-                TkSettings::default()
+                TkSettings::new()
             }
         }
     }
@@ -90,6 +90,12 @@ impl TkSettings {
     }
 }
 
+impl Default for TkSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,7 +106,7 @@ mod tests {
     #[test]
     fn serialize_deserialize_works() {
         // Arrange
-        let mut setting = TkSettings::default();
+        let mut setting = TkSettings::new();
 
         // Act
         setting.device_settings.devices.push(BpDeviceSettings::from_identifier("value"));
@@ -117,7 +123,7 @@ mod tests {
     #[test]
     fn file_existing_returns_parsed_content() {
         // Arrange
-        let mut setting = TkSettings::default();
+        let mut setting = TkSettings::new();
         setting.device_settings.devices.push(BpDeviceSettings::from_identifier("a"));
         setting.device_settings.devices.push(BpDeviceSettings::from_identifier("b"));
         setting.device_settings.devices.push(BpDeviceSettings::from_identifier("c"));
@@ -152,7 +158,7 @@ mod tests {
 
     #[test]
     fn adds_every_device_only_once() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.get_or_create("a");
         settings.device_settings.get_or_create("a");
         assert_eq!(settings.device_settings.devices.len(), 1);
@@ -160,7 +166,7 @@ mod tests {
 
     #[test]
     fn enable_and_disable_devices() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.get_or_create("a");
         settings.device_settings.get_or_create("b");
         settings.device_settings.set_enabled("a", true);
@@ -174,7 +180,7 @@ mod tests {
 
     #[test]
     fn enable_multiple_devices() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.get_or_create("a");
         settings.device_settings.get_or_create("b");
         settings.device_settings.set_enabled("a", true);
@@ -184,21 +190,21 @@ mod tests {
 
     #[test]
     fn enable_unknown_device() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.set_enabled("foobar", true);
         assert_eq!(settings.device_settings.get_enabled_devices()[0].actuator_id, "foobar");
     }
 
     #[test]
     fn is_enabled_false() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.get_or_create("a");
         assert!(!settings.device_settings.get_enabled("a"));
     }
 
     #[test]
     fn is_enabled_true() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.get_or_create("a");
         settings.device_settings.set_enabled("a", true);
         assert!(settings.device_settings.get_enabled("a"));
@@ -206,7 +212,7 @@ mod tests {
 
     #[test]
     fn write_to_temp_file() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         settings.device_settings.get_or_create("foobar");
 
         // act
@@ -223,7 +229,7 @@ mod tests {
 
     #[test]
     fn set_valid_websocket_endpoint() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         let endpoint = String::from("3.44.33.6:12345");
         settings.connection = TkConnectionType::WebSocket(endpoint);
         if let TkConnectionType::WebSocket(endpoint) = settings.connection {
@@ -235,7 +241,7 @@ mod tests {
 
     #[test]
     fn set_valid_websocket_endpoint_hostname() {
-        let mut settings = TkSettings::default();
+        let mut settings = TkSettings::new();
         let endpoint = String::from("localhost:12345");
         settings.connection = TkConnectionType::WebSocket(endpoint);
         if let TkConnectionType::WebSocket(endpoint) = settings.connection {
