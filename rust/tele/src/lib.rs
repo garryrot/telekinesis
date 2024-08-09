@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
 use tele_common::{
-    api::*, 
     connection::*, 
     input::*, 
     pattern::*, 
@@ -25,8 +24,10 @@ use bp_scheduler::{
 };
 
 use ffi::SKSEModEvent;
+use api::*;
 
 mod logging;
+mod api;
 
 #[derive(Debug)]
 pub struct TkApi {
