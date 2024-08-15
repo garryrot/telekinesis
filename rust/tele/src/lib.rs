@@ -1,14 +1,7 @@
 use std::sync::{Arc, Mutex};
 
-use bp_actions::{
-    actions::{Action, Control, ScalarActuators},
-    connection::*,
-    input::*,
-    pattern::*,
-    settings::*,
-    telekinesis::*,
-};
 use itertools::Itertools;
+use linear::LinearRange;
 use tracing::{info, instrument};
 
 use cxx::{CxxString, CxxVector};
@@ -16,8 +9,11 @@ use cxx::{CxxString, CxxVector};
 use buttplug::core::message::ActuatorType;
 
 use bp_scheduler::{
-    settings::{linear::LinearRange, ActuatorSettings},
-    speed::*,
+    client::{
+        actions::*, connection::*, input::*, pattern::*, settings::*, telekinesis::*
+    }, 
+    settings::*, 
+    speed::*
 };
 
 use api::*;
@@ -393,7 +389,7 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
             let action = Action {
                 name: "linear.stroke".into(),
                 speed: Speed::new(100),
-                control: Control::Stroke(bp_actions::actions::StrokeRange {
+                control: Control::Stroke(StrokeRange {
                     min_ms: 100,
                     max_ms: 200,
                     min_pos: 0.0,
@@ -708,11 +704,12 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-
-    use bp_actions::{
-        actions::{Action, Control, ScalarActuators}, connection::{Task, TkConnectionType}, input::DeviceCommand, telekinesis::{in_process_connector, Telekinesis}
-    };
-    use bp_scheduler::speed::Speed;
+    use bp_scheduler::{
+        client::{
+            actions::*, 
+            connection::*, 
+            telekinesis::*
+        }, speed::Speed};
     use buttplug::core::message::ActuatorType;
     use funscript::FScript;
 

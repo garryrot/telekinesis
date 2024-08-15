@@ -3,8 +3,7 @@ use std::{
     sync::Mutex,
 };
 
-
-use bp_actions::settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH};
+use bp_scheduler::client::settings::*;
 use tracing::{Level, info};
 
 #[cxx::bridge]
