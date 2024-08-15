@@ -4,7 +4,7 @@ use std::{
 };
 
 
-use tele_common::settings::*;
+use bp_actions::settings::{TkSettings, SETTINGS_FILE, SETTINGS_PATH};
 use tracing::{Level, info};
 
 #[cxx::bridge]

@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use tracing::{debug, error, info};
 
+use crate::actions::Action;
+
 // use crate::*;
 
 /// Global commands on connection level, i.e. connection handling
@@ -46,8 +48,8 @@ pub enum TkConnectionEvent {
     DeviceAdded(Arc<ButtplugClientDevice>, Option<f64>),
     DeviceRemoved(Arc<ButtplugClientDevice>),
     BatteryLevel(Arc<ButtplugClientDevice>, Option<f64>),
-    ActionStarted(Task, Vec<Arc<Actuator>>, Vec<String>, i32),
-    ActionDone(Task, Duration, i32),
+    ActionStarted(Action, Vec<Arc<Actuator>>, Vec<String>, i32),
+    ActionDone(Action, Duration, i32),
     ActionError(Arc<Actuator>, String),
 }
 

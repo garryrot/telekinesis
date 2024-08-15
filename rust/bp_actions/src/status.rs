@@ -22,18 +22,18 @@ pub struct ActuatorStatus {
     pub battery_level: Option<f64>
 }
 
-pub struct Status {
-    status_events: Receiver<TkConnectionEvent>,
-    connection: TkConnectionStatus,
-    actuators: Vec<ActuatorStatus>,
-    known_actuators: Vec<String>
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TkConnectionStatus {
     NotConnected,
     Connected,
     Failed(String),
+}
+
+pub struct Status {
+    status_events: Receiver<TkConnectionEvent>,
+    connection: TkConnectionStatus,
+    actuators: Vec<ActuatorStatus>,
+    known_actuators: Vec<String>
 }
 
 impl Status {

@@ -1,33 +1,30 @@
-
 use std::sync::{Arc, Mutex};
 
+use bp_actions::{
+    actions::{Action, Control, ScalarActuators},
+    connection::*,
+    input::*,
+    pattern::*,
+    settings::*,
+    telekinesis::*,
+};
 use itertools::Itertools;
-use tele_common::{
-    connection::*, 
-    input::*, 
-    pattern::*, 
-    settings::*, 
-    telekinesis::*
-};
-use tracing::{
-    instrument,
-    info
-};
+use tracing::{info, instrument};
 
 use cxx::{CxxString, CxxVector};
 
 use buttplug::core::message::ActuatorType;
 
 use bp_scheduler::{
-    settings::{ActuatorSettings, linear::LinearRange}, 
-    speed::*
+    settings::{linear::LinearRange, ActuatorSettings},
+    speed::*,
 };
 
-use ffi::SKSEModEvent;
 use api::*;
+use ffi::SKSEModEvent;
 
-mod logging;
 mod api;
+mod logging;
 
 #[derive(Debug)]
 pub struct TkApi {
@@ -218,7 +215,9 @@ impl TkApi {
     }
 }
 
-pub fn get_next_events_blocking(connection_events: &crossbeam_channel::Receiver<TkConnectionEvent>,) -> Option<SKSEModEvent> {
+pub fn get_next_events_blocking(
+    connection_events: &crossbeam_channel::Receiver<TkConnectionEvent>,
+) -> Option<SKSEModEvent> {
     if let Ok(result) = connection_events.recv() {
         info!("Sending SKSE Event: {:?}", result);
         let event = match result {
@@ -236,10 +235,10 @@ pub fn get_next_events_blocking(connection_events: &crossbeam_channel::Receiver<
             TkConnectionEvent::DeviceRemoved(device) => {
                 SKSEModEvent::from("Tele_DeviceRemoved", device.name())
             }
-            TkConnectionEvent::ActionStarted(task, actuators, tags, handle) => {
+            TkConnectionEvent::ActionStarted(action, actuators, tags, handle) => {
                 let str_arg = format!(
                     "{}{} on ({})",
-                    task,
+                    action.name,
                     if !tags.is_empty() {
                         format!(" {}", tags.iter().join(","))
                     } else {
@@ -249,16 +248,18 @@ pub fn get_next_events_blocking(connection_events: &crossbeam_channel::Receiver<
                 );
                 SKSEModEvent::new("Tele_DeviceActionStarted", &str_arg, f64::from(handle))
             }
-            TkConnectionEvent::ActionDone(task, duration, handle) => {
-                let str_arg = format!("{} done after {:.1}s", task, duration.as_secs());
+            TkConnectionEvent::ActionDone(action, duration, handle) => {
+                let str_arg = format!("{} done after {:.1}s", action.name, duration.as_secs());
                 SKSEModEvent::new("Tele_DeviceActionDone", &str_arg, f64::from(handle))
             }
             TkConnectionEvent::ActionError(_actuator, err) => {
                 SKSEModEvent::new("Tele_DeviceError", &err, 0.0)
             }
-            TkConnectionEvent::BatteryLevel(device, battery_level) => {
-                SKSEModEvent::new("Tele_BatteryLevel", device.name(), battery_level.unwrap_or(0.0))
-            },
+            TkConnectionEvent::BatteryLevel(device, battery_level) => SKSEModEvent::new(
+                "Tele_BatteryLevel",
+                device.name(),
+                battery_level.unwrap_or(0.0),
+            ),
         };
         return Some(event);
     }
@@ -308,83 +309,103 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_control(ApiControl {
         name: "vibrate",
         exec: |tk, speed, time_sec, _, body_parts| {
-            let cmd = DeviceCommand::from_inputs(
-                Task::Scalar(Speed::new(speed.into())),
-                &[ActuatorType::Vibrate],
-                time_sec,
-                body_parts,
-                None);
-            tk.dispatch_cmd(cmd)
+            let action = Action {
+                name: "vibrate".into(),
+                speed: Speed::new(100),
+                control: Control::Scalar(vec![ScalarActuators::Vibrate]),
+            };
+            tk.dispatch_cmd(
+                action,
+                read_input_string(body_parts),
+                Speed::new(speed.into()),
+                get_duration_from_secs(time_sec),
+            )
         },
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "scalar",
         exec: |tk, speed, time_sec, actuator_type, body_parts: &CxxVector<CxxString>| {
-            let cmd = DeviceCommand::from_inputs(
-                Task::Scalar(Speed::new(speed.into())),
-                &[read_scalar_actuator(actuator_type)],
-                time_sec,
-                body_parts,
-                None);
-            tk.dispatch_cmd(cmd)
+            let action = Action {
+                name: "scalar".into(),
+                speed: Speed::new(100),
+                control: Control::Scalar(vec![
+                    ScalarActuators::Vibrate,
+                    ScalarActuators::Constrict,
+                    ScalarActuators::Oscillate,
+                    ScalarActuators::Inflate,
+                ]),
+            };
+            tk.dispatch_cmd(
+                action,
+                read_input_string(body_parts),
+                Speed::new(speed.into()),
+                get_duration_from_secs(time_sec),
+            )
         },
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "vibrate.pattern",
-        exec: |tk, speed, time_sec, pattern_name, body_parts| match read_pattern(
-            &tk.settings.pattern_path,
-            pattern_name,
-            true,
-        ) {
-            Some(fscript) => {
-                let cmd = DeviceCommand::from_inputs(
-                    Task::Pattern(
-                        Speed::new(speed.into()),
-                        ActuatorType::Vibrate,
-                        pattern_name.into(),
-                    ),
-                    &[ActuatorType::Vibrate],
-                    time_sec,
-                    body_parts,
-                    Some(fscript));
-                tk.dispatch_cmd(cmd)
-            },
-            None => ERROR_HANDLE,
+        exec: |tk, speed, time_sec, pattern_name, body_parts| {
+            let action = Action {
+                name: "vibrate.pattern".into(),
+                speed: Speed::new(100),
+                control: Control::ScalarPattern(
+                    pattern_name.into(),
+                    vec![
+                        ScalarActuators::Vibrate,
+                        ScalarActuators::Constrict,
+                        ScalarActuators::Oscillate,
+                        ScalarActuators::Inflate,
+                    ],
+                ),
+            };
+            tk.dispatch_cmd(
+                action,
+                read_input_string(body_parts),
+                Speed::new(speed.into()),
+                get_duration_from_secs(time_sec),
+            )
         },
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "linear.pattern",
-        exec: |tk, speed, time_sec, pattern_name, body_parts| match read_pattern(
-            &tk.settings.pattern_path,
-            pattern_name,
-            false,
-        ) {
-            Some(fscript) => {
-                let cmd = DeviceCommand::from_inputs(
-                    Task::Linear(Speed::new(speed.into()), pattern_name.into()),
-                    &[ActuatorType::Position],
-                    time_sec,
-                    body_parts,
-                    Some(fscript));
-                tk.dispatch_cmd(cmd)
-            },
-            None => ERROR_HANDLE,
+        exec: |tk, speed, time_sec, pattern_name, body_parts| {
+            let action = Action {
+                name: "vibrate.pattern".into(),
+                speed: Speed::new(100),
+                control: Control::StrokePattern(pattern_name.into()),
+            };
+            tk.dispatch_cmd(
+                action,
+                read_input_string(body_parts),
+                Speed::new(speed.into()),
+                get_duration_from_secs(time_sec),
+            )
         },
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "linear.stroke",
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
-            let cmd = DeviceCommand::from_inputs(
-                Task::LinearStroke(Speed::new(speed.into()), pattern_name.into()),
-                &[ActuatorType::Position],
-                time_sec,
-                body_parts,
-                None);
-            tk.dispatch_cmd(cmd)
+            let action = Action {
+                name: "linear.stroke".into(),
+                speed: Speed::new(100),
+                control: Control::Stroke(bp_actions::actions::StrokeRange {
+                    min_ms: 100,
+                    max_ms: 200,
+                    min_pos: 0.0,
+                    max_pos: 1.0,
+                }),
+            };
+            tk.dispatch_cmd(
+                action,
+                read_input_string(body_parts),
+                Speed::new(speed.into()),
+                get_duration_from_secs(time_sec),
+            )
         },
         default: ERROR_HANDLE,
     })
@@ -408,24 +429,27 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "devices",
         exec: |tk| tk.status.get_known_actuator_ids(),
     })
-    .def_qry_bool_1(ApiQryBool1 { 
-        name: "device.has_battery_level", 
+    .def_qry_bool_1(ApiQryBool1 {
+        name: "device.has_battery_level",
         exec: |tk, actuator_id| {
-            if let Some(actuator) = tk.status.get_actuator(actuator_id)  {
+            if let Some(actuator) = tk.status.get_actuator(actuator_id) {
                 return actuator.device.has_battery_level();
             }
             false
-        }
+        },
     })
-    .def_qry_str1(ApiQryStr1 { 
-        name: "device.get_battery_level", 
+    .def_qry_str1(ApiQryStr1 {
+        name: "device.get_battery_level",
         exec: |tk, actuator_id| {
-            if let Some(actuator_status) = tk.status.get_actuator_status(actuator_id)  {
-                return actuator_status.battery_level.map(|x| ((x * 100.0) as i32).to_string()).unwrap_or("".to_owned());
+            if let Some(actuator_status) = tk.status.get_actuator_status(actuator_id) {
+                return actuator_status
+                    .battery_level
+                    .map(|x| ((x * 100.0) as i32).to_string())
+                    .unwrap_or("".to_owned());
             }
             "".into()
         },
-        default: ""
+        default: "",
     })
     .def_qry_str1(ApiQryStr1 {
         name: "device.actuator",
@@ -440,12 +464,16 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_str1(ApiQryStr1 {
         name: "device.actuator_type",
         default: "None",
-        exec: |tk, actuator_id| match tk.settings.device_settings.try_get_actuator_settings(actuator_id) {
+        exec: |tk, actuator_id| match tk
+            .settings
+            .device_settings
+            .try_get_actuator_settings(actuator_id)
+        {
             ActuatorSettings::None => {
                 if let Some(entry) = tk.status.get_actuator(actuator_id) {
                     return match entry.actuator {
                         ActuatorType::Position => "Linear".into(),
-                        _ => "Scalar".into()
+                        _ => "Scalar".into(),
                     };
                 }
                 "None".into()
@@ -485,7 +513,9 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_cmd2(ApiCmd2 {
         name: "device.settings.events",
         exec: |tk, actuator_id, events| {
-            tk.settings.device_settings.set_events(actuator_id, &parse_csv(events));
+            tk.settings
+                .device_settings
+                .set_events(actuator_id, &parse_csv(events));
             true
         },
     })
@@ -497,7 +527,8 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.scalar.min_speed",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_scalar(actuator_id, |x| x.min_speed.to_string())
         },
     })
@@ -514,7 +545,8 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.scalar.max_speed",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_scalar(actuator_id, |x| x.max_speed.to_string())
         },
     })
@@ -531,7 +563,8 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.scalar.factor",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_scalar(actuator_id, |x| x.factor.to_string())
         },
     })
@@ -548,7 +581,8 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.min_ms",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_linear(actuator_id, |x| x.min_ms.to_string())
         },
     })
@@ -565,14 +599,16 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.max_ms",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_linear(actuator_id, |x| x.max_ms.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.linear.max_ms",
         exec: |tk, actuator_id, percent| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_linear(actuator_id, |x| x.max_ms = percent.parse().unwrap_or(100));
             true
         },
@@ -581,14 +617,16 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.min_pos",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_linear(actuator_id, |x| x.min_pos.to_string())
         },
     })
     .def_cmd2(ApiCmd2 {
         name: "device.linear.min_pos",
         exec: |tk, actuator_id, percent| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_linear(actuator_id, |x| x.min_pos = percent.parse().unwrap_or(0.0));
             true
         },
@@ -597,7 +635,8 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         name: "device.linear.max_pos",
         default: "",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings
+            tk.settings
+                .device_settings
                 .update_linear(actuator_id, |x| x.max_pos.to_string())
         },
     })
@@ -612,19 +651,27 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     })
     .def_qry_bool_1(ApiQryBool1 {
         name: "device.linear.invert",
-        exec: |tk, actuator_id| tk.settings.device_settings.update_linear(actuator_id, |x| x.invert),
+        exec: |tk, actuator_id| {
+            tk.settings
+                .device_settings
+                .update_linear(actuator_id, |x| x.invert)
+        },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.linear.invert.enable",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings.update_linear(actuator_id, |x| x.invert = true);
+            tk.settings
+                .device_settings
+                .update_linear(actuator_id, |x| x.invert = true);
             true
         },
     })
     .def_cmd1(ApiCmd1 {
         name: "device.linear.invert.disable",
         exec: |tk, actuator_id| {
-            tk.settings.device_settings.update_linear(actuator_id, |x| x.invert = false);
+            tk.settings
+                .device_settings
+                .update_linear(actuator_id, |x| x.invert = false);
             true
         },
     })
@@ -632,12 +679,20 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     .def_qry_str1(ApiQryStr1 {
         name: "device.connection.status",
         default: "Not Connected",
-        exec: |tk, actuator_id| tk.status.get_actuator_connection_status(actuator_id).to_string(),
+        exec: |tk, actuator_id| {
+            tk.status
+                .get_actuator_connection_status(actuator_id)
+                .to_string()
+        },
     })
     .def_qry_str1(ApiQryStr1 {
         name: "device.connection.status",
         default: "Not Connected",
-        exec: |tk, actuator_id| tk.status.get_actuator_connection_status(actuator_id).to_string(),
+        exec: |tk, actuator_id| {
+            tk.status
+                .get_actuator_connection_status(actuator_id)
+                .to_string()
+        },
     })
     // patterns
     .def_qry_lst(ApiQryList {
@@ -654,30 +709,36 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
 mod tests {
     use std::time::Duration;
 
+    use bp_actions::{
+        actions::{Action, Control, ScalarActuators}, connection::{Task, TkConnectionType}, input::DeviceCommand, telekinesis::{in_process_connector, Telekinesis}
+    };
     use bp_scheduler::speed::Speed;
     use buttplug::core::message::ActuatorType;
     use funscript::FScript;
-    use tele_common::{connection::{Task, TkConnectionType}, input::DeviceCommand, telekinesis::{in_process_connector, Telekinesis}};
 
     use crate::get_next_events_blocking;
 
     /// Vibrate
     pub fn test_cmd(
-        tk: &mut Telekinesis, 
-        task: Task, 
+        tk: &mut Telekinesis,
+        task: Task,
         duration: Duration,
         body_parts: Vec<String>,
         fscript: Option<FScript>,
-        actuator_types: &[ActuatorType]) -> i32 {
-            tk.dispatch_cmd(DeviceCommand {
-                task,
-                duration,
-                fscript,
-                body_parts,
-                actuator_types: actuator_types.to_vec(),
-            })
-    } 
-    
+        actuator_types: &[ActuatorType],
+    ) -> i32 {
+        let speed: Speed = match task {
+            Task::Scalar(speed) => speed,
+            Task::Pattern(speed, _, _) => speed,
+            Task::Linear(speed, _) => speed,
+            Task::LinearStroke(speed, _) => speed,
+        };
+        tk.dispatch_cmd(Action {
+            name: "something".into(),
+            speed,
+            control: Control::Scalar(vec![ ScalarActuators::Vibrate ]),
+        }, body_parts, speed, duration )
+    }
 
     /// Events
     #[test]
@@ -688,8 +749,8 @@ mod tests {
             TkConnectionType::Test,
         )
         .unwrap();
-    test_cmd(
-        &mut tk,
+        test_cmd(
+            &mut tk,
             Task::Scalar(Speed::new(22)),
             Duration::from_millis(1),
             vec![],

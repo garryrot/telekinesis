@@ -8,7 +8,7 @@ name = "telekinesis_plug"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-tele_common = { path = "../tele_common" }
+bp_actions = { path = "../bp_actions" }
 bp_scheduler = { path = "../bp_scheduler" }
 bp_fakes = { path = "../bp_fakes", optional = true }
 crossbeam-channel = " 0.5.1"
