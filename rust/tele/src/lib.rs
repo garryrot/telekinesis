@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use actions::{Action, Control, ScalarActuators, Selector, Strength, StrokeRange};
 use itertools::Itertools;
 use linear::LinearRange;
 use tracing::{info, instrument};
@@ -10,7 +11,7 @@ use buttplug::core::message::ActuatorType;
 
 use bp_scheduler::{
     client::{
-        actions::*, connection::*, input::*, pattern::*, settings::*, telekinesis::*
+        connection::*, input::*, pattern::*, settings::*, client::*
     }, 
     settings::*, 
     speed::*
@@ -24,7 +25,7 @@ mod logging;
 
 #[derive(Debug)]
 pub struct TkApi {
-    pub state: Arc<Mutex<Option<Telekinesis>>>,
+    pub state: Arc<Mutex<Option<BpClient>>>,
 }
 
 /// Methods exposed as papyrus native functions
@@ -94,15 +95,15 @@ fn tk_new() -> Box<TkApi> {
     })
 }
 
-impl Api<Telekinesis> for TkApi {
-    fn state(&mut self) -> Arc<Mutex<Option<Telekinesis>>> {
+impl Api<BpClient> for TkApi {
+    fn state(&mut self) -> Arc<Mutex<Option<BpClient>>> {
         self.state.clone()
     }
 
-    fn fns(&self) -> ApiBuilder<Telekinesis> {
+    fn fns(&self) -> ApiBuilder<BpClient> {
         build_api()
     }
-    fn destroy(&mut self) -> ApiCmd0<Telekinesis> {
+    fn destroy(&mut self) -> ApiCmd0<BpClient> {
         ApiCmd0 {
             name: "disconnect",
             exec: |tk| {
@@ -262,11 +263,11 @@ pub fn get_next_events_blocking(
     None
 }
 
-pub fn build_api() -> ApiBuilder<Telekinesis> {
+pub fn build_api() -> ApiBuilder<BpClient> {
     ApiBuilder::new(ApiInit {
         name: "connect",
         exec: || {
-            Telekinesis::connect(TkSettings::try_read_or_default(
+            BpClient::connect(TkSettings::try_read_or_default(
                 SETTINGS_PATH,
                 SETTINGS_FILE,
             ))
@@ -304,61 +305,37 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     // controls
     .def_control(ApiControl {
         name: "vibrate",
-        exec: |tk, speed, time_sec, _, body_parts| {
-            let action = Action {
-                name: "vibrate".into(),
-                speed: Speed::new(100),
-                control: Control::Scalar(vec![ScalarActuators::Vibrate]),
-            };
-            tk.dispatch_cmd(
-                action,
-                read_input_string(body_parts),
-                Speed::new(speed.into()),
-                get_duration_from_secs(time_sec),
-            )
-        },
+        exec: |tk, speed, time_sec, _, body_parts| 
+            exec_action(  "vibrate", tk, speed, time_sec, "", body_parts ),
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "scalar",
-        exec: |tk, speed, time_sec, actuator_type, body_parts: &CxxVector<CxxString>| {
-            let action = Action {
-                name: "scalar".into(),
-                speed: Speed::new(100),
-                control: Control::Scalar(vec![
-                    ScalarActuators::Vibrate,
-                    ScalarActuators::Constrict,
-                    ScalarActuators::Oscillate,
-                    ScalarActuators::Inflate,
-                ]),
-            };
-            tk.dispatch_cmd(
-                action,
-                read_input_string(body_parts),
-                Speed::new(speed.into()),
-                get_duration_from_secs(time_sec),
-            )
-        },
+        exec: |tk, speed, time_sec, _, body_parts: &CxxVector<CxxString>|
+            exec_action(  "scalar", tk, speed, time_sec, "", body_parts ),
+        default: ERROR_HANDLE,
+    })
+    .def_control(ApiControl {
+        name: "linear.stroke",
+        exec: |tk, speed, time_sec, _, body_parts|
+            exec_action( "linear.stroke", tk, speed, time_sec, "", body_parts ),
         default: ERROR_HANDLE,
     })
     .def_control(ApiControl {
         name: "vibrate.pattern",
-        exec: |tk, speed, time_sec, pattern_name, body_parts| {
+        exec: |tk, speed, time_sec, _, body_parts| {
             let action = Action {
                 name: "vibrate.pattern".into(),
-                speed: Speed::new(100),
-                control: Control::ScalarPattern(
-                    pattern_name.into(),
+                control: vec![ Control::Scalar(
+                    Selector::All,
+                    Strength::RandomFunscript(100, vec![]),
                     vec![
-                        ScalarActuators::Vibrate,
-                        ScalarActuators::Constrict,
-                        ScalarActuators::Oscillate,
-                        ScalarActuators::Inflate,
-                    ],
-                ),
+                        ScalarActuators::Vibrate
+                    ]
+                )],
             };
-            tk.dispatch_cmd(
-                action,
+            tk.dispatch(
+                &action,
                 read_input_string(body_parts),
                 Speed::new(speed.into()),
                 get_duration_from_secs(time_sec),
@@ -371,33 +348,11 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         exec: |tk, speed, time_sec, pattern_name, body_parts| {
             let action = Action {
                 name: "vibrate.pattern".into(),
-                speed: Speed::new(100),
-                control: Control::StrokePattern(pattern_name.into()),
+                control: vec![ Control::StrokePattern( Selector::All, 
+                    Strength::Constant(100), pattern_name.into()) ],
             };
-            tk.dispatch_cmd(
-                action,
-                read_input_string(body_parts),
-                Speed::new(speed.into()),
-                get_duration_from_secs(time_sec),
-            )
-        },
-        default: ERROR_HANDLE,
-    })
-    .def_control(ApiControl {
-        name: "linear.stroke",
-        exec: |tk, speed, time_sec, pattern_name, body_parts| {
-            let action = Action {
-                name: "linear.stroke".into(),
-                speed: Speed::new(100),
-                control: Control::Stroke(StrokeRange {
-                    min_ms: 100,
-                    max_ms: 200,
-                    min_pos: 0.0,
-                    max_pos: 1.0,
-                }),
-            };
-            tk.dispatch_cmd(
-                action,
+            tk.dispatch(
+                &action,
                 read_input_string(body_parts),
                 Speed::new(speed.into()),
                 get_duration_from_secs(time_sec),
@@ -409,11 +364,11 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
         exec: |tk, handle, speed| tk.update(handle, Speed::new(speed.into())),
     })
     .def_stop(ApiStop {
-        exec: Telekinesis::stop,
+        exec: BpClient::stop,
     })
     .def_cmd(ApiCmd0 {
         name: "stop_all",
-        exec: Telekinesis::stop_all,
+        exec: BpClient::stop_all,
     })
     // settings
     .def_cmd(ApiCmd0 {
@@ -701,15 +656,23 @@ pub fn build_api() -> ApiBuilder<Telekinesis> {
     })
 }
 
+fn exec_action( action_name: &str, client: &mut BpClient, speed: i32, time_sec: f32, pattern_name: &str, body_parts: &CxxVector<CxxString>) -> i32 {
+    client.dispatch_name(
+        action_name,
+        read_input_string(body_parts),
+        Speed::new(speed.into()),
+        get_duration_from_secs(time_sec),
+    )
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
     use bp_scheduler::{
         client::{
-            actions::*, 
-            connection::*, 
-            telekinesis::*
-        }, speed::Speed};
+            client::*, connection::*
+        }, settings::actions::*, speed::Speed};
     use buttplug::core::message::ActuatorType;
     use funscript::FScript;
 
@@ -717,12 +680,12 @@ mod tests {
 
     /// Vibrate
     pub fn test_cmd(
-        tk: &mut Telekinesis,
+        tk: &mut BpClient,
         task: Task,
         duration: Duration,
         body_parts: Vec<String>,
-        fscript: Option<FScript>,
-        actuator_types: &[ActuatorType],
+        _: Option<FScript>,
+        _: &[ActuatorType],
     ) -> i32 {
         let speed: Speed = match task {
             Task::Scalar(speed) => speed,
@@ -730,17 +693,24 @@ mod tests {
             Task::Linear(speed, _) => speed,
             Task::LinearStroke(speed, _) => speed,
         };
-        tk.dispatch_cmd(Action {
-            name: "something".into(),
-            speed,
-            control: Control::Scalar(vec![ ScalarActuators::Vibrate ]),
-        }, body_parts, speed, duration )
+        tk.actions = Actions(vec![
+            Action { 
+                name: "foobar".into(), 
+                control: vec![
+                    Control::Scalar( 
+                        Selector::All,
+                        Strength::Constant(100),
+                        vec![ ScalarActuators::Vibrate ],
+                )]  
+            }
+        ]);
+        tk.dispatch_name( "foobar", body_parts, speed, duration )
     }
 
     /// Events
     #[test]
     fn process_next_events_after_action_returns_1() {
-        let mut tk = Telekinesis::connect_with(
+        let mut tk = BpClient::connect_with(
             || async move { in_process_connector() },
             None,
             TkConnectionType::Test,
@@ -759,7 +729,7 @@ mod tests {
 
     #[test]
     fn process_next_events_works() {
-        let mut tk = Telekinesis::connect_with(
+        let mut tk = BpClient::connect_with(
             || async move { in_process_connector() },
             None,
             TkConnectionType::Test,
