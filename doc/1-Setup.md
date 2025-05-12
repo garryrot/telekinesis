@@ -11,7 +11,7 @@ If it works, there is no reason to change any of the settings. You should leave 
 
 - **Connection** `[1]`: This specifies the connection method that is used to communicate with buttplug.io
     - **In-Process**: The built-in DLL does everything (recommended)
-    - **Intiface (WebSocket)**: Redirects the vibrator control to a running instance of the Intiface App. This means that you always have to run Intiface in the background and specify its `Intiface Host` and `Intiface Port`. This setting is only useful if you want to run the server with custom backend (like Serial Ports), which are disabled in the In-Process   
+    - **Intiface (WebSocket)**: Redirects the vibrator control to a running instance of the Intiface App. This means that you always have to run Intiface in the background and specify its `Intiface Host` and `Intiface Port`. This setting is only useful if you want to run the server with custom backend (like Serial Ports), which are disabled in the In-Process or new device types that were not yet supported in the version telekinesis is built with. For details see [Intiface Quickstart](https://docs.intiface.com/docs/intiface-central/quickstart/)
     - **Disable**: Vibrator control is disabled entirely (use this if want to use Telekinesis features with a 3rd party log parser)
 
 Note: Whenever you change any of the settings it is important to `Reconnect` `[2]`, otherwise it will have no effect
